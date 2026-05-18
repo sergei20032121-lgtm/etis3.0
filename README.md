@@ -1,3 +1,4 @@
+<img width="1861" height="897" alt="Скриншот 18-05-2026 153856" src="https://github.com/user-attachments/assets/0b85b7fd-808c-40c8-9a71-b4205e938d3b" />
 # ЕТИС 3.0
 
 > Современный редизайн студенческого портала ПГНИУ — glassmorphism, умное расписание, тёмная тема.
