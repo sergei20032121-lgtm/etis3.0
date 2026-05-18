@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ЕТИС 3.0</title>
+<style>
+	@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+	@font-face {
+		font-family: 'Material Icons Outlined';
+		font-style: normal;
+		font-weight: 400;
+		src: url(https://fonts.gstatic.com/s/materialiconsoutlined/v38/gok-H7zzDkdnRel8-DQ6KAXJ69wP1tGnf4ZGhUce.woff2) format('woff2');
+	}
+
+	:root {
+		--accent:      #7c6fd4;
+		--accent-glow: rgba(124,111,212,0.35);
+		--accent-bg:   rgba(124,111,212,0.12);
+		--bg:          #eef0f7;
+		--glass:       rgba(255,255,255,0.60);
+		--glass-hover: rgba(255,255,255,0.80);
+		--border:      rgba(255,255,255,0.20);
+		--text:        rgba(20,18,40,0.90);
+		--text-sec:    rgba(20,18,40,0.50);
+		--divider:     rgba(20,18,40,0.07);
+		--shadow:      0 8px 32px rgba(100,90,170,0.15);
+		--radius:      14px;
+		--font:        'Inter', -apple-system, sans-serif;
+	}
+
+	[data-theme="dark"] {
+		--accent:      #9d8ef0;
+		--accent-glow: rgba(157,142,240,0.38);
+		--accent-bg:   rgba(157,142,240,0.14);
+		--bg:          #0e0d1a;
+		--glass:       rgba(30,27,55,0.65);
+		--glass-hover: rgba(40,36,70,0.80);
+		--border:      rgba(255,255,255,0.10);
+		--text:        rgba(240,237,255,0.92);
+		--text-sec:    rgba(240,237,255,0.48);
+		--divider:     rgba(255,255,255,0.07);
+		--shadow:      0 8px 32px rgba(0,0,0,0.45);
+	}
+
+	* { box-sizing: border-box; margin: 0; padding: 0; }
+
+	body {
+		width: 320px;
+		font-family: var(--font);
+		font-size: 13px;
+		background:
+			radial-gradient(ellipse at 20% 20%, rgba(180,165,255,0.28) 0%, transparent 50%),
+			radial-gradient(ellipse at 85% 85%, rgba(140,180,255,0.18) 0%, transparent 50%),
+			var(--bg);
+		color: var(--text);
+		-webkit-font-smoothing: antialiased;
+		overflow: hidden;
+	}
+
+	[data-theme="dark"] body {
+		background:
+			radial-gradient(ellipse at 20% 10%, rgba(100,80,200,0.22) 0%, transparent 45%),
+			radial-gradient(ellipse at 85% 80%, rgba(60,80,180,0.16) 0%, transparent 45%),
+			var(--bg);
+	}
+
+	/* Шапка */
+	.header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 16px 18px 12px;
+		border-bottom: 1px solid var(--divider);
+	}
+
+	.header-brand {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.header-title {
+		font-size: 18px;
+		font-weight: 700;
+		letter-spacing: -0.03em;
+		background: linear-gradient(135deg, var(--accent), #b8acf6);
+		-webkit-background-clip: text;
+		-webkit-text-fill-color: transparent;
+		background-clip: text;
+	}
+
+	.header-sub {
+		font-size: 11px;
+		color: var(--text-sec);
+		font-weight: 400;
+		letter-spacing: 0.01em;
+	}
+
+	.header-icon {
+		width: 40px;
+		height: 40px;
+		border-radius: 12px;
+		background: var(--accent-bg);
+		border: 1px solid rgba(124,111,212,0.25);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-family: 'Material Icons Outlined';
+		font-size: 22px;
+		color: var(--accent);
+	}
+
+	/* Секции */
+	.section {
+		padding: 14px 18px;
+		border-bottom: 1px solid var(--divider);
+	}
+
+	.section:last-child { border-bottom: none; }
+
+	.section-title {
+		font-size: 10px;
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--text-sec);
+		margin-bottom: 10px;
+	}
+
+	/* Тема */
+	.theme-row {
+		display: flex;
+		gap: 6px;
+	}
+
+	.theme-btn {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 5px;
+		padding: 10px 6px;
+		background: var(--glass);
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		cursor: pointer;
+		transition: all 0.15s ease;
+		font-family: var(--font);
+		font-size: 11px;
+		color: var(--text-sec);
+	}
+
+	.theme-btn:hover {
+		background: var(--glass-hover);
+		color: var(--text);
+	}
+
+	.theme-btn.active {
+		background: var(--accent-bg);
+		border-color: var(--accent);
+		color: var(--accent);
+		box-shadow: 0 0 12px var(--accent-glow);
+	}
+
+	.theme-btn .mi {
+		font-family: 'Material Icons Outlined';
+		font-size: 18px;
+	}
+
+	/* Акцент */
+	.accent-row {
+		display: flex;
+		gap: 8px;
+		align-items: center;
+	}
+
+	.accent-swatch {
+		width: 32px;
+		height: 32px;
+		border-radius: 50%;
+		cursor: pointer;
+		border: 3px solid transparent;
+		transition: all 0.15s ease;
+		position: relative;
+		flex-shrink: 0;
+	}
+
+	.accent-swatch:hover { transform: scale(1.1); }
+
+	.accent-swatch.active {
+		border-color: var(--text);
+		box-shadow: 0 0 0 2px var(--accent-glow);
+	}
+
+	.accent-swatch.active::after {
+		content: 'check';
+		font-family: 'Material Icons Outlined';
+		font-size: 14px;
+		color: #fff;
+		position: absolute;
+		inset: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+	}
+
+	/* Шрифт */
+	.font-size-row {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+
+	.font-size-label {
+		font-size: 12px;
+		color: var(--text-sec);
+		min-width: 28px;
+		text-align: right;
+	}
+
+	input[type="range"] {
+		flex: 1;
+		height: 4px;
+		-webkit-appearance: none;
+		background: var(--divider);
+		border-radius: 10px;
+		outline: none;
+		cursor: pointer;
+	}
+
+	input[type="range"]::-webkit-slider-thumb {
+		-webkit-appearance: none;
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		background: var(--accent);
+		box-shadow: 0 0 8px var(--accent-glow);
+		cursor: pointer;
+		transition: transform 0.15s ease;
+	}
+
+	input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+	/* Тоглы */
+	.toggle-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 7px 0;
+	}
+
+	.toggle-row + .toggle-row {
+		border-top: 1px solid var(--divider);
+	}
+
+	.toggle-label {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 13px;
+		color: var(--text);
+	}
+
+	.toggle-label .mi {
+		font-family: 'Material Icons Outlined';
+		font-size: 16px;
+		color: var(--accent);
+	}
+
+	.toggle-label small {
+		display: block;
+		font-size: 11px;
+		color: var(--text-sec);
+		margin-top: 1px;
+	}
+
+	.toggle {
+		position: relative;
+		width: 36px;
+		height: 20px;
+		flex-shrink: 0;
+	}
+
+	.toggle input { display: none; }
+
+	.toggle-track {
+		position: absolute;
+		inset: 0;
+		background: var(--divider);
+		border-radius: 10px;
+		cursor: pointer;
+		transition: background 0.2s ease;
+		border: 1px solid var(--border);
+	}
+
+	.toggle input:checked + .toggle-track {
+		background: var(--accent);
+		box-shadow: 0 0 10px var(--accent-glow);
+	}
+
+	.toggle-track::after {
+		content: '';
+		position: absolute;
+		left: 2px;
+		top: 2px;
+		width: 14px;
+		height: 14px;
+		border-radius: 50%;
+		background: #fff;
+		transition: transform 0.2s ease;
+		box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+	}
+
+	.toggle input:checked + .toggle-track::after { transform: translateX(16px); }
+
+	/* Кнопка очистить кэш */
+	.action-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 7px 0;
+	}
+
+	.action-row + .action-row { border-top: 1px solid var(--divider); }
+
+	.action-label {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 13px;
+		color: var(--text);
+	}
+
+	.action-label .mi {
+		font-family: 'Material Icons Outlined';
+		font-size: 16px;
+		color: var(--text-sec);
+	}
+
+	.action-btn {
+		font-family: var(--font);
+		font-size: 11px;
+		font-weight: 500;
+		padding: 5px 10px;
+		border-radius: 8px;
+		border: 1px solid var(--border);
+		background: var(--glass);
+		color: var(--text);
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.action-btn:hover {
+		background: var(--glass-hover);
+		border-color: var(--accent);
+		color: var(--accent);
+	}
+
+	.action-btn.danger:hover {
+		border-color: #ef4444;
+		color: #ef4444;
+	}
+
+	/* Футер */
+	.footer {
+		padding: 10px 18px 14px;
+		text-align: center;
+		font-size: 11px;
+		color: var(--text-sec);
+		letter-spacing: 0.01em;
+	}
+
+	.footer strong { color: var(--accent); font-weight: 600; }
+
+	/* Уведомление об успехе */
+	.save-notice {
+		position: fixed;
+		bottom: 10px;
+		left: 50%;
+		transform: translateX(-50%) translateY(30px);
+		background: var(--glass);
+		backdrop-filter: blur(20px);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 6px 14px;
+		font-size: 12px;
+		font-weight: 500;
+		color: var(--accent);
+		opacity: 0;
+		transition: all 0.25s ease;
+		white-space: nowrap;
+		box-shadow: var(--shadow);
+		pointer-events: none;
+	}
+
+	.save-notice.show {
+		opacity: 1;
+		transform: translateX(-50%) translateY(0);
+	}
+</style>
+</head>
+<body>
+
+<div class="header">
+	<div class="header-brand">
+		<div class="header-title">ЕТИС 3.0</div>
+		<div class="header-sub">by Комар · настройки</div>
+	</div>
+	<div class="header-icon">school</div>
+</div>
+
+<!-- Тема -->
+<div class="section">
+	<div class="section-title">Тема</div>
+	<div class="theme-row">
+		<button class="theme-btn" data-theme-val="auto">
+			<span class="mi">brightness_6</span>
+			Авто
+		</button>
+		<button class="theme-btn" data-theme-val="light">
+			<span class="mi">light_mode</span>
+			Светлая
+		</button>
+		<button class="theme-btn" data-theme-val="dark">
+			<span class="mi">dark_mode</span>
+			Тёмная
+		</button>
+	</div>
+</div>
+
+<!-- Акцент -->
+<div class="section">
+	<div class="section-title">Акцентный цвет</div>
+	<div class="accent-row">
+		<div class="accent-swatch" data-accent="violet" style="background: linear-gradient(135deg,#7c6fd4,#9d8ef0)" title="Фиолетовый"></div>
+		<div class="accent-swatch" data-accent="blue"   style="background: linear-gradient(135deg,#4f86f7,#7eaaff)" title="Синий"></div>
+		<div class="accent-swatch" data-accent="teal"   style="background: linear-gradient(135deg,#0d9488,#2dd4bf)" title="Изумрудный"></div>
+		<div class="accent-swatch" data-accent="rose"   style="background: linear-gradient(135deg,#e11d6a,#fb7bb0)" title="Розовый"></div>
+	</div>
+</div>
+
+<!-- Шрифт -->
+<div class="section">
+	<div class="section-title">Размер текста</div>
+	<div class="font-size-row">
+		<span style="font-size:10px;color:var(--text-sec)">A</span>
+		<input type="range" id="font-size-range" min="9" max="12" step="0.5" value="10">
+		<span style="font-size:15px;color:var(--text-sec)">A</span>
+		<span class="font-size-label" id="font-size-val">10px</span>
+	</div>
+</div>
+
+<!-- Настройки расписания -->
+<div class="section">
+	<div class="section-title">Расписание</div>
+
+	<div class="toggle-row">
+		<div class="toggle-label">
+			<span class="mi">play_circle</span>
+			<div>
+				Подсветка текущей пары
+				<small>Выделяет пару, которая идёт сейчас</small>
+			</div>
+		</div>
+		<label class="toggle">
+			<input type="checkbox" id="toggle-highlight" checked>
+			<div class="toggle-track"></div>
+		</label>
+	</div>
+
+	<div class="toggle-row">
+		<div class="toggle-label">
+			<span class="mi">schedule</span>
+			<div>
+				Виджет следующей пары
+				<small>Показывает что идёт / что следующее</small>
+			</div>
+		</div>
+		<label class="toggle">
+			<input type="checkbox" id="toggle-widget" checked>
+			<div class="toggle-track"></div>
+		</label>
+	</div>
+
+	<div class="toggle-row">
+		<div class="toggle-label">
+			<span class="mi">menu_book</span>
+			<div>
+				Иконки типов пар
+				<small>Лекция, практика, лаб. работа</small>
+			</div>
+		</div>
+		<label class="toggle">
+			<input type="checkbox" id="toggle-pair-types" checked>
+			<div class="toggle-track"></div>
+		</label>
+	</div>
+</div>
+
+<!-- Данные -->
+<div class="section">
+	<div class="section-title">Данные</div>
+
+	<div class="action-row">
+		<div class="action-label">
+			<span class="mi">cached</span>
+			Кэш расписания
+		</div>
+		<button class="action-btn danger" id="btn-clear-cache">Очистить</button>
+	</div>
+
+	<div class="action-row">
+		<div class="action-label">
+			<span class="mi">restart_alt</span>
+			Сбросить все настройки
+		</div>
+		<button class="action-btn danger" id="btn-reset">Сброс</button>
+	</div>
+</div>
+
+<div class="footer">
+	<strong>ЕТИС 3.0</strong> · сделано с ❤️ by Комар
+</div>
+
+<div class="save-notice" id="save-notice">✓ Сохранено</div>
+
+<script>
+const ACCENT_COLORS = {
+	violet: { light: '#7c6fd4', dark: '#9d8ef0' },
+	blue:   { light: '#4f86f7', dark: '#7eaaff' },
+	teal:   { light: '#0d9488', dark: '#2dd4bf' },
+	rose:   { light: '#e11d6a', dark: '#fb7bb0' },
+};
+
+// Загрузка настроек
+const savedTheme   = localStorage.getItem('theme')            || 'auto';
+const savedAccent  = localStorage.getItem('etis3-accent')     || 'violet';
+const savedFontSize = parseFloat(localStorage.getItem('etis3-fontsize') || '10');
+const savedHighlight  = localStorage.getItem('etis3-highlight')  !== 'false';
+const savedWidget     = localStorage.getItem('etis3-widget')     !== 'false';
+const savedPairTypes  = localStorage.getItem('etis3-pairtypes')  !== 'false';
+
+// Применить тему попапа
+function applyPopupTheme(t) {
+	const isDark = t === 'dark' || (t === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+	document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+	// Обновить accent css var
+	const preset = ACCENT_COLORS[savedAccent] || ACCENT_COLORS.violet;
+	document.documentElement.style.setProperty('--accent', isDark ? preset.dark : preset.light);
+	document.documentElement.style.setProperty('--accent-glow', isDark
+		? 'rgba(157,142,240,0.38)' : 'rgba(124,111,212,0.35)');
+	document.documentElement.style.setProperty('--accent-bg', isDark
+		? 'rgba(157,142,240,0.14)' : 'rgba(124,111,212,0.12)');
+}
+
+applyPopupTheme(savedTheme);
+
+// Тема — кнопки
+document.querySelectorAll('.theme-btn').forEach(btn => {
+	if (btn.dataset.themeVal === savedTheme) btn.classList.add('active');
+	btn.addEventListener('click', () => {
+		document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+		btn.classList.add('active');
+		localStorage.setItem('theme', btn.dataset.themeVal);
+		applyPopupTheme(btn.dataset.themeVal);
+		showSaved();
+		// Применяем на вкладку
+		chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+			if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, { type: 'SET_THEME', value: btn.dataset.themeVal }).catch(()=>{});
+		});
+	});
+});
+
+// Акцент — свотчи
+document.querySelectorAll('.accent-swatch').forEach(sw => {
+	if (sw.dataset.accent === savedAccent) sw.classList.add('active');
+	sw.addEventListener('click', () => {
+		document.querySelectorAll('.accent-swatch').forEach(s => s.classList.remove('active'));
+		sw.classList.add('active');
+		localStorage.setItem('etis3-accent', sw.dataset.accent);
+		showSaved();
+	});
+});
+
+// Размер шрифта
+const fontRange = document.getElementById('font-size-range');
+const fontVal   = document.getElementById('font-size-val');
+fontRange.value = savedFontSize;
+fontVal.textContent = savedFontSize + 'px';
+fontRange.addEventListener('input', () => {
+	fontVal.textContent = fontRange.value + 'px';
+	localStorage.setItem('etis3-fontsize', fontRange.value);
+	showSaved();
+});
+
+// Тоглы
+function setupToggle(id, key) {
+	const el = document.getElementById(id);
+	el.checked = localStorage.getItem(key) !== 'false';
+	el.addEventListener('change', () => {
+		localStorage.setItem(key, el.checked ? 'true' : 'false');
+		showSaved();
+	});
+}
+setupToggle('toggle-highlight', 'etis3-highlight');
+setupToggle('toggle-widget',    'etis3-widget');
+setupToggle('toggle-pair-types','etis3-pairtypes');
+
+// Кнопки
+document.getElementById('btn-clear-cache').addEventListener('click', () => {
+	Object.keys(localStorage).filter(k => k.startsWith('etis3-tt-cache')).forEach(k => localStorage.removeItem(k));
+	showSaved('🗑 Кэш очищен');
+});
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+	['theme','etis3-accent','etis3-fontsize','etis3-highlight','etis3-widget','etis3-pairtypes',
+	 'etis3-last-week', ...Object.keys(localStorage).filter(k => k.startsWith('etis3-tt-cache'))
+	].forEach(k => localStorage.removeItem(k));
+	showSaved('↺ Сброшено');
+	setTimeout(() => window.location.reload(), 800);
+});
+
+function showSaved(text = '✓ Сохранено') {
+	const el = document.getElementById('save-notice');
+	el.textContent = text;
+	el.classList.add('show');
+	setTimeout(() => el.classList.remove('show'), 1800);
+}
+</script>
+</body>
+</html>
