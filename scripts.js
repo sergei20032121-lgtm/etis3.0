@@ -356,6 +356,21 @@ function styleSidebar(sidebar) {
 
 	addSidebarSearch(sidebar);
 
+	// Прогресс-бар семестра
+	addSemesterProgress(sidebar);
+
+	// Кнопка настроек ЕТИС 3.0
+	const allNavs = sidebar.querySelectorAll('.nav.nav-tabs.nav-stacked');
+	const lastNav = allNavs[allNavs.length - 1];
+	if (lastNav) {
+		const li = createEl('li', { className: 'etis3-settings-li' });
+		const a  = createEl('a',  { className: 'etis3-settings-btn', href: '#' });
+		a.innerHTML = '<span class="material-icons">tune</span><span>Настройки ЕТИС 3.0</span>';
+		a.addEventListener('click', e => { e.preventDefault(); openSettingsPanel(); });
+		li.appendChild(a);
+		lastNav.appendChild(li);
+	}
+
 	// Подпись ЕТИС 3.0 by Комар внизу сайдбара
 	const branding = createEl('div', { className: 'etis3-branding', innerHTML: 'ЕТИС 3.0 <span>by Комар</span>' });
 	sidebar.appendChild(branding);
@@ -449,7 +464,141 @@ function styleLoginPage(page) {
 			form.style.transform  = 'translateY(0) scale(1)';
 		}));
 	}
+
+	// Анимированный фон — частицы
+	initLoginParticles(loginContainer);
 }
+
+
+// ============================================================
+// ЧАСТИЦЫ НА СТРАНИЦЕ ВХОДА
+// ============================================================
+
+function initLoginParticles(container) {
+	const canvas = createEl('canvas', { id: 'etis3-particles' });
+	container.insertBefore(canvas, container.firstChild);
+
+	const ctx = canvas.getContext('2d');
+	let W, H, particles, mouse = { x: -999, y: -999 };
+
+	const isDark = () => document.documentElement.getAttribute('theme') === 'dark';
+
+	function resize() {
+		W = canvas.width  = window.innerWidth;
+		H = canvas.height = window.innerHeight;
+	}
+
+	function getAccentRgb() {
+		const dark = isDark();
+		// фиолет по умолчанию, можно расширить под другие акценты
+		return dark ? '157,142,240' : '124,111,212';
+	}
+
+	class Particle {
+		constructor(index) {
+			this.reset(true);
+			// Равномерное распределение по экрану при старте
+			this.y = Math.random() * H;
+			this.index = index;
+		}
+
+		reset(initial = false) {
+			this.x     = Math.random() * W;
+			this.y     = initial ? Math.random() * H : H + 20;
+			this.r     = Math.random() * 2.2 + 0.6;
+			this.speedY = -(Math.random() * 0.4 + 0.15);
+			this.speedX = (Math.random() - 0.5) * 0.3;
+			this.alpha  = Math.random() * 0.5 + 0.15;
+			this.targetAlpha = this.alpha;
+			this.pulse  = Math.random() * Math.PI * 2; // фаза пульсации
+			this.pulseSpeed = Math.random() * 0.012 + 0.005;
+			this.glow   = Math.random() > 0.75; // часть частиц с glow
+		}
+
+		update() {
+			this.x    += this.speedX;
+			this.y    += this.speedY;
+			this.pulse += this.pulseSpeed;
+
+			// Лёгкое притяжение к курсору
+			const dx = mouse.x - this.x;
+			const dy = mouse.y - this.y;
+			const dist = Math.sqrt(dx*dx + dy*dy);
+			if (dist < 140) {
+				const force = (140 - dist) / 140 * 0.012;
+				this.x += dx * force;
+				this.y += dy * force;
+			}
+
+			// Пульсация прозрачности
+			this.alpha = this.targetAlpha * (0.7 + 0.3 * Math.sin(this.pulse));
+
+			if (this.y < -20) this.reset();
+		}
+
+		draw() {
+			const rgb = getAccentRgb();
+			ctx.save();
+
+			if (this.glow) {
+				ctx.shadowBlur  = this.r * 8;
+				ctx.shadowColor = `rgba(${rgb}, 0.6)`;
+			}
+
+			ctx.globalAlpha = this.alpha;
+			ctx.fillStyle   = `rgba(${rgb}, 1)`;
+			ctx.beginPath();
+			ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+			ctx.fill();
+			ctx.restore();
+		}
+	}
+
+	function drawConnections() {
+		const rgb = getAccentRgb();
+		for (let i = 0; i < particles.length; i++) {
+			for (let j = i + 1; j < particles.length; j++) {
+				const dx   = particles[i].x - particles[j].x;
+				const dy   = particles[i].y - particles[j].y;
+				const dist = Math.sqrt(dx*dx + dy*dy);
+				if (dist < 100) {
+					const alpha = (1 - dist / 100) * 0.12;
+					ctx.beginPath();
+					ctx.strokeStyle = `rgba(${rgb}, ${alpha})`;
+					ctx.lineWidth   = 0.5;
+					ctx.moveTo(particles[i].x, particles[i].y);
+					ctx.lineTo(particles[j].x, particles[j].y);
+					ctx.stroke();
+				}
+			}
+		}
+	}
+
+	function init() {
+		resize();
+		const count = Math.min(80, Math.floor(W * H / 14000));
+		particles   = Array.from({ length: count }, (_, i) => new Particle(i));
+	}
+
+	let animId;
+	function animate() {
+		ctx.clearRect(0, 0, W, H);
+		drawConnections();
+		particles.forEach(p => { p.update(); p.draw(); });
+		animId = requestAnimationFrame(animate);
+	}
+
+	window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+	window.addEventListener('resize', () => { resize(); });
+	window.addEventListener('beforeunload', () => cancelAnimationFrame(animId));
+
+	init();
+	animate();
+}
+
+
+
+
 
 
 // ============================================================
@@ -915,6 +1064,7 @@ function stylePage_certif(span9) {
 
 function stylePage_signs(span9, pageMode) {
 	if (!span9 || pageMode !== 'current') return;
+	buildSignsStats(span9);
 
 	let tooltipWrapper;
 	const tooltipElem     = createEl('div', { className: 'sign-tooltip' });
@@ -987,6 +1137,16 @@ function styleSignsRows(table) {
 			bar.appendChild(fill);
 			firstCell.appendChild(bar);
 		}
+
+		// Цветные точки рядом с каждой оценкой
+		row.querySelectorAll('td').forEach(td => {
+			const n = parseFloat(td.textContent.trim());
+			if (isNaN(n) || n <= 0 || n > 10) return;
+			const dot = createEl('span', { className: 'score-dot' });
+			dot.classList.add(n >= 7 ? 'score-dot--high' : n >= 4 ? 'score-dot--mid' : 'score-dot--low');
+			dot.title = `${n} / 10`;
+			td.appendChild(dot);
+		});
 	});
 }
 
@@ -997,5 +1157,384 @@ function styleSignsRows(table) {
 
 document.addEventListener('DOMContentLoaded', () => {
 	setIcon();
+
+	// Компактный режим
+	if (localStorage.getItem('etis3-compact') === 'true') {
+		document.body.classList.add('etis3-compact');
+	}
+
+	// Размер шрифта
+	const fontSize = localStorage.getItem('etis3-fontsize');
+	if (fontSize) document.documentElement.style.fontSize = fontSize + 'px';
+
 	stylePages();
+	initPageTransitions();
 });
+
+
+// ============================================================
+// ПЕРЕХОДЫ МЕЖДУ СТРАНИЦАМИ
+// ============================================================
+
+function initPageTransitions() {
+	// Overlay для fade
+	const overlay = createEl('div', { id: 'etis3-page-overlay' });
+	document.body.appendChild(overlay);
+
+	// Перехватываем клики по внутренним ссылкам
+	document.addEventListener('click', e => {
+		const a = e.target.closest('a');
+		if (!a) return;
+		const href = a.getAttribute('href');
+		if (!href) return;
+
+		// Только внутренние ссылки ЕТИСа (без http, без #)
+		if (href.startsWith('http') || href.startsWith('#') || href.startsWith('javascript')) return;
+		if (a.target === '_blank') return;
+
+		e.preventDefault();
+		overlay.classList.add('etis3-overlay--out');
+		setTimeout(() => {
+			window.location.href = href;
+		}, 240);
+	});
+
+	// Fade-in при загрузке
+	requestAnimationFrame(() => {
+		overlay.classList.add('etis3-overlay--in');
+		setTimeout(() => overlay.classList.remove('etis3-overlay--in'), 350);
+	});
+}
+
+
+// ============================================================
+// ПРОГРЕСС-БАР СЕМЕСТРА В САЙДБАРЕ
+// ============================================================
+
+function addSemesterProgress(sidebar) {
+	// Определяем текущий семестр по дате
+	const now    = new Date();
+	const month  = now.getMonth() + 1; // 1-12
+	const day    = now.getDate();
+
+	let semStart, semEnd, semName;
+
+	// Осенний семестр: сентябрь — декабрь (примерно 1 сен — 25 дек)
+	// Весенний семестр: февраль — июнь (примерно 10 фев — 30 июн)
+	if (month >= 9 || month === 1) {
+		semName  = 'Осенний семестр';
+		semStart = new Date(now.getFullYear(), 8, 1);   // 1 сен
+		semEnd   = new Date(now.getFullYear(), 11, 25); // 25 дек
+		if (month === 1) {
+			// Январь — уже следующий год после осеннего
+			semStart = new Date(now.getFullYear() - 1, 8, 1);
+			semEnd   = new Date(now.getFullYear() - 1, 11, 25);
+		}
+	} else {
+		semName  = 'Весенний семестр';
+		semStart = new Date(now.getFullYear(), 1, 10);  // 10 фев
+		semEnd   = new Date(now.getFullYear(), 5, 30);  // 30 июн
+	}
+
+	const total   = semEnd - semStart;
+	const passed  = Math.min(Math.max(now - semStart, 0), total);
+	const pct     = Math.round((passed / total) * 100);
+	const weeksLeft = Math.max(0, Math.ceil((semEnd - now) / (7 * 24 * 3600 * 1000)));
+
+	const wrap = createEl('div', { className: 'semester-progress' });
+	wrap.innerHTML = `
+		<div class="semester-progress__header">
+			<span class="semester-progress__name">${semName}</span>
+			<span class="semester-progress__pct">${pct}%</span>
+		</div>
+		<div class="semester-progress__bar">
+			<div class="semester-progress__fill" style="width:${pct}%"></div>
+		</div>
+		<div class="semester-progress__sub">${weeksLeft > 0 ? `ещё ${weeksLeft} нед.` : 'семестр завершён'}</div>
+	`;
+
+	// Вставляем перед первым nav
+	const firstNav = sidebar.querySelector('.nav.nav-tabs.nav-stacked');
+	if (firstNav) sidebar.insertBefore(wrap, firstNav);
+	else sidebar.prepend(wrap);
+}
+
+
+
+
+
+// ============================================================
+// ПАНЕЛЬ НАСТРОЕК
+// ============================================================
+
+function openSettingsPanel() {
+	if (document.getElementById('etis3-sp-overlay')) return;
+
+	const ACCENTS = [
+		{ key:'violet', c:'#7c6fd4' }, { key:'blue',   c:'#007AFF' },
+		{ key:'teal',   c:'#0d9488' }, { key:'rose',   c:'#e11d6a' },
+		{ key:'green',  c:'#34C759' }, { key:'orange', c:'#FF9500' },
+		{ key:'indigo', c:'#5856D6' }, { key:'mint',   c:'#00C7BE' },
+	];
+
+	const t = localStorage.getItem('theme')        || 'auto';
+	const a = localStorage.getItem('etis3-accent') || 'violet';
+
+	const overlay = createEl('div', { id: 'etis3-sp-overlay' });
+	const panel   = createEl('div', { id: 'etis3-sp-panel' });
+
+	panel.innerHTML = `
+		<div class="etis3-sp-head">
+			<div class="etis3-sp-title">
+				<span class="material-icons">tune</span>
+				ЕТИС 3.0 — Настройки
+			</div>
+			<button class="etis3-sp-close" id="etis3-sp-close-btn">
+				<span class="material-icons">close</span>
+			</button>
+		</div>
+		<div class="etis3-sp-body">
+			<div class="etis3-sp-section">
+				<div class="etis3-sp-section-label">ТЕМА</div>
+				<div class="etis3-sp-row3">
+					<button class="etis3-sp-opt ${t==='auto'?'active':''}" data-theme="auto">
+						<span class="material-icons">brightness_6</span>Авто
+					</button>
+					<button class="etis3-sp-opt ${t==='light'?'active':''}" data-theme="light">
+						<span class="material-icons">light_mode</span>Светлая
+					</button>
+					<button class="etis3-sp-opt ${t==='dark'?'active':''}" data-theme="dark">
+						<span class="material-icons">dark_mode</span>Тёмная
+					</button>
+				</div>
+			</div>
+
+			<div class="etis3-sp-section">
+				<div class="etis3-sp-section-label">АКЦЕНТНЫЙ ЦВЕТ</div>
+				<div class="etis3-sp-accents">
+					${ACCENTS.map(x => `
+						<div class="etis3-sp-swatch ${x.key===a?'active':''}"
+							data-accent="${x.key}"
+							style="background:${x.c}"
+						></div>
+					`).join('')}
+				</div>
+			</div>
+
+			<div class="etis3-sp-section">
+				<div class="etis3-sp-section-label">РАСПИСАНИЕ</div>
+				<div class="etis3-sp-toggles">
+					${[
+						['sp-highlight','etis3-highlight','play_circle','Подсветка текущей пары','Выделяет пару которая идёт сейчас'],
+						['sp-widget','etis3-widget','schedule','Виджет следующей пары','Показывает что идёт / что следующее'],
+						['sp-pairtypes','etis3-pairtypes','menu_book','Иконки типов пар','Лекция, практика, лаб. работа'],
+					].map(([id,key,icon,label,sub]) => `
+						<div class="etis3-sp-toggle-row">
+							<div class="etis3-sp-toggle-info">
+								<span class="material-icons">${icon}</span>
+								<div>${label}<small>${sub}</small></div>
+							</div>
+							<label class="etis3-sp-toggle">
+								<input type="checkbox" id="${id}" ${localStorage.getItem(key)!=='false'?'checked':''}>
+								<div class="etis3-sp-track"></div>
+							</label>
+						</div>
+					`).join('')}
+				</div>
+			</div>
+
+			<div class="etis3-sp-section">
+				<div class="etis3-sp-section-label">ИНТЕРФЕЙС</div>
+				<div class="etis3-sp-toggles">
+					${[
+						['sp-compact','etis3-compact','density_small','Компактный режим','Меньше отступов, больше контента'],
+						['sp-scoredots','etis3-scoredots','grade','Цветные точки у оценок','Индикаторы рядом с баллом'],
+					].map(([id,key,icon,label,sub]) => `
+						<div class="etis3-sp-toggle-row">
+							<div class="etis3-sp-toggle-info">
+								<span class="material-icons">${icon}</span>
+								<div>${label}<small>${sub}</small></div>
+							</div>
+							<label class="etis3-sp-toggle">
+								<input type="checkbox" id="${id}" ${localStorage.getItem(key)==='true'?'checked':''}>
+								<div class="etis3-sp-track"></div>
+							</label>
+						</div>
+					`).join('')}
+				</div>
+			</div>
+
+			<div class="etis3-sp-section etis3-sp-section-last">
+				<button class="etis3-sp-danger" id="etis3-sp-reset">
+					<span class="material-icons">restart_alt</span>
+					Сбросить все настройки
+				</button>
+			</div>
+		</div>
+	`;
+
+	document.body.appendChild(overlay);
+	document.body.appendChild(panel);
+
+	requestAnimationFrame(() => requestAnimationFrame(() => {
+		overlay.classList.add('etis3-sp-visible');
+		panel.classList.add('etis3-sp-visible');
+	}));
+
+	function close() {
+		overlay.classList.remove('etis3-sp-visible');
+		panel.classList.remove('etis3-sp-visible');
+		setTimeout(() => { overlay.remove(); panel.remove(); }, 300);
+	}
+
+	overlay.addEventListener('click', close);
+	document.getElementById('etis3-sp-close-btn').addEventListener('click', close);
+
+	// Тема
+	panel.querySelectorAll('[data-theme]').forEach(btn => {
+		btn.addEventListener('click', () => {
+			panel.querySelectorAll('[data-theme]').forEach(b => b.classList.remove('active'));
+			btn.classList.add('active');
+			const val = btn.dataset.theme;
+			localStorage.setItem('theme', val);
+			if (typeof chrome !== 'undefined' && chrome.storage) chrome.storage.local.set({ theme: val });
+			if (val === 'auto') { removeSystemThemeDetection(); setSystemThemeDetection(); }
+			else { removeSystemThemeDetection(); document.documentElement.setAttribute('theme', val); }
+			loadAccent();
+		});
+	});
+
+	// Акцент
+	panel.querySelectorAll('[data-accent]').forEach(sw => {
+		sw.addEventListener('click', () => {
+			panel.querySelectorAll('[data-accent]').forEach(s => s.classList.remove('active'));
+			sw.classList.add('active');
+			const key = sw.dataset.accent;
+			localStorage.setItem('etis3-accent', key);
+			if (typeof chrome !== 'undefined' && chrome.storage) chrome.storage.local.set({ 'etis3-accent': key });
+			applyAccent(key);
+		});
+	});
+
+	// Тоглы
+	[
+		['sp-highlight',  'etis3-highlight',  null],
+		['sp-widget',     'etis3-widget',     null],
+		['sp-pairtypes',  'etis3-pairtypes',  null],
+		['sp-compact',    'etis3-compact',    v => document.body.classList.toggle('etis3-compact', v)],
+		['sp-scoredots',  'etis3-scoredots',  null],
+	].forEach(([id, key, cb]) => {
+		const el = panel.querySelector('#' + id);
+		if (!el) return;
+		el.addEventListener('change', () => {
+			const val = el.checked ? 'true' : 'false';
+			localStorage.setItem(key, val);
+			if (typeof chrome !== 'undefined' && chrome.storage) chrome.storage.local.set({ [key]: val });
+			if (cb) cb(el.checked);
+		});
+	});
+
+	// Сброс
+	document.getElementById('etis3-sp-reset').addEventListener('click', () => {
+		['theme','etis3-accent','etis3-fontsize','etis3-highlight','etis3-widget',
+		 'etis3-pairtypes','etis3-compact','etis3-scoredots'].forEach(k => localStorage.removeItem(k));
+		if (typeof chrome !== 'undefined' && chrome.storage)
+			chrome.storage.local.remove(['theme','etis3-accent','etis3-fontsize',
+				'etis3-highlight','etis3-widget','etis3-pairtypes','etis3-compact','etis3-scoredots']);
+		close();
+		setTimeout(() => window.location.reload(), 250);
+	});
+}
+
+
+// ============================================================
+// СТАТИСТИКА ОЦЕНОК
+// ============================================================
+
+function buildSignsStats(span9) {
+	const allScores = [];
+	const bySubj = [];
+
+	span9.querySelectorAll('table.common').forEach(table => {
+		const scores = [];
+		table.querySelectorAll('tbody tr td').forEach(td => {
+			const n = parseFloat(td.textContent.trim());
+			if (!isNaN(n) && n > 0 && n <= 10) { scores.push(n); allScores.push(n); }
+		});
+		if (scores.length) {
+			const th = table.querySelector('th');
+			bySubj.push({ name: (th ? th.textContent.trim().slice(0,55) : 'Дисциплина'), scores });
+		}
+	});
+
+	if (allScores.length < 2) return;
+
+	const avg = arr => arr.reduce((a,b)=>a+b,0) / arr.length;
+	const g   = avg(allScores).toFixed(2);
+	const col = +g >= 7 ? 'var(--color-green)' : +g >= 4 ? 'var(--color-yellow)' : 'var(--color-red)';
+	const pct = Math.round(allScores.filter(s=>s>=7).length / allScores.length * 100);
+	const best  = bySubj.length > 1 ? [...bySubj].sort((a,b)=>avg(b.scores)-avg(a.scores))[0]  : null;
+	const worst = bySubj.length > 1 ? [...bySubj].sort((a,b)=>avg(a.scores)-avg(b.scores))[0]  : null;
+
+	const w = createEl('div', { className: 'etis3-stats-widget' });
+	w.innerHTML = `
+		<div class="esw-header">
+			<span class="material-icons">analytics</span>
+			<span class="esw-title">Статистика оценок</span>
+		</div>
+		<div class="esw-grid">
+			<div class="esw-card">
+				<div class="esw-label">Средний балл</div>
+				<div class="esw-value" style="color:${col}">${g}</div>
+			</div>
+			<div class="esw-card">
+				<div class="esw-label">Всего оценок</div>
+				<div class="esw-value">${allScores.length}</div>
+			</div>
+			<div class="esw-card">
+				<div class="esw-label">Высоких ≥7</div>
+				<div class="esw-value" style="color:var(--color-green)">${pct}%</div>
+			</div>
+			<div class="esw-card">
+				<div class="esw-label">Дисциплин</div>
+				<div class="esw-value">${bySubj.length}</div>
+			</div>
+		</div>
+		${best && worst && best.name !== worst.name ? `
+		<div class="esw-extremes">
+			<div class="esw-ext esw-ext-best">
+				<span class="material-icons">emoji_events</span>
+				<div>
+					<div class="esw-ext-label">Лучше всего</div>
+					<div class="esw-ext-name">${best.name}</div>
+					<div class="esw-ext-val">${avg(best.scores).toFixed(1)} / 10</div>
+				</div>
+			</div>
+			<div class="esw-ext esw-ext-worst">
+				<span class="material-icons">trending_down</span>
+				<div>
+					<div class="esw-ext-label">Стоит подтянуть</div>
+					<div class="esw-ext-name">${worst.name}</div>
+					<div class="esw-ext-val">${avg(worst.scores).toFixed(1)} / 10</div>
+				</div>
+			</div>
+		</div>` : ''}
+		<div class="esw-bar-wrap">
+			<div class="esw-bar-title">Распределение</div>
+			<div class="esw-bars">
+				${[1,2,3,4,5,6,7,8,9,10].map(n => {
+					const cnt = allScores.filter(s => Math.round(s) === n).length;
+					const h   = Math.max(Math.round(cnt / allScores.length * 100), cnt > 0 ? 4 : 0);
+					const c   = n >= 7 ? 'var(--color-green)' : n >= 4 ? 'var(--color-yellow)' : 'var(--color-red)';
+					return `<div class="esw-bar-col">
+						<div class="esw-bar-fill" style="height:${h}%;background:${c}" title="${cnt}×"></div>
+						<div class="esw-bar-num">${n}</div>
+					</div>`;
+				}).join('')}
+			</div>
+		</div>
+	`;
+
+	span9.prepend(w);
+}
+
