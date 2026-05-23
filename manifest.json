@@ -1,12 +1,18 @@
 {
 	"name": "ЕТИС 3.0",
 	"version": "3.1.0",
-	"description": "Современный редизайн ЕТИСа — glassmorphism, виджет пар, настройки. by Комар",
+	"description": "Современный редизайн ЕТИСа — Apple-стиль, виджет пар, настройки. by Комар",
 	"action": {
 		"default_popup": "popup.html",
 		"default_icon": { "16": "logo.png", "48": "logo.png", "128": "logo.png" },
 		"default_title": "ЕТИС 3.0 — настройки"
 	},
+	"permissions": [
+		"storage",
+		"tabs",
+		"scripting",
+		"activeTab"
+	],
 	"content_scripts": [
 		{
 			"matches": ["https://student.psu.ru/*"],
@@ -22,5 +28,6 @@
 			"matches": ["https://student.psu.ru/*"]
 		}
 	],
+	"host_permissions": ["https://student.psu.ru/*"],
 	"manifest_version": 3
 }
