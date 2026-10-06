@@ -2342,3 +2342,68 @@ button,
 }
 .span9 > h3.etis3-section--empty > a.dashed { opacity: 0.6 !important; }
 .span9 > h3.etis3-section--empty > a.dashed:hover { opacity: 0.85 !important; }
+
+/* ---------- Сообщения и объявления: читаемый текст ---------- */
+.nav.msg.message > li { font-size: 1.35rem !important; line-height: 1.55 !important; }
+.nav.msg.message > li.message-header { line-height: 1.35 !important; }
+.message-header font[style="font-weight:bold"] { font-size: 1.4rem !important; }
+
+/* Ответ студента: файловая форма и кнопка — в стиле «Добавить ответ» */
+.nav.msg.repl_s input[type="button"],
+.nav.msg.repl_s input[type="submit"],
+.nav.msg input[type="submit"] {
+	margin-top: 0.8rem !important;
+	padding: 0.6rem 1.2rem !important;
+	font-size: 1.2rem !important;
+	font-family: var(--font-family) !important;
+	border-radius: var(--radius-medium) !important;
+	border: 1px solid var(--color-accent-light) !important;
+	background: var(--color-accent-bg) !important;
+	color: var(--color-accent) !important;
+	cursor: pointer !important;
+}
+.nav.msg.repl_s input[type="button"]:hover,
+.nav.msg input[type="submit"]:hover { background: var(--color-accent-bg-hover) !important; }
+
+/* ---------- Электронные ресурсы ---------- */
+.span9 > p[style*="width:800px"] {
+	width: auto !important;
+	max-width: 72rem !important;
+	font-size: 1.4rem !important;
+	line-height: 1.55 !important;
+	margin-bottom: 1.6rem !important;
+}
+.span9 > h3[style*="dotted"] {
+	width: auto !important;
+	border: none !important;
+	border-left: 3px solid var(--color-accent) !important;
+	border-radius: var(--radius-medium) !important;
+	background: var(--color-accent-bg) !important;
+	padding: 1.2rem 1.6rem !important;
+	font-size: 1.5rem !important;
+	letter-spacing: -0.01em !important;
+}
+table#resources { width: 100% !important; }
+td.etis3-copy {
+	cursor: copy !important;
+	font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace !important;
+	font-size: 1.25rem !important;
+	transition: background 0.12s ease, color 0.12s ease !important;
+}
+td.etis3-copy:hover { background: var(--color-accent-bg) !important; color: var(--color-accent) !important; }
+
+/* ---------- Образовательный стандарт: компетенции ---------- */
+.cpt_list {
+	display: flex !important;
+	gap: 0.8rem !important;
+	font-size: 1.35rem !important;
+	line-height: 1.5 !important;
+	margin-bottom: 0.8rem !important;
+}
+.cpt_list .cpt_num {
+	flex-shrink: 0 !important;
+	min-width: 2.2rem !important;
+	color: var(--color-accent) !important;
+	font-weight: 700 !important;
+	font-variant-numeric: tabular-nums !important;
+}

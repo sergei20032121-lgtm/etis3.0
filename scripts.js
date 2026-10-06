@@ -422,10 +422,12 @@ function stylePages() {
 		case 'stu.change_pass_form':
 		case 'stu.change_pass':            stylePage_changePass(span9);           break;
 		case 'stu_email_pkg.change_email': stylePage_changeEmail(span9);          break;
-		case 'stu.announce':               stylePage_announce();                   break;
+		case 'stu.announce':
+		case 'stu_ann.announces':          stylePage_announce();                   break;
 		case 'stu.teacher_notes':          stylePage_teacherNotes();              break;
 		case 'cert_pkg.stu_certif':        stylePage_certif(span9);               break;
 		case 'stu.signs':                  stylePage_signs(span9, pageMode);      break;
+		case 'stu.electr':                 stylePage_electr(span9);               break;
 	}
 }
 
@@ -996,8 +998,9 @@ function stylePage_teacherNotes() {
 		const brs = msg.querySelectorAll('li > br');
 		[0, 1, 2, brs.length - 2, brs.length - 1].forEach(i => brs[i]?.remove());
 
+		// В начале текста ЕТИС ставит отступ из &nbsp; и переносы — срезаем всё до первого символа
 		const body = msg.querySelectorAll('li')[1];
-		if (body) body.innerHTML = body.innerHTML.substring('&nbsp;&nbsp;&nbsp;'.length);
+		if (body) body.innerHTML = body.innerHTML.replace(/^(\s|&nbsp;|<br\s*\/?>)+/i, '');
 
 		const answerWrapper = createEl('li', { className: 'answer-wrapper' });
 		const answerInput   = msg.querySelector('input[type="button"]');
@@ -1021,6 +1024,32 @@ function stylePage_teacherNotes() {
 		answerInput?.remove();
 		answerWrapper.appendChild(answerButton);
 		msg.appendChild(answerWrapper);
+	});
+}
+
+
+// ============================================================
+// ЭЛЕКТРОННЫЕ РЕСУРСЫ — логины и пароли копируются по клику
+// ============================================================
+
+function stylePage_electr(span9) {
+	const table = span9?.querySelector('#resources');
+	if (!table) return;
+	table.querySelectorAll('tr').forEach(row => {
+		const cells = row.querySelectorAll('td');
+		if (cells.length < 2) return;
+		[...cells].slice(1).forEach(td => {
+			// «Код доступа УЗ: F9E5-…» → копируем только сам код
+			const value = td.textContent.trim().replace(/^[^:]*:\s*(?=\S+$)/, '');
+			if (!value || td.querySelector('a')) return;
+			td.classList.add('etis3-copy');
+			td.title = 'Нажми, чтобы скопировать';
+			td.addEventListener('click', () => {
+				navigator.clipboard.writeText(value)
+					.then(() => showToast('Скопировано'))
+					.catch(() => showToast('Не удалось скопировать'));
+			});
+		});
 	});
 }
 
