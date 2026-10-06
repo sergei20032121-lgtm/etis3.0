@@ -4286,3 +4286,105 @@ html.etis3-modern .span9 .next-pair-widget { margin-bottom: 1.6rem !important; }
 }
 #etis3-whatsnew .wn-ok:hover { transform: translateY(-1px); filter: brightness(1.08); }
 @media (prefers-reduced-motion: reduce) { .wn-item { animation: none !important; opacity: 1; } }
+
+
+/* ============================================================
+   ОЦЕНКИ ЗА СЕССИИ (4.4)
+   ============================================================ */
+
+.ssv { display: flex; flex-direction: column; gap: 1.8rem; margin-top: 1.6rem; --g5: 52,199,89; --g4: 10,132,255; --g3: 255,159,10; --g2: 255,59,48; }
+.ssv-summary, .ssv-term {
+	border-radius: 2.4rem;
+	background: var(--glass-bg-card);
+	backdrop-filter: var(--glass-filter); -webkit-backdrop-filter: var(--glass-filter);
+	border: var(--glass-border); box-shadow: var(--glass-shadow-card);
+	animation: hm-in 0.5s cubic-bezier(.2,.8,.2,1) both;
+}
+.ssv-summary { display: grid; grid-template-columns: 22rem minmax(0, 1fr) 26rem; gap: 2.4rem; padding: 2.4rem; align-items: stretch;
+	background: radial-gradient(50% 120% at 0% 0%, rgba(var(--color-accent-rgb, 124,111,212), 0.18), transparent 70%), var(--glass-bg-card); }
+@media (max-width: 1100px) { .ssv-summary { grid-template-columns: 1fr 1fr; } .ssv-trend { grid-column: 1 / -1; order: 3; } }
+@media (max-width: 640px) { .ssv-summary { grid-template-columns: 1fr; } }
+.ssv-label { font-size: 1.15rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-text-tertiary); margin-bottom: 0.8rem; }
+.ssv-big { font-size: 6.4rem; font-weight: 800; letter-spacing: -0.05em; line-height: 1; }
+.ssv-sub { margin-top: 0.8rem; font-size: 1.25rem; color: var(--color-text-secondary); }
+.ssv-delta { display: inline-flex; align-items: center; gap: 0.4rem; margin-top: 1.2rem; padding: 0.3rem 1rem; border-radius: 10rem; font-size: 1.2rem; font-weight: 600; }
+.ssv-delta .material-icons { font-size: 1.7rem; }
+.ssv-delta.up { background: rgba(var(--g5), 0.14); color: var(--color-green); }
+.ssv-delta.down { background: rgba(var(--g2), 0.12); color: var(--color-red); }
+
+.ssv-trend { min-width: 0; display: flex; flex-direction: column; }
+.ssv-plot { position: relative; flex: 1; min-height: 15rem; padding-bottom: 2rem; }
+.ssv-chart { position: absolute; inset: 0 0 2rem 0; width: 100%; height: calc(100% - 2rem); overflow: visible; }
+.ssv-grid { stroke: var(--color-divider); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.ssv-axis { font-size: 11px; fill: var(--color-text-tertiary); }
+.ssv-line { fill: none; stroke: var(--color-accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.ssv-area { fill: rgba(var(--color-accent-rgb, 124,111,212), 0.10); stroke: none; }
+.ssv-dots { position: absolute; inset: 0 0 2rem 0; }
+.ssv-dot {
+	position: absolute; width: 1rem; height: 1rem; margin: -0.5rem 0 0 -0.5rem; border-radius: 50%;
+	background: var(--color-accent); box-shadow: 0 0 0 2px var(--glass-bg-active, #fff);
+	cursor: default; transition: transform 0.15s;
+}
+.ssv-dot::after { content: ''; position: absolute; inset: -0.9rem; border-radius: 50%; }
+.ssv-dot:hover { transform: scale(1.5); }
+.ssv-dot:hover::before {
+	content: attr(data-tip); position: absolute; bottom: calc(100% + 1rem); left: 50%; transform: translateX(-50%) scale(0.667);
+	transform-origin: bottom center; white-space: nowrap;
+	padding: 0.6rem 1rem; border-radius: 1rem; font-size: 1.8rem; font-weight: 600;
+	background: var(--glass-bg-tooltip); color: var(--color-text-primary); box-shadow: var(--glass-shadow); pointer-events: none;
+}
+.ssv-xlabels { position: absolute; left: 0; right: 0; bottom: 0; height: 1.6rem; }
+.ssv-xlabels span { position: absolute; transform: translateX(-50%); font-size: 1.05rem; color: var(--color-text-tertiary); white-space: nowrap; }
+
+.ssv-dist { display: flex; flex-direction: column; }
+.ssv-bar { display: flex; gap: 2px; height: 1.2rem; border-radius: 0.6rem; overflow: hidden; margin: 0.4rem 0 1.4rem; }
+.ssv-bar i, .ssv-legend i { display: block; }
+.ssv-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem 1.4rem; font-size: 1.3rem; }
+.ssv-legend span { display: flex; align-items: center; gap: 0.7rem; color: var(--color-text-secondary); }
+.ssv-legend i { width: 1rem; height: 1rem; border-radius: 0.3rem; flex: none; }
+.ssv-legend b { margin-left: auto; color: var(--color-text-primary); font-variant-numeric: tabular-nums; }
+.ssv-bar .g5, .ssv-legend .g5 { background: rgb(var(--g5)); }
+.ssv-bar .g4, .ssv-legend .g4 { background: rgb(var(--g4)); }
+.ssv-bar .g3, .ssv-legend .g3 { background: rgb(var(--g3)); }
+.ssv-bar .g2, .ssv-legend .g2, .ssv-bar .gfail, .ssv-legend .gfail { background: rgb(var(--g2)); }
+.ssv-bar .gpass, .ssv-legend .gpass { background: rgba(var(--g5), 0.4); }
+
+.ssv-term { padding: 2rem 2.2rem 1.2rem; }
+.ssv-term--old { opacity: 0.92; }
+.ssv-term-head { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1.2rem; flex-wrap: wrap; }
+.ssv-term-head h3 { margin: 0 !important; padding: 0 !important; font-size: 2rem !important; font-weight: 800 !important; letter-spacing: -0.03em !important; color: var(--color-text-primary) !important; border: 0 !important; background: none !important; }
+.ssv-term-head h3::before { display: none !important; }
+.ssv-course { padding: 0.2rem 0.9rem; border-radius: 10rem; font-size: 1.15rem; font-weight: 600; color: var(--color-text-secondary); background: rgba(127,127,127,0.10); }
+.ssv-term-avg { margin-left: auto; font-size: 1.3rem; color: var(--color-text-secondary); }
+.ssv-term-avg b { font-size: 1.8rem; color: var(--color-text-primary); }
+.ssv-rows { display: grid; grid-template-columns: repeat(auto-fill, minmax(42rem, 1fr)); gap: 0.2rem 1.6rem; margin: 0 -0.6rem; }
+@media (max-width: 640px) { .ssv-rows { grid-template-columns: 1fr; } }
+.ssv-row { display: flex; align-items: center; gap: 1.2rem; padding: 0.7rem 0.6rem; border-radius: 1.2rem; transition: background 0.15s; }
+.ssv-row:hover { background: rgba(127,127,127,0.07); }
+.ssv-grade {
+	flex: none; width: 4.4rem; height: 4.4rem; border-radius: 1.3rem;
+	display: grid; place-items: center; font-size: 1.9rem; font-weight: 800;
+	color: var(--color-text-primary); background: rgba(127,127,127,0.10);
+}
+.ssv-grade.g5 { background: rgba(var(--g5), 0.18); box-shadow: inset 0 0 0 1.5px rgba(var(--g5), 0.55); }
+.ssv-grade.g4 { background: rgba(var(--g4), 0.16); box-shadow: inset 0 0 0 1.5px rgba(var(--g4), 0.5); }
+.ssv-grade.g3 { background: rgba(var(--g3), 0.16); box-shadow: inset 0 0 0 1.5px rgba(var(--g3), 0.5); }
+.ssv-grade.g2, .ssv-grade.gfail { background: rgba(var(--g2), 0.16); box-shadow: inset 0 0 0 1.5px rgba(var(--g2), 0.55); font-size: 1.2rem; }
+.ssv-grade.g2 { font-size: 1.9rem; }
+.ssv-grade.gpass { background: rgba(var(--g5), 0.10); }
+.ssv-grade.gpass .material-icons { font-size: 2.2rem; color: var(--color-green); }
+.ssv-dis { flex: 1; min-width: 0; font-size: 1.4rem; font-weight: 500; line-height: 1.3; }
+.ssv-dis small { display: block; font-size: 1.15rem; font-weight: 400; color: var(--color-text-secondary); }
+.ssv-date { flex: none; font-size: 1.15rem; color: var(--color-text-tertiary); font-variant-numeric: tabular-nums; }
+
+.ssv-note { margin-top: 1.8rem; padding: 1.2rem 1.6rem; border-radius: 1.6rem; background: rgba(127,127,127,0.06); border: 1px solid rgba(127,127,127,0.12); font-size: 1.3rem; line-height: 1.6; color: var(--color-text-secondary); }
+.ssv-note summary { display: flex; align-items: center; gap: 0.8rem; cursor: pointer; font-weight: 600; color: var(--color-text-primary); list-style: none; }
+.ssv-note summary::-webkit-details-marker { display: none; }
+.ssv-note summary .material-icons { font-size: 1.9rem; color: var(--color-accent); }
+.ssv-note > div { margin-top: 1rem; }
+.ssv-plot { padding-left: 2.2rem; }
+.ssv-chart, .ssv-dots { left: 2.2rem !important; }
+.ssv-xlabels { left: 2.2rem; }
+.ssv-ylabels { position: absolute; left: 0; top: 0; bottom: 2rem; width: 1.6rem; }
+.ssv-ylabels span { position: absolute; left: 0; transform: translateY(-50%); font-size: 1.1rem; color: var(--color-text-tertiary); }
+.ssv-chart { width: calc(100% - 2.2rem) !important; }

@@ -640,7 +640,7 @@ function stylePages() {
 		case 'stu_ann.announces':          stylePage_announce();                   break;
 		case 'stu.teacher_notes':          stylePage_teacherNotes();              break;
 		case 'cert_pkg.stu_certif':        stylePage_certif(span9);               break;
-		case 'stu.signs':                  stylePage_signs(span9, pageMode);      break;
+		case 'stu.signs':                  stylePage_signs(span9, pageMode); if (!pageMode || pageMode === 'session') buildSessionView(span9); break;
 		case 'stu.electr':                 stylePage_electr(span9);               break;
 	}
 }
@@ -3091,6 +3091,9 @@ function buildTimetableDays(span9, week) {
 // ============================================================
 
 const CHANGELOG = [
+	['4.4.0', [
+		['insights', 'Оценки за сессии', 'Средний балл, график по семестрам, распределение оценок и семестры карточками'],
+	]],
 	['4.3.0', [
 		['view_agenda', 'Расписание лентой', 'Дни — карточками, пары — таймлайном: что прошло, что идёт, «окна» между парами'],
 		['new_releases', 'Это окно', 'Теперь после обновления видно, что поменялось'],
@@ -3167,4 +3170,117 @@ async function showWhatsNew() {
 	wrap.querySelector('.wn-ok').addEventListener('click', close);
 	wrap.addEventListener('mousedown', e => { if (e.target === wrap) close(); });
 	setTimeout(() => wrap.querySelector('.wn-ok')?.focus({ preventScroll: true }), 400);
+}
+
+
+// ---------- Оценки за сессии ----------
+const SESSION_GRADE = {
+	'5': { cls: 'g5', num: 5 }, '4': { cls: 'g4', num: 4 }, '3': { cls: 'g3', num: 3 }, '2': { cls: 'g2', num: 2 },
+	'отлично': { cls: 'g5', num: 5 }, 'хорошо': { cls: 'g4', num: 4 }, 'удовлетворительно': { cls: 'g3', num: 3 }, 'неудовлетворительно': { cls: 'g2', num: 2 },
+};
+
+function sessionGrade(text) {
+	const t = text.trim().toLowerCase();
+	if (SESSION_GRADE[t]) return { ...SESSION_GRADE[t], text: t.length > 2 ? String(SESSION_GRADE[t].num) : t };
+	if (/^незач/.test(t)) return { cls: 'gfail', num: null, text: 'незачёт' };
+	if (/^зач/.test(t)) return { cls: 'gpass', num: null, text: 'зачёт' };
+	if (/неяв/.test(t)) return { cls: 'gfail', num: null, text: 'неявка' };
+	return { cls: '', num: null, text: t || '—' };
+}
+
+function buildSessionView(span9) {
+	const table = span9?.querySelector(':scope > table.common');
+	if (!table) return;
+	const terms = [];
+	table.querySelectorAll('tr').forEach(tr => {
+		const head = tr.querySelector('th[colspan]');
+		if (head) {
+			const txt = head.textContent.replace(/\s+/g, ' ').trim();
+			const m = txt.match(/^(.*?)\s*\((\d+)\s*курс\)/);
+			terms.push({ title: m ? m[1] : txt.split(',')[0], course: m ? +m[2] : null,
+				end: (txt.match(/(\d{2}\.\d{2}\.\d{4})/) || [])[1] || '', rows: [] });
+			return;
+		}
+		const c = [...tr.children];
+		if (c.length < 4 || c[0].tagName === 'TH' || !terms.length) return;
+		terms[terms.length - 1].rows.push({ dis: c[0].textContent.trim(), grade: sessionGrade(c[1].textContent), date: c[2].textContent.trim(), who: c[3].textContent.trim() });
+	});
+	const filled = terms.filter(t => t.rows.length);
+	if (!filled.length) return;
+
+	const avg = rows => { const n = rows.map(r => r.grade.num).filter(x => x); return n.length ? n.reduce((a, b) => a + b, 0) / n.length : null; };
+	const all = filled.flatMap(t => t.rows);
+	const total = avg(all);
+	const count = k => all.filter(r => r.grade.cls === k).length;
+	const dist = [['g5', '5', count('g5')], ['g4', '4', count('g4')], ['g3', '3', count('g3')], ['g2', '2', count('g2')], ['gpass', 'зачёт', count('gpass')], ['gfail', 'незачёт', count('gfail')]].filter(d => d[2]);
+	const exams = dist.filter(d => /^g[2-5]$/.test(d[0])).reduce((s, d) => s + d[2], 0);
+	filled.forEach(t => { t.avg = avg(t.rows); });
+
+	// График среднего по семестрам: одна линия, точки с подсказками
+	const pts = filled.filter(t => t.avg !== null);
+	let chart = '';
+	if (pts.length > 1) {
+		const W = 600, H = 150, px = 18, py = 18;
+		const min = Math.min(3, ...pts.map(p => p.avg)), max = 5;
+		const x = i => px + i * (W - px * 2) / (pts.length - 1);
+		const y = v => py + (max - v) / (max - min) * (H - py * 2);
+		const line = pts.map((p, i) => `${x(i).toFixed(1)},${y(p.avg).toFixed(1)}`).join(' ');
+		chart = `<svg class="ssv-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Средний балл по семестрам">
+			${[5, 4, 3].filter(v => v >= min).map(v => `<line x1="${px}" x2="${W - px}" y1="${y(v)}" y2="${y(v)}" class="ssv-grid"/>`).join('')}
+			<polyline points="${line} ${x(pts.length - 1)},${H - py} ${x(0)},${H - py}" class="ssv-area"/>
+			<polyline points="${line}" class="ssv-line" vector-effect="non-scaling-stroke"/>
+		</svg>
+		<div class="ssv-dots">${pts.map((p, i) => `<span class="ssv-dot" style="left:${(x(i) / W * 100).toFixed(2)}%;top:${(y(p.avg) / H * 100).toFixed(2)}%" data-tip="${escapeHtml(p.title)}: ${fmtNum(Math.round(p.avg * 100) / 100)}"></span>`).join('')}</div>
+		<div class="ssv-ylabels">${[5, 4, 3].filter(v => v >= min).map(v => `<span style="top:${(y(v) / H * 100).toFixed(2)}%">${v}</span>`).join('')}</div>
+		<div class="ssv-xlabels">${pts.map((p, i) => `<span style="left:${(x(i) / W * 100).toFixed(2)}%">${escapeHtml(p.title.replace(/\s*(семестр|триместр)/i, ''))}</span>`).join('')}</div>`;
+	}
+
+	const last = pts[pts.length - 1], prev = pts[pts.length - 2];
+	const delta = last && prev ? last.avg - prev.avg : null;
+	const wrap = createEl('div', { className: 'etis3-view ssv' });
+	wrap.innerHTML = `
+		<section class="ssv-summary">
+			<div class="ssv-hero">
+				<div class="ssv-label">Средний балл за экзамены</div>
+				<div class="ssv-big">${total !== null ? fmtNum(Math.round(total * 100) / 100) : '—'}</div>
+				<div class="ssv-sub">${exams} экз. · ${count('gpass') + count('gfail')} зач. · ${filled.length} ${/триместр/i.test(filled[0].title) ? 'триместров' : 'семестров'}</div>
+				${delta !== null ? `<div class="ssv-delta ${delta >= 0 ? 'up' : 'down'}"><span class="material-icons">${delta >= 0 ? 'trending_up' : 'trending_down'}</span>${delta >= 0 ? '+' : '−'}${fmtNum(Math.abs(Math.round(delta * 100) / 100))} за последний</div>` : ''}
+			</div>
+			${chart ? `<div class="ssv-trend"><div class="ssv-label">Средний балл по ${/триместр/i.test(filled[0].title) ? 'триместрам' : 'семестрам'}</div><div class="ssv-plot">${chart}</div></div>` : ''}
+			<div class="ssv-dist">
+				<div class="ssv-label">Оценки</div>
+				<div class="ssv-bar">${dist.map(([k, , n]) => `<i class="${k}" style="flex:${n}" title="${n}"></i>`).join('')}</div>
+				<div class="ssv-legend">${dist.map(([k, label, n]) => `<span><i class="${k}"></i>${label}<b>${n}</b></span>`).join('')}</div>
+			</div>
+		</section>
+		${[...filled].reverse().map((t, ti) => `
+			<section class="ssv-term${ti === 0 ? '' : ' ssv-term--old'}">
+				<header class="ssv-term-head">
+					<h3>${escapeHtml(t.title)}</h3>
+					${t.course ? `<span class="ssv-course">${t.course} курс</span>` : ''}
+					<span class="ssv-term-avg">${t.avg !== null ? `средний <b>${fmtNum(Math.round(t.avg * 100) / 100)}</b>` : 'только зачёты'}</span>
+				</header>
+				<div class="ssv-rows">${t.rows.map(r => `
+					<div class="ssv-row etis3-dis" style="--dis-h:${disciplineHue(r.dis)}">
+						<span class="ssv-grade ${r.grade.cls}">${r.grade.cls === 'gpass' ? '<span class="material-icons">check</span>' : escapeHtml(r.grade.text)}</span>
+						<span class="ssv-dis">${escapeHtml(r.dis)}<small>${escapeHtml(r.who)}</small></span>
+						<span class="ssv-date">${escapeHtml(r.date)}</span>
+					</div>`).join('')}
+				</div>
+			</section>`).join('')}
+	`;
+	table.before(wrap);
+	table.classList.add('etis3-orig');
+
+	// Подсказки на точках графика
+	wrap.querySelectorAll('.ssv-dot').forEach(d => d.title = d.dataset.tip);
+
+	// Длинное пояснение ЕТИСа — под спойлер
+	const note = span9.querySelector(':scope > p');
+	if (note) {
+		const det = createEl('details', { className: 'etis3-view ssv-note' });
+		det.innerHTML = `<summary><span class="material-icons">info</span>Если оценка указана неверно</summary><div>${note.innerHTML}</div>`;
+		note.after(det);
+		note.classList.add('etis3-orig');
+	}
 }
