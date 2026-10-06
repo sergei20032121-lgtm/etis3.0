@@ -2407,3 +2407,69 @@ td.etis3-copy:hover { background: var(--color-accent-bg) !important; color: var(
 	font-weight: 700 !important;
 	font-variant-numeric: tabular-nums !important;
 }
+
+/* ---------- Bootstrap 2 из ЕТИСа: [class^="icon-"] задаёт 14×14px и спрайт глифов
+   всем элементам с классом на icon-, включая наши кнопки — сбрасываем ---------- */
+.icon-button, .icon-button2 {
+	width: auto !important;
+	height: auto !important;
+	line-height: normal !important;
+	margin-top: 0 !important;
+	vertical-align: middle !important;
+	background-image: none !important;
+}
+.icon-button { white-space: nowrap !important; }
+.span9 > a.icon-button { margin-bottom: 1.6rem !important; }
+.span9 > a.icon-button + br + br { display: none !important; }
+
+/* ---------- Подменю-вкладки (библиотека, обратная связь, …) ---------- */
+.span9 .submenu {
+	display: flex !important;
+	flex-wrap: wrap !important;
+	gap: 0.6rem !important;
+	margin: 0 0 2rem !important;
+	font-size: 1.25rem !important;
+}
+.span9 .submenu-item {
+	margin: 0 !important;
+	padding: 0.5rem 1.2rem !important;
+	border-radius: 10rem !important;
+	background: var(--color-accent-bg) !important;
+	color: var(--color-accent) !important;
+	font-weight: 600 !important;
+}
+.span9 .submenu-item:has(> a) { padding: 0 !important; background: none !important; }
+.span9 .submenu-item > a.dashed {
+	display: inline-block !important;
+	padding: 0.5rem 1.2rem !important;
+	border: var(--glass-border) !important;
+	border-radius: 10rem !important;
+	background: var(--glass-bg-card) !important;
+	color: var(--color-text-secondary) !important;
+	font-weight: 500 !important;
+	text-decoration: none !important;
+}
+.span9 .submenu-item > a.dashed:hover { color: var(--color-text-primary) !important; background: var(--glass-bg-hover) !important; opacity: 1 !important; }
+.span9 > .submenu + p { font-size: 1.3rem !important; margin-bottom: 2rem !important; color: var(--color-text-secondary) !important; }
+
+/* ---------- Список ссылок-строк в контенте (журнал посещений) ---------- */
+.span9 > ul.nav-stacked {
+	margin: 0 0 2rem !important;
+	padding: 0.4rem !important;
+	max-width: 72rem !important;
+	background: var(--glass-bg-card) !important;
+	border: var(--glass-border) !important;
+	border-radius: var(--radius-xl) !important;
+	box-shadow: var(--glass-shadow-card) !important;
+}
+.span9 > ul.nav-stacked > li > a {
+	display: block !important;
+	padding: 1rem 1.4rem !important;
+	border: none !important;
+	border-radius: var(--radius-medium) !important;
+	background: none !important;
+	color: var(--color-text-primary) !important;
+	font-size: 1.35rem !important;
+}
+.span9 > ul.nav-stacked > li > a:hover { background: var(--color-accent-bg) !important; color: var(--color-accent) !important; opacity: 1 !important; }
+.span9 > ul.nav-stacked > li + li { border-top: 1px solid var(--color-divider) !important; }
