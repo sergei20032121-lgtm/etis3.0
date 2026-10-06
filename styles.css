@@ -2887,3 +2887,107 @@ table.common tr.kt-new > td { background: rgba(var(--color-accent-rgb, 124,111,2
 @media (prefers-reduced-motion: reduce) {
 	.etis3-week-grid { animation: none !important; }
 }
+
+
+/* ============================================================
+   LIQUID GLASS 3.7
+   Стекло снова главное: светлее и прозрачнее подложка, яркий
+   блик по верхней кромке, отражение снизу, сильнее размытие и
+   насыщенность, а за стеклом — живой цветной фон, чтобы было
+   что преломлять. Всё через переменные, вёрстка не меняется.
+   ============================================================ */
+
+[theme="light"] {
+	--glass-sheen:
+		linear-gradient(180deg, rgba(255,255,255,0.70) 0, rgba(255,255,255,0.18) 3.2rem, rgba(255,255,255,0) 9rem),
+		radial-gradient(140% 9rem at 0 0, rgba(255,255,255,0.45), rgba(255,255,255,0) 70%);
+	--glass-bg:         var(--glass-sheen), rgba(255,255,255,0.40);
+	--glass-bg-card:    var(--glass-sheen), rgba(255,255,255,0.34);
+	--glass-bg-sidebar: var(--glass-sheen), rgba(255,255,255,0.38);
+	--glass-bg-header:  var(--glass-sheen), rgba(250,250,255,0.55);
+	--glass-bg-hover:   rgba(255,255,255,0.62);
+	--glass-bg-active:  rgba(255,255,255,0.80);
+	--glass-bg-input:   rgba(255,255,255,0.46);
+
+	--glass-border:       1px solid rgba(255,255,255,0.78);
+	--glass-border-light: 1px solid rgba(255,255,255,0.90);
+	--glass-border-inner:
+		inset 0 1px 0 rgba(255,255,255,1),
+		inset 0 -1px 0 rgba(255,255,255,0.45),
+		inset 1px 0 0 rgba(255,255,255,0.55),
+		inset 0 0 0 1px rgba(255,255,255,0.18),
+		inset 0 -1.2rem 2.4rem -1.6rem rgba(255,255,255,0.55);
+	--glass-shadow:       0 8px 32px rgba(60,50,120,0.10), 0 1px 3px rgba(0,0,0,0.05), var(--glass-border-inner);
+	--glass-shadow-hover: 0 14px 44px rgba(60,50,120,0.16), 0 2px 6px rgba(0,0,0,0.06), var(--glass-border-inner);
+	--glass-shadow-card:  0 6px 26px rgba(60,50,120,0.08), 0 1px 2px rgba(0,0,0,0.04), var(--glass-border-inner);
+
+	--glass-filter:        blur(26px) saturate(200%) brightness(1.06);
+	--glass-filter-strong: blur(44px) saturate(220%) brightness(1.06);
+
+	--bg-gradient:
+		radial-gradient(60% 55% at 8% 6%,   rgba(var(--color-accent-rgb, 160,140,255), 0.42) 0%, transparent 70%),
+		radial-gradient(45% 50% at 92% 14%, rgba(255,150,200,0.30) 0%, transparent 70%),
+		radial-gradient(50% 45% at 62% 52%, rgba(var(--color-accent-rgb, 160,140,255), 0.16) 0%, transparent 70%),
+		radial-gradient(55% 50% at 30% 96%, rgba(110,210,255,0.30) 0%, transparent 70%),
+		radial-gradient(40% 40% at 96% 88%, rgba(255,210,140,0.22) 0%, transparent 70%),
+		#ecebf4;
+}
+
+[theme="dark"] {
+	--glass-sheen:
+		linear-gradient(180deg, rgba(255,255,255,0.10) 0, rgba(255,255,255,0.03) 3.2rem, rgba(255,255,255,0) 9rem),
+		radial-gradient(140% 9rem at 0 0, rgba(255,255,255,0.07), rgba(255,255,255,0) 70%);
+	--glass-bg:         var(--glass-sheen), rgba(30,30,42,0.42);
+	--glass-bg-card:    var(--glass-sheen), rgba(26,26,38,0.36);
+	--glass-bg-sidebar: var(--glass-sheen), rgba(24,24,34,0.40);
+	--glass-bg-header:  var(--glass-sheen), rgba(20,20,30,0.60);
+	--glass-bg-hover:   rgba(255,255,255,0.09);
+	--glass-bg-active:  rgba(48,48,62,0.86);
+	--glass-bg-input:   rgba(8,8,16,0.32);
+
+	--glass-border:       1px solid rgba(255,255,255,0.11);
+	--glass-border-light: 1px solid rgba(255,255,255,0.16);
+	--glass-border-inner:
+		inset 0 1px 0 rgba(255,255,255,0.24),
+		inset 0 -1px 0 rgba(255,255,255,0.06),
+		inset 1px 0 0 rgba(255,255,255,0.08),
+		inset 0 -1.2rem 2.4rem -1.6rem rgba(255,255,255,0.07);
+	--glass-shadow:       0 10px 36px rgba(0,0,0,0.42), 0 1px 3px rgba(0,0,0,0.30), var(--glass-border-inner);
+	--glass-shadow-hover: 0 16px 48px rgba(0,0,0,0.52), 0 2px 6px rgba(0,0,0,0.34), var(--glass-border-inner);
+	--glass-shadow-card:  0 8px 30px rgba(0,0,0,0.34), 0 1px 2px rgba(0,0,0,0.26), var(--glass-border-inner);
+
+	--glass-filter:        blur(28px) saturate(190%) brightness(1.04);
+	--glass-filter-strong: blur(46px) saturate(210%) brightness(1.02);
+
+	--bg-gradient:
+		radial-gradient(60% 55% at 8% 6%,   rgba(var(--color-accent-rgb, 120,100,220), 0.40) 0%, transparent 70%),
+		radial-gradient(45% 50% at 94% 12%, rgba(200,60,150,0.26) 0%, transparent 70%),
+		radial-gradient(50% 45% at 62% 52%, rgba(var(--color-accent-rgb, 120,100,220), 0.14) 0%, transparent 70%),
+		radial-gradient(55% 50% at 28% 98%, rgba(30,140,200,0.30) 0%, transparent 70%),
+		radial-gradient(40% 40% at 96% 90%, rgba(110,60,220,0.24) 0%, transparent 70%),
+		#0d0d14;
+}
+
+/* Таблицы: строки прозрачные, стекло видно насквозь; цвета статусов — мягкой подсветкой */
+.common th, .common th.subheader, .slimtab_nice th, .teach_plan th { background: rgba(255,255,255,0.025) !important; }
+[theme="light"] .common th, [theme="light"] .common th.subheader,
+[theme="light"] .slimtab_nice th, [theme="light"] .teach_plan th { background: rgba(255,255,255,0.30) !important; }
+tr.row-green td { background: rgba(52,199,89,0.05) !important; }
+tr.row-red   td { background: rgba(255,59,48,0.07) !important; }
+tr.row-green > td:first-child { box-shadow: inset 3px 0 0 rgba(52,199,89,0.55) !important; }
+tr.row-red   > td:first-child { box-shadow: inset 3px 0 0 rgba(255,59,48,0.65) !important; }
+tr.row-green:hover td { background: rgba(52,199,89,0.12) !important; }
+tr.row-red:hover   td { background: rgba(255,59,48,0.14) !important; }
+
+/* Цвет дисциплин — акцентом, а не заливкой: стекло остаётся стеклом */
+.ewg-pair { background: var(--glass-bg-card) !important; backdrop-filter: var(--glass-filter) !important; -webkit-backdrop-filter: var(--glass-filter) !important; box-shadow: var(--glass-shadow-card) !important; }
+.ewg-pair::after {
+	content: '' !important;
+	position: absolute !important;
+	inset: 0 !important;
+	border-radius: inherit !important;
+	background: linear-gradient(135deg, var(--dis-soft), transparent 70%) !important;
+	pointer-events: none !important;
+}
+.ewg-pair { position: relative !important; }
+.ewg-pair > * { position: relative !important; z-index: 1 !important; }

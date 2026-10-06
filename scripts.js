@@ -1604,7 +1604,7 @@ function styleSignsTable(d) {
 		<span class="eds-chip">рейтинг <b>${d.cur}</b> / ${d.max}</span>
 		<span class="eds-chip eds-chip--ok">сдано ${d.passed}</span>
 		${d.failed ? `<span class="eds-chip eds-chip--bad">не сдано ${d.failed}</span>` : ''}
-		${d.pending ? `<span class="eds-chip">впереди ${d.pending} · до +${d.left}</span>` : ''}
+		${d.pending ? `<span class="eds-chip">впереди ${d.pending}${d.left ? ` · до +${d.left}` : ''}</span>` : ''}
 		${d.fresh ? `<span class="eds-chip eds-chip--new">новых ${d.fresh}</span>` : ''}
 		<span class="eds-chip eds-chip--goal" hidden></span>
 		<span class="eds-bar"><span class="eds-bar-fill" style="width:${pct}%"></span></span>
@@ -1622,18 +1622,22 @@ const NEW_GRADE_DAYS  = 3;
 function markNewGrades(disciplines) {
 	let seen = null;
 	try { seen = JSON.parse(localStorage.getItem(SEEN_GRADES_KEY)); } catch (e) {}
-	const first = !seen || typeof seen !== 'object';
-	if (first) seen = {};
+	if (!seen || typeof seen !== 'object') seen = {};
 
 	const now = Date.now();
 	let fresh = 0;
 	disciplines.forEach(d => {
 		d.fresh = 0;
+		// Дисциплину, которую видим впервые (другой семестр, первый заход), только запоминаем
+		const dkey  = disciplineKey(d.name);
+		const known = `#${dkey}` in seen;
+		seen[`#${dkey}`] = 1;
 		d.kts.forEach((k, i) => {
 			if (k.grade === null) return;
-			const key  = `${disciplineKey(d.name)}|${i}|${k.topic.slice(0, 60)}`;
+			const key  = `${dkey}|${i}|${k.topic.slice(0, 60)}`;
 			const prev = seen[key];
-			if (!prev || prev.g !== k.grade) seen[key] = { g: k.grade, t: first ? 0 : now };
+			if (!known) seen[key] = { g: k.grade, t: 0 };
+			else if (!prev || prev.g !== k.grade) seen[key] = { g: k.grade, t: now };
 			if (now - seen[key].t < NEW_GRADE_DAYS * 864e5) {
 				k.row.classList.add('kt-new');
 				k.gradeCell.prepend(createEl('span', { className: 'kt-new-badge', textContent: 'new', title: 'Новая оценка' }));
@@ -1948,7 +1952,7 @@ function buildSignsStats(span9, disciplines, fresh = 0) {
 	w.innerHTML = `
 		<div class="esw-header">
 			<span class="material-icons">analytics</span>
-			<span class="esw-title">Сводка по семестру</span>
+			<span class="esw-title">Сводка по ${/триместр/i.test(span9.querySelector('.submenu')?.textContent || '') ? 'триместру' : 'семестру'}</span>
 			${fresh ? `<span class="esw-new">новых оценок: ${fresh}</span>` : ''}
 			<label class="esw-goal" title="Цель по баллам в рейтинг для каждой дисциплины — покажу, сколько ещё нужно набрать">
 				<span class="material-icons">flag</span>цель
