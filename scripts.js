@@ -349,6 +349,7 @@ function styleSidebar(sidebar) {
 	});
 
 	addSidebarSearch(sidebar);
+	addProfileCard(sidebar);
 
 	// Прогресс-бар семестра
 	addSemesterProgress(sidebar);
@@ -368,6 +369,26 @@ function styleSidebar(sidebar) {
 	// Подпись ЕТИС 3.0 by Комар внизу сайдбара
 	const branding = createEl('div', { className: 'etis3-branding', innerHTML: 'ЕТИС 3.0 <span>by Комар</span>' });
 	sidebar.appendChild(branding);
+}
+
+
+// Шапка ЕТИСа скрыта стилями — переносим ФИО и направление в сайдбар
+function addProfileCard(sidebar) {
+	const info = document.querySelector('.navbar .span12 > span');
+	if (!info) return;
+	const fullName = (info.firstChild?.textContent || '').replace(/\(.*?\)/, '').trim();
+	if (!fullName) return;
+	const parts = [...info.querySelectorAll(':scope > span')].map(s => s.textContent.trim()).filter(Boolean);
+	const words = fullName.split(/\s+/);
+	const initials = words.slice(0, 2).map(w => w[0]).join('').toUpperCase();
+
+	const card = createEl('div', { className: 'etis3-profile', title: fullName });
+	card.appendChild(createEl('div', { className: 'etis3-profile__avatar', textContent: initials }));
+	const text = createEl('div', { className: 'etis3-profile__info' });
+	text.appendChild(createEl('div', { className: 'etis3-profile__name', textContent: words.slice(0, 2).join(' ') }));
+	if (parts.length) text.appendChild(createEl('div', { className: 'etis3-profile__sub', textContent: parts.join(' · ') }));
+	card.appendChild(text);
+	sidebar.prepend(card);
 }
 
 
@@ -651,6 +672,14 @@ function stylePage_teachers(span9) {
 
 function stylePage_portfolio(span9) {
 	if (!span9) return;
+
+	// Счётчики разделов: «(0)» → «0», пустые разделы приглушаем
+	span9.querySelectorAll('h3 > a.dashed > span[id$="_cnt"]').forEach(cnt => {
+		const n = parseInt(cnt.textContent.replace(/\D/g, ''), 10) || 0;
+		cnt.textContent = n;
+		cnt.closest('h3').classList.toggle('etis3-section--empty', n === 0);
+	});
+
 	span9.querySelectorAll('img[name="load_doc"]').forEach(img => {
 		const btn = createEl('a', { className: 'icon-button2', textContent: 'attach_file' });
 		['name','data-tab','data-term','data-ttp','data-dis'].forEach(a => btn.setAttribute(a, img.getAttribute(a)));
