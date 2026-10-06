@@ -2513,3 +2513,51 @@ tr.pair-row--empty .pair_info::after {
 
 /* ---------- Поясняющие абзацы в контенте ---------- */
 .span9 > p { font-size: 1.3rem !important; line-height: 1.6 !important; max-width: 80rem !important; }
+
+/* ---------- Оценки: сводка по дисциплине и семестру ---------- */
+.etis3-dis-summary {
+	display: flex !important;
+	flex-wrap: wrap !important;
+	align-items: center !important;
+	gap: 0.6rem !important;
+	margin: -0.8rem 0 1.2rem !important;
+}
+.eds-chip {
+	padding: 0.25rem 0.9rem !important;
+	border-radius: 10rem !important;
+	font-size: 1.15rem !important;
+	background: var(--glass-bg-card) !important;
+	border: var(--glass-border) !important;
+	color: var(--color-text-secondary) !important;
+}
+.eds-chip b { color: var(--color-text-primary) !important; }
+.eds-chip--ok  { color: var(--color-green) !important; }
+.eds-chip--bad { color: var(--color-red) !important; background: rgba(255,59,48,0.10) !important; }
+.eds-bar, .esw-dis-bar {
+	flex: 1 1 12rem !important;
+	max-width: 24rem !important;
+	height: 0.5rem !important;
+	border-radius: 10rem !important;
+	background: var(--color-divider) !important;
+	overflow: hidden !important;
+}
+.eds-bar-fill, .esw-dis-bar > span {
+	display: block !important;
+	height: 100% !important;
+	border-radius: 10rem !important;
+	background: var(--gradient-accent) !important;
+}
+.esw-value small { font-size: 1.3rem !important; font-weight: 600 !important; color: var(--color-text-tertiary) !important; }
+.esw-dis-list { display: flex !important; flex-direction: column !important; gap: 0.8rem !important; margin-top: 1.4rem !important; }
+.esw-dis {
+	display: grid !important;
+	grid-template-columns: minmax(0, 1fr) 14rem 15rem !important;
+	align-items: center !important;
+	gap: 1.2rem !important;
+	font-size: 1.25rem !important;
+}
+.esw-dis-name { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; color: var(--color-text-primary) !important; }
+.esw-dis .esw-dis-bar { max-width: none !important; }
+.esw-dis-val { text-align: right !important; color: var(--color-text-secondary) !important; font-variant-numeric: tabular-nums !important; }
+.esw-dis-val b { color: var(--color-red) !important; font-weight: 600 !important; }
+.esw-dis--bad .esw-dis-bar > span { background: var(--color-red) !important; }

@@ -1130,7 +1130,9 @@ function stylePage_certif(span9) {
 
 function stylePage_signs(span9, pageMode) {
 	if (!span9 || pageMode !== 'current') return;
-	buildSignsStats(span9);
+	const disciplines = [...span9.querySelectorAll('table.common')].map(parseSignsTable).filter(Boolean);
+	buildSignsStats(span9, disciplines);
+	disciplines.forEach(styleSignsTable);
 
 	let tooltipWrapper;
 	const tooltipElem     = createEl('div', { className: 'sign-tooltip' });
@@ -1169,51 +1171,100 @@ function stylePage_signs(span9, pageMode) {
 	document.querySelectorAll('table.common').forEach(table => {
 		let idx = 0;
 		table.querySelectorAll('a').forEach(a => {
-			if (a.getAttribute('href')?.split('?')[0] !== 'stu.theme') return;
+			if (!/(^|\/)stu\.theme$/.test((a.getAttribute('href') || '').split('?')[0])) return;
 			a.setAttribute('data-tooltip', a.innerText);
 			a.innerHTML = 'КТ ' + (++idx);
 			a.addEventListener('mouseover', renderTooltip);
 			a.parentNode.addEventListener('mouseover', renderTooltip);
 			a.parentNode.addEventListener('mouseout', removeTooltip);
 		});
-		styleSignsRows(table);
 	});
 }
 
-function styleSignsRows(table) {
-	table.querySelectorAll('tbody > tr').forEach(row => {
-		const scores = [];
-		row.querySelectorAll('td').forEach(td => {
-			const n = parseFloat(td.textContent.trim());
-			if (!isNaN(n) && n >= 0 && n <= 10) scores.push(n);
-		});
-		if (!scores.length) return;
-		const avg    = scores.reduce((a, b) => a + b, 0) / scores.length;
-		const filled = scores.filter(s => s > 0).length;
-		row.classList.remove('row-green', 'row-yellow', 'row-red');
-		if (avg >= 7)      row.classList.add('row-green');
-		else if (avg >= 4) row.classList.add('row-yellow');
-		else               row.classList.add('row-red');
-		const firstCell = row.querySelector('td:first-child');
-		if (firstCell && scores.length > 0) {
-			const pct  = Math.round((filled / scores.length) * 100);
-			const bar  = createEl('div', { className: 'kt-progress' });
-			const fill = createEl('div', { className: 'kt-progress-fill' });
-			fill.style.width = pct + '%';
-			bar.appendChild(fill);
-			firstCell.appendChild(bar);
-		}
+// Таблица оценок ПГНИУ: Тема | Вид работы | Вид контроля | Оценка | Проходной балл |
+// Балл в рейтинг (текущий, максимальный) | Дата | Преподаватель. Оценки не по 10-балльной
+// шкале: КТ сдана, если оценка не ниже проходного балла.
+function parseSignsTable(table) {
+	const rows = [...table.querySelectorAll('tr')];
+	const head = rows[0];
+	if (!head) return null;
 
-		// Цветные точки рядом с каждой оценкой
-		row.querySelectorAll('td').forEach(td => {
-			const n = parseFloat(td.textContent.trim());
-			if (isNaN(n) || n <= 0 || n > 10) return;
-			const dot = createEl('span', { className: 'score-dot' });
-			dot.classList.add(n >= 7 ? 'score-dot--high' : n >= 4 ? 'score-dot--mid' : 'score-dot--low');
-			dot.title = `${n} / 10`;
-			td.appendChild(dot);
-		});
+	const col = {};
+	let pos = 0;
+	head.querySelectorAll('th, td').forEach(cell => {
+		const name = cell.textContent.trim().toLowerCase();
+		if (name.startsWith('оценка'))         col.grade = pos;
+		else if (name.startsWith('проходной')) col.pass = pos;
+		else if (name.startsWith('балл в рейтинг')) { col.cur = pos; col.max = pos + 1; }
+		else if (name.startsWith('дата'))      col.date = pos;
+		pos += cell.colSpan || 1;
 	});
+	if (col.grade === undefined || col.pass === undefined) return null;
+
+	const num = td => {
+		if (!td) return null;
+		const t = [...td.childNodes].filter(n => !n.classList?.contains('score-dot')).map(n => n.textContent).join('').trim();
+		if (!t || !/^-?\d+([.,]\d+)?$/.test(t)) return null;
+		return parseFloat(t.replace(',', '.'));
+	};
+
+	const kts = [];
+	let total = null;
+	rows.forEach(tr => {
+		const cells = [...tr.children];
+		if (cells.some(c => c.tagName === 'TH')) return;
+		if (/^(итого|всего)/i.test(cells[0]?.textContent.trim() || '')) {
+			total = { cur: num(cells[1]), max: num(cells[2]) };
+			return;
+		}
+		if (cells.length < pos) return;
+		const grade = num(cells[col.grade]);
+		const pass  = num(cells[col.pass]);
+		const status = grade === null ? 'pending' : (pass === null || grade >= pass ? 'passed' : 'failed');
+		kts.push({ row: tr, gradeCell: cells[col.grade], grade, pass, status,
+			cur: col.cur !== undefined ? num(cells[col.cur]) : null,
+			max: col.cur !== undefined ? num(cells[col.max]) : null });
+	});
+	if (!kts.length) return null;
+
+	const sum = key => kts.reduce((s, k) => s + (k[key] || 0), 0);
+	let h = table.previousElementSibling;
+	while (h && h.tagName !== 'H3') h = h.previousElementSibling;
+	return {
+		table, heading: h,
+		name: h ? h.textContent.trim() : 'Дисциплина',
+		kts,
+		cur: total?.cur ?? sum('cur'),
+		max: total?.max ?? sum('max'),
+		passed:  kts.filter(k => k.status === 'passed').length,
+		failed:  kts.filter(k => k.status === 'failed').length,
+		pending: kts.filter(k => k.status === 'pending').length,
+	};
+}
+
+function styleSignsTable(d) {
+	d.kts.forEach(k => {
+		k.row.classList.remove('row-green', 'row-yellow', 'row-red');
+		if (k.status === 'passed') k.row.classList.add('row-green');
+		if (k.status === 'failed') k.row.classList.add('row-red');
+		if (k.status === 'pending') return;
+		const dot = createEl('span', { className: 'score-dot ' + (k.status === 'passed' ? 'score-dot--high' : 'score-dot--low') });
+		dot.title = `${k.grade} из проходных ${k.pass}`;
+		k.gradeCell.appendChild(dot);
+	});
+
+	// Сводка по дисциплине рядом с заголовком
+	if (!d.heading) return;
+	const pct = d.max ? Math.round(d.cur / d.max * 100) : 0;
+	const sum = createEl('div', { className: 'etis3-dis-summary' });
+	sum.innerHTML = `
+		<span class="eds-chip">рейтинг <b>${d.cur}</b> / ${d.max}</span>
+		<span class="eds-chip eds-chip--ok">сдано ${d.passed}</span>
+		${d.failed ? `<span class="eds-chip eds-chip--bad">не сдано ${d.failed}</span>` : ''}
+		${d.pending ? `<span class="eds-chip">впереди ${d.pending}</span>` : ''}
+		<span class="eds-bar"><span class="eds-bar-fill" style="width:${pct}%"></span></span>
+	`;
+	d.heading.after(sum);
 }
 
 
@@ -1473,90 +1524,56 @@ function openSettingsPanel() {
 // СТАТИСТИКА ОЦЕНОК
 // ============================================================
 
-function buildSignsStats(span9) {
-	const allScores = [];
-	const bySubj = [];
+function buildSignsStats(span9, disciplines) {
+	if (!disciplines.length) return;
 
-	span9.querySelectorAll('table.common').forEach(table => {
-		const scores = [];
-		table.querySelectorAll('tbody tr td').forEach(td => {
-			const n = parseFloat(td.textContent.trim());
-			if (!isNaN(n) && n > 0 && n <= 10) { scores.push(n); allScores.push(n); }
-		});
-		if (scores.length) {
-			const th = table.querySelector('th');
-			bySubj.push({ name: (th ? th.textContent.trim().slice(0,55) : 'Дисциплина'), scores });
-		}
-	});
+	const cur     = disciplines.reduce((s, d) => s + d.cur, 0);
+	const max     = disciplines.reduce((s, d) => s + d.max, 0);
+	const passed  = disciplines.reduce((s, d) => s + d.passed, 0);
+	const failed  = disciplines.reduce((s, d) => s + d.failed, 0);
+	const pending = disciplines.reduce((s, d) => s + d.pending, 0);
+	const graded  = passed + failed;
 
-	if (allScores.length < 2) return;
-
-	const avg = arr => arr.reduce((a,b)=>a+b,0) / arr.length;
-	const g   = avg(allScores).toFixed(2);
-	const col = +g >= 7 ? 'var(--color-green)' : +g >= 4 ? 'var(--color-yellow)' : 'var(--color-red)';
-	const pct = Math.round(allScores.filter(s=>s>=7).length / allScores.length * 100);
-	const best  = bySubj.length > 1 ? [...bySubj].sort((a,b)=>avg(b.scores)-avg(a.scores))[0]  : null;
-	const worst = bySubj.length > 1 ? [...bySubj].sort((a,b)=>avg(a.scores)-avg(b.scores))[0]  : null;
+	const rows = [...disciplines].sort((a, b) => (b.failed - a.failed) || (a.cur / (a.max || 1)) - (b.cur / (b.max || 1)));
 
 	const w = createEl('div', { className: 'etis3-stats-widget' });
 	w.innerHTML = `
 		<div class="esw-header">
 			<span class="material-icons">analytics</span>
-			<span class="esw-title">Статистика оценок</span>
+			<span class="esw-title">Сводка по семестру</span>
 		</div>
 		<div class="esw-grid">
 			<div class="esw-card">
-				<div class="esw-label">Средний балл</div>
-				<div class="esw-value" style="color:${col}">${g}</div>
+				<div class="esw-label">Баллов в рейтинг</div>
+				<div class="esw-value">${cur}<small> / ${max}</small></div>
 			</div>
 			<div class="esw-card">
-				<div class="esw-label">Всего оценок</div>
-				<div class="esw-value">${allScores.length}</div>
+				<div class="esw-label">КТ сдано</div>
+				<div class="esw-value" style="color:var(--color-green)">${passed}<small> / ${graded}</small></div>
 			</div>
 			<div class="esw-card">
-				<div class="esw-label">Высоких ≥7</div>
-				<div class="esw-value" style="color:var(--color-green)">${pct}%</div>
+				<div class="esw-label">Не сдано</div>
+				<div class="esw-value" style="color:${failed ? 'var(--color-red)' : 'var(--color-text-primary)'}">${failed}</div>
 			</div>
 			<div class="esw-card">
-				<div class="esw-label">Дисциплин</div>
-				<div class="esw-value">${bySubj.length}</div>
+				<div class="esw-label">КТ впереди</div>
+				<div class="esw-value">${pending}</div>
 			</div>
 		</div>
-		${best && worst && best.name !== worst.name ? `
-		<div class="esw-extremes">
-			<div class="esw-ext esw-ext-best">
-				<span class="material-icons">emoji_events</span>
-				<div>
-					<div class="esw-ext-label">Лучше всего</div>
-					<div class="esw-ext-name">${escapeHtml(best.name)}</div>
-					<div class="esw-ext-val">${avg(best.scores).toFixed(1)} / 10</div>
-				</div>
-			</div>
-			<div class="esw-ext esw-ext-worst">
-				<span class="material-icons">trending_down</span>
-				<div>
-					<div class="esw-ext-label">Стоит подтянуть</div>
-					<div class="esw-ext-name">${escapeHtml(worst.name)}</div>
-					<div class="esw-ext-val">${avg(worst.scores).toFixed(1)} / 10</div>
-				</div>
-			</div>
-		</div>` : ''}
-		<div class="esw-bar-wrap">
-			<div class="esw-bar-title">Распределение</div>
-			<div class="esw-bars">
-				${[1,2,3,4,5,6,7,8,9,10].map(n => {
-					const cnt = allScores.filter(s => Math.round(s) === n).length;
-					const h   = Math.max(Math.round(cnt / allScores.length * 100), cnt > 0 ? 4 : 0);
-					const c   = n >= 7 ? 'var(--color-green)' : n >= 4 ? 'var(--color-yellow)' : 'var(--color-red)';
-					return `<div class="esw-bar-col">
-						<div class="esw-bar-fill" style="height:${h}%;background:${c}" title="${cnt}×"></div>
-						<div class="esw-bar-num">${n}</div>
-					</div>`;
-				}).join('')}
-			</div>
+		<div class="esw-dis-list">
+			${rows.map(d => {
+				const pct = d.max ? Math.round(d.cur / d.max * 100) : 0;
+				return `<div class="esw-dis${d.failed ? ' esw-dis--bad' : ''}">
+					<div class="esw-dis-name" title="${escapeHtml(d.name)}">${escapeHtml(d.name)}</div>
+					<div class="esw-dis-bar"><span style="width:${pct}%"></span></div>
+					<div class="esw-dis-val">${d.cur} / ${d.max}${d.failed ? ` · <b>${d.failed} не сдано</b>` : ''}</div>
+				</div>`;
+			}).join('')}
 		</div>
 	`;
 
-	span9.prepend(w);
+	// После вкладок «оценки за сессии / в семестре / …» и выбора семестра
+	const menus = span9.querySelectorAll(':scope > .submenu');
+	if (menus.length) menus[menus.length - 1].after(w);
+	else span9.prepend(w);
 }
-
