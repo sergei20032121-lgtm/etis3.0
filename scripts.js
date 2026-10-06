@@ -34,15 +34,6 @@ function getCurrentPairNum() {
 	return null;
 }
 
-function getNextPair() {
-	const now = nowMinutes();
-	for (const p of PAIR_SCHEDULE) {
-		const s = p.start[0]*60 + p.start[1];
-		if (s > now) return { ...p, minutesUntil: s - now };
-	}
-	return null;
-}
-
 function pairProgress() {
 	const now = nowMinutes();
 	for (const p of PAIR_SCHEDULE) {
@@ -53,8 +44,78 @@ function pairProgress() {
 	return null;
 }
 
+function formatDuration(mins) {
+	if (mins < 60) return `${mins} мин`;
+	const h = Math.floor(mins / 60), m = mins % 60;
+	return m ? `${h} ч ${m} мин` : `${h} ч`;
+}
+
+function escapeHtml(str) {
+	return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+
 function formatTime(h, m) {
 	return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+
+
+// ============================================================
+// НАСТРОЙКИ
+// ============================================================
+// Источник правды — chrome.storage.local. Копия в localStorage сайта
+// нужна только чтобы на document_start применить тему без мигания.
+
+let settings = etis3Normalize(readSettingsMirror() || etis3FromLegacy(localStorage));
+
+function readSettingsMirror() {
+	try { return JSON.parse(localStorage.getItem(ETIS3_STORAGE_KEY)); } catch (e) { return null; }
+}
+
+function writeSettingsMirror() {
+	try { localStorage.setItem(ETIS3_STORAGE_KEY, JSON.stringify(settings)); } catch (e) {}
+}
+
+function saveSettings(patch) {
+	settings = etis3Normalize({ ...settings, ...patch });
+	writeSettingsMirror();
+	etis3StorageSet(settings);
+	applySettings();
+}
+
+// Всё, что можно применить без перезагрузки страницы
+function applySettings() {
+	applyTheme();
+	const root = document.documentElement;
+	root.style.setProperty('font-size', settings.fontSize + 'px', 'important');
+	root.classList.toggle('etis3-compact',      settings.compact);
+	root.classList.toggle('etis3-no-highlight', !settings.highlight);
+	root.classList.toggle('etis3-no-widget',    !settings.widget);
+	root.classList.toggle('etis3-no-pairtypes', !settings.pairTypes);
+	root.classList.toggle('etis3-no-scoredots', !settings.scoreDots);
+	syncThemeSwitcher();
+	document.getElementById('etis3-sp-panel')?.etis3Render?.();
+}
+
+async function initSettings() {
+	const stored = await etis3StorageGet();
+	if (stored) {
+		settings = etis3Normalize(stored);
+	} else {
+		// Первый запуск или миграция со старых ключей localStorage
+		etis3StorageSet(settings);
+	}
+	writeSettingsMirror();
+	applySettings();
+
+	// Мусор от версий до 3.2: кэш расписания, который никогда не читался
+	try { ['etis3-tt-cache', 'etis3-last-week'].forEach(k => localStorage.removeItem(k)); } catch (e) {}
+
+	chrome.storage.onChanged.addListener((changes, area) => {
+		if (area !== 'local' || !changes[ETIS3_STORAGE_KEY]) return;
+		settings = etis3Normalize(changes[ETIS3_STORAGE_KEY].newValue);
+		writeSettingsMirror();
+		applySettings();
+	});
 }
 
 
@@ -62,123 +123,57 @@ function formatTime(h, m) {
 // ТЕМА
 // ============================================================
 
-let theme = 'auto';
-let prefersColorSchemeMedia;
+const THEME_LABELS = { auto: 'Системная', light: 'Светлая', dark: 'Тёмная' };
+const prefersDark  = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
 
-function setDarkTheme(e) {
-	document.documentElement.setAttribute('theme', e.matches ? 'dark' : 'light');
-	loadAccent();
-}
+prefersDark?.addEventListener('change', () => { if (settings.theme === 'auto') applyTheme(); });
 
-function setSystemThemeDetection() {
-	if (window.matchMedia) {
-		prefersColorSchemeMedia = window.matchMedia('(prefers-color-scheme: dark)');
-		document.documentElement.setAttribute('theme', prefersColorSchemeMedia.matches ? 'dark' : 'light');
-		prefersColorSchemeMedia.addEventListener('change', setDarkTheme);
-	}
-}
-
-function removeSystemThemeDetection() {
-	if (window.matchMedia && prefersColorSchemeMedia)
-		prefersColorSchemeMedia.removeEventListener('change', setDarkTheme);
-}
-
-function detectTheme() {
-	const saved = localStorage.getItem('theme');
-	if (saved) {
-		theme = saved;
-		if (theme === 'auto') setSystemThemeDetection();
-		else document.documentElement.setAttribute('theme', theme);
-	} else {
-		theme = 'auto';
-		setSystemThemeDetection();
-	}
+function applyTheme() {
+	document.documentElement.setAttribute('theme', etis3IsDark(settings.theme) ? 'dark' : 'light');
+	applyAccent(settings.accent);
 }
 
 function themeIcon(t) {
 	return t === 'dark' ? 'dark_mode' : t === 'light' ? 'light_mode' : 'brightness_6';
 }
 
-function switchTheme(e) {
-	const next   = { auto: 'light', light: 'dark', dark: 'auto' };
-	const labels = { auto: 'Системная', light: 'Светлая', dark: 'Тёмная' };
-	if (theme === 'auto') removeSystemThemeDetection();
-	theme = next[theme];
-	if (theme === 'auto') setSystemThemeDetection();
-	else document.documentElement.setAttribute('theme', theme);
-	localStorage.setItem('theme', theme);
-	loadAccent();
-	const a    = e.currentTarget;
-	const icon = a.querySelector('.material-icons');
-	const txt  = a.querySelector('.theme-label');
-	if (txt)  txt.textContent = labels[theme];
-	if (icon) icon.textContent = themeIcon(theme);
+function switchTheme() {
+	const next = { auto: 'light', light: 'dark', dark: 'auto' };
+	saveSettings({ theme: next[settings.theme] });
 }
 
-detectTheme();
+function syncThemeSwitcher() {
+	const btn = document.querySelector('.theme-switcher-btn');
+	if (!btn) return;
+	const icon = btn.querySelector('.material-icons');
+	const txt  = btn.querySelector('.theme-label');
+	if (icon) icon.textContent = themeIcon(settings.theme);
+	if (txt)  txt.textContent  = THEME_LABELS[settings.theme];
+}
 
 
 // ============================================================
 // АКЦЕНТНЫЙ ЦВЕТ
 // ============================================================
 
-const ACCENT_PRESETS = {
-	violet: { light: '#7c6fd4', dark: '#9d8ef0', label: 'Фиолетовый' },
-	blue:   { light: '#4f86f7', dark: '#7eaaff', label: 'Синий'      },
-	teal:   { light: '#0d9488', dark: '#2dd4bf', label: 'Изумрудный' },
-	rose:   { light: '#e11d6a', dark: '#fb7bb0', label: 'Розовый'    },
-};
-
 function applyAccent(key) {
-	const preset = ACCENT_PRESETS[key] || ACCENT_PRESETS.violet;
+	const preset = ETIS3_ACCENTS[key] || ETIS3_ACCENTS.violet;
 	const isDark = document.documentElement.getAttribute('theme') === 'dark';
 	const hex    = isDark ? preset.dark : preset.light;
-	const r = parseInt(hex.slice(1,3),16);
-	const g = parseInt(hex.slice(3,5),16);
-	const b = parseInt(hex.slice(5,7),16);
-	const root = document.documentElement;
+	const rgb    = etis3HexToRgb(hex);
+	const root   = document.documentElement;
 	root.style.setProperty('--color-accent',         hex);
-	root.style.setProperty('--color-accent-glow',     `rgba(${r},${g},${b},0.38)`);
-	root.style.setProperty('--color-accent-bg',       `rgba(${r},${g},${b},0.11)`);
-	root.style.setProperty('--color-accent-bg-hover', `rgba(${r},${g},${b},0.20)`);
+	root.style.setProperty('--color-accent-rgb',     rgb);
+	root.style.setProperty('--color-accent-glow',     `rgba(${rgb},0.38)`);
+	root.style.setProperty('--color-accent-bg',       `rgba(${rgb},0.11)`);
+	root.style.setProperty('--color-accent-bg-hover', `rgba(${rgb},0.20)`);
 	root.style.setProperty('--gradient-accent',       `linear-gradient(135deg,${hex},${hex}cc)`);
 	root.style.setProperty('--color-text-link',       hex);
 	root.style.setProperty('--color-text-accent',     hex);
 }
 
-function loadAccent() {
-	applyAccent(localStorage.getItem('etis3-accent') || 'violet');
-}
-
-loadAccent();
-
-
-// ============================================================
-// КЭШ РАСПИСАНИЯ
-// ============================================================
-
-const CACHE_KEY    = 'etis3-tt-cache';
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1 час
-
-function saveTimetableCache(html) {
-	try {
-		localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), html }));
-	} catch(e) {}
-}
-
-function loadTimetableCache() {
-	try {
-		const raw = localStorage.getItem(CACHE_KEY);
-		if (!raw) return null;
-		const { ts, html } = JSON.parse(raw);
-		if (Date.now() - ts > CACHE_TTL_MS) return null;
-		return { html, age: Math.round((Date.now() - ts) / 60000) };
-	} catch(e) { return null; }
-}
-
-function clearTimetableCache() {
-	localStorage.removeItem(CACHE_KEY);
-}
+applySettings();
+initSettings();
 
 
 // ============================================================
@@ -326,8 +321,8 @@ function styleSidebar(sidebar) {
 	if (nav) {
 		const li            = createEl('li');
 		const switcher      = createEl('a', { className: 'theme-switcher-btn' });
-		const switcherIcon  = createEl('span', { className: 'material-icons', textContent: themeIcon(theme) });
-		const switcherLabel = createEl('span', { className: 'theme-label', textContent: { auto: 'Системная', light: 'Светлая', dark: 'Тёмная' }[theme] });
+		const switcherIcon  = createEl('span', { className: 'material-icons', textContent: themeIcon(settings.theme) });
+		const switcherLabel = createEl('span', { className: 'theme-label', textContent: THEME_LABELS[settings.theme] });
 		switcher.appendChild(switcherIcon);
 		switcher.appendChild(switcherLabel);
 		switcher.addEventListener('click', switchTheme);
@@ -335,14 +330,13 @@ function styleSidebar(sidebar) {
 		nav.prepend(li);
 
 		const iconMap = {
-			null:                         'brightness_6',
 			'stu.change_pass_form':       'vpn_key',
 			'stu_email_pkg.change_email': 'alternate_email',
 			'stu.change_pr_page':         'account_box',
 			'stu.logout':                 'exit_to_app',
 		};
 		nav.querySelectorAll('li > a').forEach(a => {
-			const name = iconMap[a.getAttribute('href')] ?? null;
+			const name = iconMap[a.getAttribute('href')];
 			if (name) a.prepend(createEl('span', { className: 'material-icons', textContent: name }));
 		});
 	}
@@ -423,6 +417,7 @@ function styleLoginPage(page) {
 	document.body.innerHTML = '<div class="login-container">' + document.body.innerHTML + '</div>';
 	const loginContainer = document.querySelector('div.login-container');
 	const loginItems     = document.querySelector('#form > div.items');
+	if (!loginItems) return;
 	const loginActions   = createEl('div', { className: 'login-actions' });
 	loginItems.appendChild(loginActions);
 
@@ -446,9 +441,11 @@ function styleLoginPage(page) {
 	if (page !== 'stu_email_pkg.send_r_email') {
 		const infoStr = loginItems.textContent.split('\n').slice(-3)[0].trim();
 		const footer  = document.querySelector('div.header_message');
-		footer.className = 'footer';
-		footer.innerHTML = '<p>' + footer.innerHTML + '</p><p>' + infoStr + '</p>';
-		loginContainer.appendChild(footer);
+		if (footer) {
+			footer.className = 'footer';
+			footer.innerHTML = '<p>' + footer.innerHTML + '</p><p>' + escapeHtml(infoStr) + '</p>';
+			loginContainer.appendChild(footer);
+		}
 	}
 
 	// Бренд на странице входа
@@ -475,6 +472,8 @@ function styleLoginPage(page) {
 // ============================================================
 
 function initLoginParticles(container) {
+	if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+
 	const canvas = createEl('canvas', { id: 'etis3-particles' });
 	container.insertBefore(canvas, container.firstChild);
 
@@ -489,9 +488,8 @@ function initLoginParticles(container) {
 	}
 
 	function getAccentRgb() {
-		const dark = isDark();
-		// фиолет по умолчанию, можно расширить под другие акценты
-		return dark ? '157,142,240' : '124,111,212';
+		return getComputedStyle(document.documentElement).getPropertyValue('--color-accent-rgb').trim()
+			|| (isDark() ? '157,142,240' : '124,111,212');
 	}
 
 	class Particle {
@@ -536,8 +534,7 @@ function initLoginParticles(container) {
 			if (this.y < -20) this.reset();
 		}
 
-		draw() {
-			const rgb = getAccentRgb();
+		draw(rgb) {
 			ctx.save();
 
 			if (this.glow) {
@@ -554,8 +551,7 @@ function initLoginParticles(container) {
 		}
 	}
 
-	function drawConnections() {
-		const rgb = getAccentRgb();
+	function drawConnections(rgb) {
 		for (let i = 0; i < particles.length; i++) {
 			for (let j = i + 1; j < particles.length; j++) {
 				const dx   = particles[i].x - particles[j].x;
@@ -582,9 +578,10 @@ function initLoginParticles(container) {
 
 	let animId;
 	function animate() {
+		const rgb = getAccentRgb();
 		ctx.clearRect(0, 0, W, H);
-		drawConnections();
-		particles.forEach(p => { p.update(); p.draw(); });
+		drawConnections(rgb);
+		particles.forEach(p => { p.update(); p.draw(rgb); });
 		animId = requestAnimationFrame(animate);
 	}
 
@@ -668,88 +665,104 @@ function stylePage_portfolio(span9) {
 // РАСПИСАНИЕ
 // ============================================================
 
-// Определяем тип пары по тексту
-function getPairTypeIcon(text) {
+const PAIR_TYPES = [
+	{ re: /^лек/,   icon: 'menu_book',     label: 'Лекция',       cls: 'pair-type--lec'  },
+	{ re: /^лаб/,   icon: 'science',       label: 'Лаб. работа',  cls: 'pair-type--lab'  },
+	{ re: /^практ/, icon: 'edit',          label: 'Практика',     cls: 'pair-type--prac' },
+	{ re: /^сем/,   icon: 'groups',        label: 'Семинар',      cls: 'pair-type--sem'  },
+	{ re: /^конс/,  icon: 'support_agent', label: 'Консультация', cls: 'pair-type--cons' },
+];
+
+// Тип пары берём только из скобок в конце названия: «Матан (лек.)»,
+// иначе «Диалектика» или «Семантика» распознаются как лекция/семинар
+function parsePairType(text) {
+	const m = (text || '').match(/\s*\(([^()]*)\)\s*$/);
+	if (!m) return null;
+	const type = PAIR_TYPES.find(t => t.re.test(m[1].trim().toLowerCase()));
+	if (!type) return null;
+	return { ...type, name: text.slice(0, m.index).trim(), raw: m[0].trim() };
+}
+
+const MONTH_RES = [/^январ/, /^феврал/, /^март/, /^апрел/, /^ма[йя]/, /^июн/, /^июл/, /^август/, /^сентябр/, /^октябр/, /^ноябр/, /^декабр/];
+
+// Заголовок дня → сегодня ли это. Понимает «06.10», «6 октября» и просто число.
+function isTodayTitle(text) {
+	const now = new Date();
+	const d = now.getDate(), m = now.getMonth() + 1;
 	const t = (text || '').toLowerCase();
-	if (t.includes('лек'))   return { icon: 'menu_book',     label: 'Лекция',       cls: 'pair-type--lec'  };
-	if (t.includes('лаб'))   return { icon: 'science',        label: 'Лаб. работа',  cls: 'pair-type--lab'  };
-	if (t.includes('практ')) return { icon: 'edit_note',      label: 'Практика',     cls: 'pair-type--prac' };
-	if (t.includes('сем'))   return { icon: 'groups',         label: 'Семинар',      cls: 'pair-type--sem'  };
-	if (t.includes('конс'))  return { icon: 'support_agent',  label: 'Консультация', cls: 'pair-type--cons' };
-	return null;
+	const numeric = t.match(/(\d{1,2})\.(\d{1,2})/);
+	if (numeric) return +numeric[1] === d && +numeric[2] === m;
+	const worded = t.match(/(\d{1,2})\s+([а-яё]+)/);
+	if (worded) {
+		const mi = MONTH_RES.findIndex(re => re.test(worded[2]));
+		return +worded[1] === d && (mi < 0 || mi + 1 === m);
+	}
+	return new RegExp(`(^|\\D)0?${d}(\\D|$)`).test(t);
+}
+
+function findTodayBlock(span9) {
+	return [...span9.querySelectorAll('div.day')].find(day => isTodayTitle(day.querySelector('h3')?.textContent)) || null;
+}
+
+function readPairs(dayEl) {
+	const pairs = {};
+	if (!dayEl) return pairs;
+	dayEl.querySelectorAll('table tbody tr').forEach(row => {
+		const num = parseInt(row.querySelector('.pair_num .eval')?.textContent.trim(), 10);
+		const dis = row.querySelector('.pair_info .dis a');
+		if (isNaN(num) || !dis) return;
+		pairs[num] = {
+			row,
+			name: dis.dataset.name || dis.textContent.trim(),
+			aud:  row.querySelector('.pair_info .aud')?.textContent.trim() || '',
+		};
+	});
+	return pairs;
 }
 
 // Виджет следующей/текущей пары
-function buildNextPairWidget(span9) {
+function buildNextPairWidget(pairs) {
 	const currentNum = getCurrentPairNum();
-	const next       = getNextPair();
-	const progress   = pairProgress();
+	const now        = nowMinutes();
+	const widget     = createEl('div', { className: 'next-pair-widget' });
+	const upcoming   = PAIR_SCHEDULE.find(p => p.start[0] * 60 + p.start[1] > now && pairs[p.num]);
 
-	// Собираем данные пар из DOM
-	const pairsData = {};
-	span9.querySelectorAll('div.day').forEach(day => {
-		// Проверяем, сегодня ли этот день
-		const h3text = day.querySelector('h3')?.textContent || '';
-		const todayD = new Date().getDate();
-		if (!h3text.includes(String(todayD))) return;
+	const audHtml = info => info.aud
+		? `<div class="npw-aud"><span class="material-icons">room</span>${escapeHtml(info.aud)}</div>` : '';
 
-		day.querySelectorAll('table tbody tr').forEach(row => {
-			const numEl = row.querySelector('.pair_num .eval');
-			const disEl = row.querySelector('.pair_info .dis a');
-			const audEl = row.querySelector('.pair_info .aud');
-			if (!numEl || !disEl) return;
-			const num = parseInt(numEl.textContent.trim());
-			if (!isNaN(num)) {
-				pairsData[num] = {
-					name: disEl.textContent.trim(),
-					aud:  audEl?.textContent.trim() || '',
-				};
-			}
-		});
-	});
-
-	const widget = createEl('div', { className: 'next-pair-widget' });
-
-	if (currentNum && pairsData[currentNum]) {
-		// Идёт пара прямо сейчас
-		const p     = PAIR_SCHEDULE[currentNum - 1];
-		const info  = pairsData[currentNum];
-		const endT  = formatTime(p.end[0], p.end[1]);
-		const minsLeft = (p.end[0]*60 + p.end[1]) - nowMinutes();
-
+	if (currentNum && pairs[currentNum]) {
+		const p        = PAIR_SCHEDULE[currentNum - 1];
+		const info     = pairs[currentNum];
+		const minsLeft = (p.end[0] * 60 + p.end[1]) - now;
 		widget.innerHTML = `
 			<div class="npw-label">
 				<span class="material-icons npw-icon">play_circle</span>
 				<span>Сейчас идёт · пара ${currentNum}</span>
-				<span class="npw-time-badge">до ${endT} · ещё ${minsLeft} мин</span>
+				<span class="npw-time-badge">до ${formatTime(p.end[0], p.end[1])} · ещё ${formatDuration(minsLeft)}</span>
 			</div>
-			<div class="npw-name">${info.name}</div>
-			${info.aud ? `<div class="npw-aud"><span class="material-icons">room</span>${info.aud}</div>` : ''}
-			<div class="npw-progress-bar"><div class="npw-progress-fill" style="width:${progress}%"></div></div>
+			<div class="npw-name">${escapeHtml(info.name)}</div>
+			${audHtml(info)}
+			<div class="npw-progress-bar"><div class="npw-progress-fill" style="width:${pairProgress()}%"></div></div>
 		`;
 		widget.classList.add('npw--active');
-	} else if (next && pairsData[next.num]) {
-		// Следующая пара
-		const info  = pairsData[next.num];
-		const p     = PAIR_SCHEDULE[next.num - 1];
-		const startT = formatTime(p.start[0], p.start[1]);
-
+	} else if (upcoming) {
+		const info  = pairs[upcoming.num];
+		const until = upcoming.start[0] * 60 + upcoming.start[1] - now;
 		widget.innerHTML = `
 			<div class="npw-label">
 				<span class="material-icons npw-icon">schedule</span>
-				<span>Следующая пара · ${next.num}</span>
-				<span class="npw-time-badge">в ${startT} · через ${next.minutesUntil} мин</span>
+				<span>Следующая пара · ${upcoming.num}</span>
+				<span class="npw-time-badge">в ${formatTime(upcoming.start[0], upcoming.start[1])} · через ${formatDuration(until)}</span>
 			</div>
-			<div class="npw-name">${info.name}</div>
-			${info.aud ? `<div class="npw-aud"><span class="material-icons">room</span>${info.aud}</div>` : ''}
+			<div class="npw-name">${escapeHtml(info.name)}</div>
+			${audHtml(info)}
 		`;
 		widget.classList.add('npw--next');
 	} else {
-		// Пар больше нет
 		widget.innerHTML = `
 			<div class="npw-label">
 				<span class="material-icons npw-icon">check_circle</span>
-				<span>На сегодня пар больше нет</span>
+				<span>${Object.keys(pairs).length ? 'На сегодня пар больше нет' : 'Сегодня пар нет'}</span>
 			</div>
 		`;
 		widget.classList.add('npw--done');
@@ -758,33 +771,23 @@ function buildNextPairWidget(span9) {
 	return widget;
 }
 
+// Подсветка текущей пары — только в блоке сегодняшнего дня
+function highlightCurrentPair(span9, pairs) {
+	span9.querySelectorAll('tr.pair-row--active').forEach(row => row.classList.remove('pair-row--active'));
+	span9.querySelectorAll('.pair-progress-bar').forEach(bar => bar.remove());
+
+	const current = pairs[getCurrentPairNum()];
+	if (!current) return;
+	current.row.classList.add('pair-row--active');
+	const bar  = createEl('div', { className: 'pair-progress-bar' });
+	const fill = createEl('div', { className: 'pair-progress-fill' });
+	fill.style.height = pairProgress() + '%';
+	bar.appendChild(fill);
+	current.row.querySelector('.pair_num')?.appendChild(bar);
+}
+
 function stylePage_timetable(span9) {
 	if (!span9) return;
-
-	// Кэш — сохраняем HTML расписания
-	const cacheKey  = 'etis3-tt-cache-' + window.location.search;
-	const timetableEl = span9.querySelector('.timetable, div.day');
-
-	// Проверяем есть ли кэш и стоит ли показать плашку
-	const cached = loadTimetableCache();
-
-	// Сохраняем в кэш текущее состояние
-	if (timetableEl) {
-		saveTimetableCache(span9.innerHTML.substring(0, 50000));
-	}
-
-	// Запомнить неделю
-	span9.querySelectorAll('.weeks .week > a').forEach(a => {
-		a.addEventListener('click', () => {
-			try {
-				const p = new URL(a.href).searchParams.get('p_week');
-				if (p) localStorage.setItem('etis3-last-week', p);
-			} catch(e) {}
-		});
-	});
-
-	// Виджет следующей пары — строим после обработки строк
-	// (сначала нужно обработать строки чтоб данные были в DOM)
 
 	// Панель кнопок
 	const buttonbar = createEl('div', { className: 'timetable-buttonbar' });
@@ -804,18 +807,6 @@ function stylePage_timetable(span9) {
 	copyBtn.addEventListener('click', () => copyTimetable(span9));
 	buttonbar.appendChild(copyBtn);
 
-	// Если есть кэш — кнопка "обновлено N мин назад"
-	if (cached) {
-		const cacheInfo = createEl('span', {
-			className: 'timetable-cache-label',
-			textContent: `обновлено ${cached.age} мин назад`,
-		});
-		buttonbar.appendChild(cacheInfo);
-	}
-
-	// Перенос преподавателя + тип пары + подсветка текущей
-	const currentNum = getCurrentPairNum();
-
 	span9.querySelectorAll('div.day > table > tbody > tr').forEach(row => {
 		// Перенос преподавателя
 		const teacher = row.querySelector('span.teacher');
@@ -826,73 +817,48 @@ function stylePage_timetable(span9) {
 			teacher.remove();
 		}
 
-		// Тип пары — иконка
+		// Тип пары — чип. Исходный текст «(лек.)» оставляем скрытым:
+		// он виден при выключенных иконках и попадает в копирование.
 		const disLink = row.querySelector('.pair_info .dis a');
-		if (disLink) {
-			const fullText = disLink.textContent;
-			const typeInfo = getPairTypeIcon(fullText);
-			if (typeInfo) {
-				// Убираем текстовый тип из названия
-				const cleanName = fullText
-					.replace(/\(лек\.?\)/i, '')
-					.replace(/\(лаб\.?\)/i, '')
-					.replace(/\(практ\.?\)/i, '')
-					.replace(/\(сем\.?\)/i, '')
-					.replace(/\(конс\.?\)/i, '')
-					.trim();
-				disLink.textContent = cleanName;
+		const type    = disLink && parsePairType(disLink.textContent);
+		if (type) {
+			disLink.dataset.name = type.name;
+			disLink.textContent  = type.name + ' ';
+			disLink.appendChild(createEl('span', { className: 'pair-type-raw', textContent: type.raw }));
 
-				const typeChip = createEl('span', { className: `pair-type-chip ${typeInfo.cls}` });
-				const typeIcon = createEl('span', { className: 'material-icons', textContent: typeInfo.icon });
-				const typeLbl  = createEl('span', { textContent: typeInfo.label });
-				typeChip.appendChild(typeIcon);
-				typeChip.appendChild(typeLbl);
-				typeChip.title = typeInfo.label;
-
-				const disCell = row.querySelector('.pair_info');
-				if (disCell) disCell.appendChild(typeChip);
-			}
-		}
-
-		// Подсветка текущей пары
-		const numEl = row.querySelector('.pair_num .eval');
-		if (numEl && currentNum) {
-			const num = parseInt(numEl.textContent.trim());
-			if (num === currentNum) {
-				row.classList.add('pair-row--active');
-				// Прогресс внутри ячейки номера
-				const prog = pairProgress();
-				if (prog !== null) {
-					const bar  = createEl('div', { className: 'pair-progress-bar' });
-					const fill = createEl('div', { className: 'pair-progress-fill' });
-					fill.style.height = prog + '%';
-					bar.appendChild(fill);
-					row.querySelector('.pair_num')?.appendChild(bar);
-				}
-			}
+			const chip = createEl('span', { className: `pair-type-chip ${type.cls}`, title: type.label });
+			chip.appendChild(createEl('span', { className: 'material-icons', textContent: type.icon }));
+			chip.appendChild(createEl('span', { textContent: type.label }));
+			row.querySelector('.pair_info')?.appendChild(chip);
 		}
 	});
 
-	// Виджет ПОСЛЕ обработки строк
-	const widget = buildNextPairWidget(span9);
-	// Вставляем перед первым .day
-	const firstDay = span9.querySelector('div.day');
-	if (firstDay) span9.insertBefore(widget, firstDay);
-	else span9.prepend(widget);
+	// Виджет и подсветка — после обработки строк, обновляются раз в минуту
+	const todayBlock = findTodayBlock(span9);
+	let widget = null;
 
-	// Скролл к сегодня
-	const todayNum = new Date().getDate();
-	span9.querySelectorAll('div.day h3').forEach(h3 => {
-		if (h3.textContent.includes(String(todayNum))) {
-			setTimeout(() => h3.closest('.day')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 500);
+	function refresh() {
+		const pairs = readPairs(todayBlock);
+		highlightCurrentPair(span9, pairs);
+
+		// Виджет показываем только на неделе, где есть сегодняшний день
+		if (!todayBlock) return;
+		const fresh = buildNextPairWidget(pairs);
+		if (widget) {
+			widget.replaceWith(fresh);
+		} else {
+			const firstDay = span9.querySelector('div.day');
+			if (firstDay) firstDay.before(fresh);
+			else span9.prepend(fresh);
 		}
-	});
+		widget = fresh;
+	}
+	refresh();
+	setInterval(refresh, 60 * 1000);
 
-	// Обновляем виджет каждую минуту
-	setInterval(() => {
-		const newWidget = buildNextPairWidget(span9);
-		widget.replaceWith(newWidget);
-	}, 60000);
+	if (todayBlock) {
+		setTimeout(() => todayBlock.scrollIntoView({ behavior: 'smooth', block: 'start' }), 500);
+	}
 }
 
 function copyTimetable(span9) {
@@ -1157,16 +1123,6 @@ function styleSignsRows(table) {
 
 document.addEventListener('DOMContentLoaded', () => {
 	setIcon();
-
-	// Компактный режим
-	if (localStorage.getItem('etis3-compact') === 'true') {
-		document.body.classList.add('etis3-compact');
-	}
-
-	// Размер шрифта
-	const fontSize = localStorage.getItem('etis3-fontsize');
-	if (fontSize) document.documentElement.style.fontSize = fontSize + 'px';
-
 	stylePages();
 	initPageTransitions();
 });
@@ -1177,32 +1133,32 @@ document.addEventListener('DOMContentLoaded', () => {
 // ============================================================
 
 function initPageTransitions() {
-	// Overlay для fade
+	if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+
 	const overlay = createEl('div', { id: 'etis3-page-overlay' });
 	document.body.appendChild(overlay);
 
-	// Перехватываем клики по внутренним ссылкам
-	document.addEventListener('click', e => {
-		const a = e.target.closest('a');
-		if (!a) return;
-		const href = a.getAttribute('href');
-		if (!href) return;
+	// Вернулись кнопкой «Назад» из bfcache — снять затемнение
+	window.addEventListener('pageshow', () => overlay.classList.remove('etis3-overlay--out'));
 
-		// Только внутренние ссылки ЕТИСа (без http, без #)
-		if (href.startsWith('http') || href.startsWith('#') || href.startsWith('javascript')) return;
-		if (a.target === '_blank') return;
+	// Плавное затемнение перед переходом по внутренним ссылкам.
+	// Слушаем на bubbling: если ссылку уже обработал скрипт ЕТИСа, не трогаем.
+	document.addEventListener('click', e => {
+		if (e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+		const a = e.target.closest('a[href]');
+		if (!a || a.target === '_blank' || a.hasAttribute('download') || a.hasAttribute('onclick')) return;
+
+		const href = a.getAttribute('href');
+		if (!href || href.startsWith('#')) return;
+
+		let url;
+		try { url = new URL(href, location.href); } catch (err) { return; }
+		if (url.origin !== location.origin) return; // заодно отсекает javascript: и mailto:
+		if (url.pathname === location.pathname && url.search === location.search && url.hash) return;
 
 		e.preventDefault();
 		overlay.classList.add('etis3-overlay--out');
-		setTimeout(() => {
-			window.location.href = href;
-		}, 240);
-	});
-
-	// Fade-in при загрузке
-	requestAnimationFrame(() => {
-		overlay.classList.add('etis3-overlay--in');
-		setTimeout(() => overlay.classList.remove('etis3-overlay--in'), 350);
+		setTimeout(() => { window.location.href = url.href; }, 200);
 	});
 }
 
@@ -1267,18 +1223,20 @@ function addSemesterProgress(sidebar) {
 // ПАНЕЛЬ НАСТРОЕК
 // ============================================================
 
+const SETTINGS_TOGGLES = {
+	'РАСПИСАНИЕ': [
+		['highlight', 'play_circle',   'Подсветка текущей пары', 'Выделяет пару, которая идёт сейчас'],
+		['widget',    'schedule',      'Виджет следующей пары',  'Показывает, что идёт / что следующее'],
+		['pairTypes', 'menu_book',     'Иконки типов пар',       'Лекция, практика, лаб. работа'],
+	],
+	'ИНТЕРФЕЙС': [
+		['compact',   'compress',      'Компактный режим',       'Меньше отступов, больше контента'],
+		['scoreDots', 'grade',         'Цветные точки у оценок', 'Индикаторы рядом с баллом'],
+	],
+};
+
 function openSettingsPanel() {
 	if (document.getElementById('etis3-sp-overlay')) return;
-
-	const ACCENTS = [
-		{ key:'violet', c:'#7c6fd4' }, { key:'blue',   c:'#007AFF' },
-		{ key:'teal',   c:'#0d9488' }, { key:'rose',   c:'#e11d6a' },
-		{ key:'green',  c:'#34C759' }, { key:'orange', c:'#FF9500' },
-		{ key:'indigo', c:'#5856D6' }, { key:'mint',   c:'#00C7BE' },
-	];
-
-	const t = localStorage.getItem('theme')        || 'auto';
-	const a = localStorage.getItem('etis3-accent') || 'violet';
 
 	const overlay = createEl('div', { id: 'etis3-sp-overlay' });
 	const panel   = createEl('div', { id: 'etis3-sp-panel' });
@@ -1297,72 +1255,51 @@ function openSettingsPanel() {
 			<div class="etis3-sp-section">
 				<div class="etis3-sp-section-label">ТЕМА</div>
 				<div class="etis3-sp-row3">
-					<button class="etis3-sp-opt ${t==='auto'?'active':''}" data-theme="auto">
-						<span class="material-icons">brightness_6</span>Авто
-					</button>
-					<button class="etis3-sp-opt ${t==='light'?'active':''}" data-theme="light">
-						<span class="material-icons">light_mode</span>Светлая
-					</button>
-					<button class="etis3-sp-opt ${t==='dark'?'active':''}" data-theme="dark">
-						<span class="material-icons">dark_mode</span>Тёмная
-					</button>
+					${['auto', 'light', 'dark'].map(t => `
+						<button class="etis3-sp-opt" data-theme="${t}">
+							<span class="material-icons">${themeIcon(t)}</span>${t === 'auto' ? 'Авто' : THEME_LABELS[t]}
+						</button>
+					`).join('')}
 				</div>
 			</div>
 
 			<div class="etis3-sp-section">
 				<div class="etis3-sp-section-label">АКЦЕНТНЫЙ ЦВЕТ</div>
 				<div class="etis3-sp-accents">
-					${ACCENTS.map(x => `
-						<div class="etis3-sp-swatch ${x.key===a?'active':''}"
-							data-accent="${x.key}"
-							style="background:${x.c}"
-						></div>
+					${Object.entries(ETIS3_ACCENTS).map(([key, x]) => `
+						<div class="etis3-sp-swatch" data-accent="${key}" title="${x.label}"
+							style="background:${x.light}"></div>
 					`).join('')}
 				</div>
 			</div>
 
 			<div class="etis3-sp-section">
-				<div class="etis3-sp-section-label">РАСПИСАНИЕ</div>
-				<div class="etis3-sp-toggles">
-					${[
-						['sp-highlight','etis3-highlight','play_circle','Подсветка текущей пары','Выделяет пару которая идёт сейчас'],
-						['sp-widget','etis3-widget','schedule','Виджет следующей пары','Показывает что идёт / что следующее'],
-						['sp-pairtypes','etis3-pairtypes','menu_book','Иконки типов пар','Лекция, практика, лаб. работа'],
-					].map(([id,key,icon,label,sub]) => `
-						<div class="etis3-sp-toggle-row">
-							<div class="etis3-sp-toggle-info">
-								<span class="material-icons">${icon}</span>
-								<div>${label}<small>${sub}</small></div>
-							</div>
-							<label class="etis3-sp-toggle">
-								<input type="checkbox" id="${id}" ${localStorage.getItem(key)!=='false'?'checked':''}>
-								<div class="etis3-sp-track"></div>
-							</label>
-						</div>
-					`).join('')}
+				<div class="etis3-sp-section-label">РАЗМЕР ТЕКСТА</div>
+				<div class="etis3-sp-font-row">
+					<input type="range" id="etis3-sp-font" min="${ETIS3_FONT_MIN}" max="${ETIS3_FONT_MAX}" step="0.5">
+					<span id="etis3-sp-font-val"></span>
 				</div>
 			</div>
 
-			<div class="etis3-sp-section">
-				<div class="etis3-sp-section-label">ИНТЕРФЕЙС</div>
-				<div class="etis3-sp-toggles">
-					${[
-						['sp-compact','etis3-compact','density_small','Компактный режим','Меньше отступов, больше контента'],
-						['sp-scoredots','etis3-scoredots','grade','Цветные точки у оценок','Индикаторы рядом с баллом'],
-					].map(([id,key,icon,label,sub]) => `
-						<div class="etis3-sp-toggle-row">
-							<div class="etis3-sp-toggle-info">
-								<span class="material-icons">${icon}</span>
-								<div>${label}<small>${sub}</small></div>
+			${Object.entries(SETTINGS_TOGGLES).map(([title, rows]) => `
+				<div class="etis3-sp-section">
+					<div class="etis3-sp-section-label">${title}</div>
+					<div class="etis3-sp-toggles">
+						${rows.map(([key, icon, label, sub]) => `
+							<div class="etis3-sp-toggle-row">
+								<div class="etis3-sp-toggle-info">
+									<span class="material-icons">${icon}</span>
+									<div>${label}<small>${sub}</small></div>
+								</div>
+								<label class="etis3-sp-toggle">
+									<input type="checkbox" data-setting="${key}">
+									<div class="etis3-sp-track"></div>
+								</label>
 							</div>
-							<label class="etis3-sp-toggle">
-								<input type="checkbox" id="${id}" ${localStorage.getItem(key)==='true'?'checked':''}>
-								<div class="etis3-sp-track"></div>
-							</label>
-						</div>
-					`).join('')}
+						`).join('')}
+					</div>
 				</div>
-			</div>
+			`).join('')}
 
 			<div class="etis3-sp-section etis3-sp-section-last">
 				<button class="etis3-sp-danger" id="etis3-sp-reset">
@@ -1376,73 +1313,58 @@ function openSettingsPanel() {
 	document.body.appendChild(overlay);
 	document.body.appendChild(panel);
 
+	const fontRange = panel.querySelector('#etis3-sp-font');
+	const fontVal   = panel.querySelector('#etis3-sp-font-val');
+
+	// Отрисовать текущее состояние (вызывается и при изменениях из попапа)
+	function render() {
+		panel.querySelectorAll('[data-theme]').forEach(b => b.classList.toggle('active', b.dataset.theme === settings.theme));
+		panel.querySelectorAll('[data-accent]').forEach(s => s.classList.toggle('active', s.dataset.accent === settings.accent));
+		panel.querySelectorAll('[data-setting]').forEach(el => { el.checked = settings[el.dataset.setting]; });
+		fontRange.value      = settings.fontSize;
+		fontVal.textContent  = settings.fontSize + 'px';
+	}
+	render();
+	panel.etis3Render = render;
+
 	requestAnimationFrame(() => requestAnimationFrame(() => {
 		overlay.classList.add('etis3-sp-visible');
 		panel.classList.add('etis3-sp-visible');
 	}));
 
+	function onKey(e) { if (e.key === 'Escape') close(); }
 	function close() {
+		document.removeEventListener('keydown', onKey);
 		overlay.classList.remove('etis3-sp-visible');
 		panel.classList.remove('etis3-sp-visible');
 		setTimeout(() => { overlay.remove(); panel.remove(); }, 300);
 	}
 
+	document.addEventListener('keydown', onKey);
 	overlay.addEventListener('click', close);
-	document.getElementById('etis3-sp-close-btn').addEventListener('click', close);
+	panel.querySelector('#etis3-sp-close-btn').addEventListener('click', close);
 
-	// Тема
 	panel.querySelectorAll('[data-theme]').forEach(btn => {
-		btn.addEventListener('click', () => {
-			panel.querySelectorAll('[data-theme]').forEach(b => b.classList.remove('active'));
-			btn.classList.add('active');
-			const val = btn.dataset.theme;
-			localStorage.setItem('theme', val);
-			if (typeof chrome !== 'undefined' && chrome.storage) chrome.storage.local.set({ theme: val });
-			if (val === 'auto') { removeSystemThemeDetection(); setSystemThemeDetection(); }
-			else { removeSystemThemeDetection(); document.documentElement.setAttribute('theme', val); }
-			loadAccent();
-		});
+		btn.addEventListener('click', () => { saveSettings({ theme: btn.dataset.theme }); render(); });
 	});
 
-	// Акцент
 	panel.querySelectorAll('[data-accent]').forEach(sw => {
-		sw.addEventListener('click', () => {
-			panel.querySelectorAll('[data-accent]').forEach(s => s.classList.remove('active'));
-			sw.classList.add('active');
-			const key = sw.dataset.accent;
-			localStorage.setItem('etis3-accent', key);
-			if (typeof chrome !== 'undefined' && chrome.storage) chrome.storage.local.set({ 'etis3-accent': key });
-			applyAccent(key);
-		});
+		sw.addEventListener('click', () => { saveSettings({ accent: sw.dataset.accent }); render(); });
 	});
 
-	// Тоглы
-	[
-		['sp-highlight',  'etis3-highlight',  null],
-		['sp-widget',     'etis3-widget',     null],
-		['sp-pairtypes',  'etis3-pairtypes',  null],
-		['sp-compact',    'etis3-compact',    v => document.body.classList.toggle('etis3-compact', v)],
-		['sp-scoredots',  'etis3-scoredots',  null],
-	].forEach(([id, key, cb]) => {
-		const el = panel.querySelector('#' + id);
-		if (!el) return;
-		el.addEventListener('change', () => {
-			const val = el.checked ? 'true' : 'false';
-			localStorage.setItem(key, val);
-			if (typeof chrome !== 'undefined' && chrome.storage) chrome.storage.local.set({ [key]: val });
-			if (cb) cb(el.checked);
-		});
+	fontRange.addEventListener('input', () => {
+		saveSettings({ fontSize: parseFloat(fontRange.value) });
+		fontVal.textContent = settings.fontSize + 'px';
 	});
 
-	// Сброс
-	document.getElementById('etis3-sp-reset').addEventListener('click', () => {
-		['theme','etis3-accent','etis3-fontsize','etis3-highlight','etis3-widget',
-		 'etis3-pairtypes','etis3-compact','etis3-scoredots'].forEach(k => localStorage.removeItem(k));
-		if (typeof chrome !== 'undefined' && chrome.storage)
-			chrome.storage.local.remove(['theme','etis3-accent','etis3-fontsize',
-				'etis3-highlight','etis3-widget','etis3-pairtypes','etis3-compact','etis3-scoredots']);
-		close();
-		setTimeout(() => window.location.reload(), 250);
+	panel.querySelectorAll('[data-setting]').forEach(el => {
+		el.addEventListener('change', () => saveSettings({ [el.dataset.setting]: el.checked }));
+	});
+
+	panel.querySelector('#etis3-sp-reset').addEventListener('click', () => {
+		saveSettings({ ...ETIS3_DEFAULTS });
+		render();
+		showToast('Настройки сброшены');
 	});
 }
 
@@ -1506,7 +1428,7 @@ function buildSignsStats(span9) {
 				<span class="material-icons">emoji_events</span>
 				<div>
 					<div class="esw-ext-label">Лучше всего</div>
-					<div class="esw-ext-name">${best.name}</div>
+					<div class="esw-ext-name">${escapeHtml(best.name)}</div>
 					<div class="esw-ext-val">${avg(best.scores).toFixed(1)} / 10</div>
 				</div>
 			</div>
@@ -1514,7 +1436,7 @@ function buildSignsStats(span9) {
 				<span class="material-icons">trending_down</span>
 				<div>
 					<div class="esw-ext-label">Стоит подтянуть</div>
-					<div class="esw-ext-name">${worst.name}</div>
+					<div class="esw-ext-name">${escapeHtml(worst.name)}</div>
 					<div class="esw-ext-val">${avg(worst.scores).toFixed(1)} / 10</div>
 				</div>
 			</div>

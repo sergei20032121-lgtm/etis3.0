@@ -1256,8 +1256,8 @@ form > .items > .item { position: relative !important; margin: 0 0 3.2rem !impor
    ПОДСВЕТКА ТЕКУЩЕЙ ПАРЫ
    ============================================================ */
 
-tr.pair-row--active td { background: var(--color-accent-bg) !important; position: relative !important; }
-tr.pair-row--active td:first-child { border-left: 2.5px solid var(--color-accent) !important; }
+html:not(.etis3-no-highlight) tr.pair-row--active td { background: var(--color-accent-bg) !important; position: relative !important; }
+html:not(.etis3-no-highlight) tr.pair-row--active td:first-child { border-left: 2.5px solid var(--color-accent) !important; }
 .pair-progress-bar { position: absolute !important; top: 0 !important; right: 0 !important; width: 3px !important; height: 100% !important; background: var(--color-divider) !important; border-radius: 10rem !important; overflow: hidden !important; }
 .pair-progress-fill { position: absolute !important; top: 0 !important; width: 100% !important; background: var(--gradient-accent) !important; border-radius: 10rem !important; transition: height 60s linear !important; }
 
@@ -1589,6 +1589,7 @@ table.common td, table.slimtab_nice td { font-variant-numeric: tabular-nums !imp
 	border: 3px solid transparent !important;
 	transition: transform 0.12s ease !important;
 }
+.etis3-sp-swatch { cursor: pointer !important; }
 .etis3-sp-swatch:hover { transform: scale(1.12) !important; }
 .etis3-sp-swatch.active { border-color: var(--color-text-primary) !important; }
 
@@ -1768,12 +1769,14 @@ table.common td, table.slimtab_nice td { font-variant-numeric: tabular-nums !imp
 .semester-progress,
 .etis3-stats-widget,
 .login form, .login #form,
-#etis3-sp-panel,
 .sign-tooltip,
 .etis3-toast {
 	position: relative !important;
 	isolation: isolate !important;
 }
+
+/* Панель настроек остаётся fixed — блик ::before позиционируется относительно неё */
+#etis3-sp-panel { isolation: isolate !important; }
 
 /* Specular highlight — ::before — тонкий блик по верхнему краю */
 .span3 > .nav.nav-tabs.nav-stacked::before,
@@ -2120,3 +2123,67 @@ button,
 		inset 0 1px 0 rgba(255,255,255,0.12) !important;
 }
 
+
+/* ============================================================
+   ПЕРЕКЛЮЧАТЕЛИ ИЗ НАСТРОЕК
+   Классы вешаются на <html>, чтобы применять без перезагрузки
+   ============================================================ */
+
+.pair-type-raw                              { display: none !important; }
+.etis3-no-pairtypes .pair-type-raw          { display: inline !important; }
+.etis3-no-pairtypes .pair-type-chip         { display: none !important; }
+.etis3-no-widget .next-pair-widget          { display: none !important; }
+.etis3-no-highlight .pair-progress-bar      { display: none !important; }
+.etis3-no-scoredots .score-dot              { display: none !important; }
+
+
+/* ============================================================
+   ПЕРЕХОД МЕЖДУ СТРАНИЦАМИ
+   ============================================================ */
+
+#etis3-page-overlay {
+	position: fixed !important;
+	inset: 0 !important;
+	z-index: 99999 !important;
+	background: var(--bg-gradient) !important;
+	opacity: 0 !important;
+	pointer-events: none !important;
+	transition: opacity 0.2s ease !important;
+}
+#etis3-page-overlay.etis3-overlay--out { opacity: 0.85 !important; }
+
+
+/* ============================================================
+   РАЗМЕР ТЕКСТА В ПАНЕЛИ НАСТРОЕК
+   ============================================================ */
+
+.etis3-sp-font-row {
+	display: flex !important;
+	align-items: center !important;
+	gap: 1.2rem !important;
+}
+.etis3-sp-font-row input[type="range"] {
+	flex: 1 !important;
+	accent-color: var(--color-accent) !important;
+	cursor: pointer !important;
+}
+#etis3-sp-font-val {
+	min-width: 3.6rem !important;
+	text-align: right !important;
+	font-size: 1.2rem !important;
+	color: var(--color-text-secondary) !important;
+}
+
+
+/* ============================================================
+   МЕНЬШЕ ДВИЖЕНИЯ
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+	*, *::before, *::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+}

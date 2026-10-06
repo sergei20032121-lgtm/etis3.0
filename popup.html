@@ -56,7 +56,7 @@
 			var(--bg);
 		color: var(--text);
 		-webkit-font-smoothing: antialiased;
-		overflow: hidden;
+		overflow-x: hidden;
 	}
 
 	[data-theme="dark"] body {
@@ -85,7 +85,7 @@
 		font-size: 18px;
 		font-weight: 700;
 		letter-spacing: -0.03em;
-		background: linear-gradient(135deg, var(--accent), #b8acf6);
+		background: linear-gradient(135deg, var(--accent), var(--accent-glow));
 		-webkit-background-clip: text;
 		-webkit-text-fill-color: transparent;
 		background-clip: text;
@@ -103,7 +103,7 @@
 		height: 40px;
 		border-radius: 12px;
 		background: var(--accent-bg);
-		border: 1px solid rgba(124,111,212,0.25);
+		border: 1px solid var(--accent-glow);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -171,14 +171,14 @@
 
 	/* Акцент */
 	.accent-row {
-		display: flex;
-		gap: 8px;
-		align-items: center;
+		display: grid;
+		grid-template-columns: repeat(8, 1fr);
+		gap: 6px;
 	}
 
 	.accent-swatch {
-		width: 32px;
-		height: 32px;
+		width: 100%;
+		aspect-ratio: 1;
 		border-radius: 50%;
 		cursor: pointer;
 		border: 3px solid transparent;
@@ -284,7 +284,8 @@
 		flex-shrink: 0;
 	}
 
-	.toggle input { display: none; }
+	.toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+	.toggle input:focus-visible + .toggle-track { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 	.toggle-track {
 		position: absolute;
@@ -434,12 +435,7 @@
 <!-- Акцент -->
 <div class="section">
 	<div class="section-title">Акцентный цвет</div>
-	<div class="accent-row">
-		<div class="accent-swatch" data-accent="violet" style="background: linear-gradient(135deg,#7c6fd4,#9d8ef0)" title="Фиолетовый"></div>
-		<div class="accent-swatch" data-accent="blue"   style="background: linear-gradient(135deg,#4f86f7,#7eaaff)" title="Синий"></div>
-		<div class="accent-swatch" data-accent="teal"   style="background: linear-gradient(135deg,#0d9488,#2dd4bf)" title="Изумрудный"></div>
-		<div class="accent-swatch" data-accent="rose"   style="background: linear-gradient(135deg,#e11d6a,#fb7bb0)" title="Розовый"></div>
-	</div>
+	<div class="accent-row" id="accent-row"></div>
 </div>
 
 <!-- Шрифт -->
@@ -447,7 +443,7 @@
 	<div class="section-title">Размер текста</div>
 	<div class="font-size-row">
 		<span style="font-size:10px;color:var(--text-sec)">A</span>
-		<input type="range" id="font-size-range" min="9" max="12" step="0.5" value="10">
+		<input type="range" id="font-size-range" min="9" max="12" step="0.5" value="10" aria-label="Размер текста">
 		<span style="font-size:15px;color:var(--text-sec)">A</span>
 		<span class="font-size-label" id="font-size-val">10px</span>
 	</div>
@@ -466,7 +462,7 @@
 			</div>
 		</div>
 		<label class="toggle">
-			<input type="checkbox" id="toggle-highlight" checked>
+			<input type="checkbox" data-setting="highlight">
 			<div class="toggle-track"></div>
 		</label>
 	</div>
@@ -480,7 +476,7 @@
 			</div>
 		</div>
 		<label class="toggle">
-			<input type="checkbox" id="toggle-widget" checked>
+			<input type="checkbox" data-setting="widget">
 			<div class="toggle-track"></div>
 		</label>
 	</div>
@@ -494,22 +490,42 @@
 			</div>
 		</div>
 		<label class="toggle">
-			<input type="checkbox" id="toggle-pair-types" checked>
+			<input type="checkbox" data-setting="pairTypes">
 			<div class="toggle-track"></div>
 		</label>
 	</div>
 </div>
 
-<!-- Данные -->
+<!-- Интерфейс -->
 <div class="section">
-	<div class="section-title">Данные</div>
+	<div class="section-title">Интерфейс</div>
 
-	<div class="action-row">
-		<div class="action-label">
-			<span class="mi">cached</span>
-			Кэш расписания
+	<div class="toggle-row">
+		<div class="toggle-label">
+			<span class="mi">compress</span>
+			<div>
+				Компактный режим
+				<small>Меньше отступов, больше контента</small>
+			</div>
 		</div>
-		<button class="action-btn danger" id="btn-clear-cache">Очистить</button>
+		<label class="toggle">
+			<input type="checkbox" data-setting="compact">
+			<div class="toggle-track"></div>
+		</label>
+	</div>
+
+	<div class="toggle-row">
+		<div class="toggle-label">
+			<span class="mi">grade</span>
+			<div>
+				Цветные точки у оценок
+				<small>Индикаторы рядом с баллом</small>
+			</div>
+		</div>
+		<label class="toggle">
+			<input type="checkbox" data-setting="scoreDots">
+			<div class="toggle-track"></div>
+		</label>
 	</div>
 
 	<div class="action-row">
@@ -527,108 +543,7 @@
 
 <div class="save-notice" id="save-notice">✓ Сохранено</div>
 
-<script>
-const ACCENT_COLORS = {
-	violet: { light: '#7c6fd4', dark: '#9d8ef0' },
-	blue:   { light: '#4f86f7', dark: '#7eaaff' },
-	teal:   { light: '#0d9488', dark: '#2dd4bf' },
-	rose:   { light: '#e11d6a', dark: '#fb7bb0' },
-};
-
-// Загрузка настроек
-const savedTheme   = localStorage.getItem('theme')            || 'auto';
-const savedAccent  = localStorage.getItem('etis3-accent')     || 'violet';
-const savedFontSize = parseFloat(localStorage.getItem('etis3-fontsize') || '10');
-const savedHighlight  = localStorage.getItem('etis3-highlight')  !== 'false';
-const savedWidget     = localStorage.getItem('etis3-widget')     !== 'false';
-const savedPairTypes  = localStorage.getItem('etis3-pairtypes')  !== 'false';
-
-// Применить тему попапа
-function applyPopupTheme(t) {
-	const isDark = t === 'dark' || (t === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-	document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
-	// Обновить accent css var
-	const preset = ACCENT_COLORS[savedAccent] || ACCENT_COLORS.violet;
-	document.documentElement.style.setProperty('--accent', isDark ? preset.dark : preset.light);
-	document.documentElement.style.setProperty('--accent-glow', isDark
-		? 'rgba(157,142,240,0.38)' : 'rgba(124,111,212,0.35)');
-	document.documentElement.style.setProperty('--accent-bg', isDark
-		? 'rgba(157,142,240,0.14)' : 'rgba(124,111,212,0.12)');
-}
-
-applyPopupTheme(savedTheme);
-
-// Тема — кнопки
-document.querySelectorAll('.theme-btn').forEach(btn => {
-	if (btn.dataset.themeVal === savedTheme) btn.classList.add('active');
-	btn.addEventListener('click', () => {
-		document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
-		btn.classList.add('active');
-		localStorage.setItem('theme', btn.dataset.themeVal);
-		applyPopupTheme(btn.dataset.themeVal);
-		showSaved();
-		// Применяем на вкладку
-		chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
-			if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, { type: 'SET_THEME', value: btn.dataset.themeVal }).catch(()=>{});
-		});
-	});
-});
-
-// Акцент — свотчи
-document.querySelectorAll('.accent-swatch').forEach(sw => {
-	if (sw.dataset.accent === savedAccent) sw.classList.add('active');
-	sw.addEventListener('click', () => {
-		document.querySelectorAll('.accent-swatch').forEach(s => s.classList.remove('active'));
-		sw.classList.add('active');
-		localStorage.setItem('etis3-accent', sw.dataset.accent);
-		showSaved();
-	});
-});
-
-// Размер шрифта
-const fontRange = document.getElementById('font-size-range');
-const fontVal   = document.getElementById('font-size-val');
-fontRange.value = savedFontSize;
-fontVal.textContent = savedFontSize + 'px';
-fontRange.addEventListener('input', () => {
-	fontVal.textContent = fontRange.value + 'px';
-	localStorage.setItem('etis3-fontsize', fontRange.value);
-	showSaved();
-});
-
-// Тоглы
-function setupToggle(id, key) {
-	const el = document.getElementById(id);
-	el.checked = localStorage.getItem(key) !== 'false';
-	el.addEventListener('change', () => {
-		localStorage.setItem(key, el.checked ? 'true' : 'false');
-		showSaved();
-	});
-}
-setupToggle('toggle-highlight', 'etis3-highlight');
-setupToggle('toggle-widget',    'etis3-widget');
-setupToggle('toggle-pair-types','etis3-pairtypes');
-
-// Кнопки
-document.getElementById('btn-clear-cache').addEventListener('click', () => {
-	Object.keys(localStorage).filter(k => k.startsWith('etis3-tt-cache')).forEach(k => localStorage.removeItem(k));
-	showSaved('🗑 Кэш очищен');
-});
-
-document.getElementById('btn-reset').addEventListener('click', () => {
-	['theme','etis3-accent','etis3-fontsize','etis3-highlight','etis3-widget','etis3-pairtypes',
-	 'etis3-last-week', ...Object.keys(localStorage).filter(k => k.startsWith('etis3-tt-cache'))
-	].forEach(k => localStorage.removeItem(k));
-	showSaved('↺ Сброшено');
-	setTimeout(() => window.location.reload(), 800);
-});
-
-function showSaved(text = '✓ Сохранено') {
-	const el = document.getElementById('save-notice');
-	el.textContent = text;
-	el.classList.add('show');
-	setTimeout(() => el.classList.remove('show'), 1800);
-}
-</script>
+<script src="settings.js"></script>
+<script src="popup.js"></script>
 </body>
 </html>
