@@ -7,15 +7,19 @@
 // ============================================================
 // РАСПИСАНИЕ ПАР (время начала и конца)
 // ============================================================
+// Значения по умолчанию — звонки ПГНИУ. На странице расписания время начала
+// уточняется из самой таблицы (learnPairTimes), пара длится 1 ч 35 мин.
+
+const PAIR_LENGTH_MIN = 95;
 
 const PAIR_SCHEDULE = [
 	{ num: 1, start: [8,  0],  end: [9,  35]  },
 	{ num: 2, start: [9,  45], end: [11, 20]  },
 	{ num: 3, start: [11, 30], end: [13, 5]   },
-	{ num: 4, start: [13, 35], end: [15, 10]  },
-	{ num: 5, start: [15, 20], end: [16, 55]  },
-	{ num: 6, start: [17, 5],  end: [18, 40]  },
-	{ num: 7, start: [18, 45], end: [20, 20]  },
+	{ num: 4, start: [13, 30], end: [15, 5]   },
+	{ num: 5, start: [15, 15], end: [16, 50]  },
+	{ num: 6, start: [17, 0],  end: [18, 35]  },
+	{ num: 7, start: [18, 40], end: [20, 15]  },
 	{ num: 8, start: [20, 25], end: [22, 0]   },
 ];
 
@@ -312,10 +316,11 @@ function styleSidebar(sidebar) {
 		});
 	});
 
-	sidebar.querySelectorAll('.nav.nav-tabs.nav-stacked > li').forEach(li => {
-		const a = li.querySelector('a');
-		if (a && a.href === window.location.href) li.classList.add('active');
-	});
+	// ЕТИС иногда помечает активными несколько пунктов (учебный план + дисциплины по выбору) —
+	// если есть точное совпадение с адресом, подсвечиваем только его
+	const items = [...sidebar.querySelectorAll('.nav.nav-tabs.nav-stacked > li')];
+	const exact = items.filter(li => li.querySelector('a')?.href === window.location.href);
+	if (exact.length) items.forEach(li => li.classList.toggle('active', exact.includes(li)));
 
 	const nav = sidebar.querySelector('ul:nth-last-child(1)');
 	if (nav) {
@@ -731,6 +736,30 @@ function isTodayTitle(text) {
 	return new RegExp(`(^|\\D)0?${d}(\\D|$)`).test(t);
 }
 
+// Ячейка номера пары в ЕТИСе: «1 пара<br><font class="eval">8:00</font>»
+function readPairNum(row) {
+	const cell = row.querySelector('.pair_num');
+	if (!cell) return NaN;
+	const m = cell.textContent.match(/(\d+)\s*пар/i);
+	return m ? parseInt(m[1], 10) : NaN;
+}
+
+// Время начала пар берём из самой таблицы — у разных корпусов/лет оно может отличаться
+function learnPairTimes(span9) {
+	span9.querySelectorAll('div.day tr').forEach(row => {
+		const num  = readPairNum(row);
+		const time = row.querySelector('.pair_num .eval')?.textContent.match(/(\d{1,2})[:.](\d{2})/);
+		if (isNaN(num) || !time) return;
+		const start = +time[1] * 60 + +time[2];
+		const end   = start + PAIR_LENGTH_MIN;
+		const slot  = { num, start: [Math.floor(start / 60), start % 60], end: [Math.floor(end / 60), end % 60] };
+		const i = PAIR_SCHEDULE.findIndex(p => p.num === num);
+		if (i >= 0) PAIR_SCHEDULE[i] = slot;
+		else PAIR_SCHEDULE.push(slot);
+	});
+	PAIR_SCHEDULE.sort((a, b) => a.num - b.num);
+}
+
 function findTodayBlock(span9) {
 	return [...span9.querySelectorAll('div.day')].find(day => isTodayTitle(day.querySelector('h3')?.textContent)) || null;
 }
@@ -739,7 +768,7 @@ function readPairs(dayEl) {
 	const pairs = {};
 	if (!dayEl) return pairs;
 	dayEl.querySelectorAll('table tbody tr').forEach(row => {
-		const num = parseInt(row.querySelector('.pair_num .eval')?.textContent.trim(), 10);
+		const num = readPairNum(row);
 		const dis = row.querySelector('.pair_info .dis a');
 		if (isNaN(num) || !dis) return;
 		pairs[num] = {
@@ -762,7 +791,7 @@ function buildNextPairWidget(pairs) {
 		? `<div class="npw-aud"><span class="material-icons">room</span>${escapeHtml(info.aud)}</div>` : '';
 
 	if (currentNum && pairs[currentNum]) {
-		const p        = PAIR_SCHEDULE[currentNum - 1];
+		const p        = PAIR_SCHEDULE.find(x => x.num === currentNum);
 		const info     = pairs[currentNum];
 		const minsLeft = (p.end[0] * 60 + p.end[1]) - now;
 		widget.innerHTML = `
@@ -819,18 +848,20 @@ function highlightCurrentPair(span9, pairs) {
 
 function stylePage_timetable(span9) {
 	if (!span9) return;
+	learnPairTimes(span9);
 
 	// Панель кнопок
 	const buttonbar = createEl('div', { className: 'timetable-buttonbar' });
 	span9.prepend(buttonbar);
 
-	const consultDiv = span9.querySelector('div:nth-child(6)');
+	// Блок «Консультации…» с кнопкой «Показать»
+	const consultDiv = [...span9.children].find(el => el.tagName === 'DIV' && el.querySelector('#tb_show'));
 	if (consultDiv) { consultDiv.className = 'timetable-btn consultations'; buttonbar.appendChild(consultDiv); }
 
 	const feedbackBtn = span9.querySelector('a.estimate_tt');
 	if (feedbackBtn) { feedbackBtn.className = 'timetable-btn icon-button icon-feedback'; feedbackBtn.text = 'Оставить отзыв'; buttonbar.appendChild(feedbackBtn); }
 
-	const todayBtn = span9.querySelector('a:nth-child(5)');
+	const todayBtn = [...span9.children].find(el => el.tagName === 'A' && /сегодн/i.test(el.textContent));
 	if (todayBtn) { todayBtn.className = 'timetable-btn icon-button icon-today'; buttonbar.appendChild(todayBtn); }
 
 	const copyBtn = createEl('a', { className: 'timetable-btn icon-button icon-copy', textContent: 'Скопировать' });
@@ -862,6 +893,17 @@ function stylePage_timetable(span9) {
 			chip.appendChild(createEl('span', { textContent: type.label }));
 			row.querySelector('.pair_info')?.appendChild(chip);
 		}
+	});
+
+	// Пустые слоты: до первой пары дня прячем, «окна» между парами делаем компактными
+	span9.querySelectorAll('div.day').forEach(day => {
+		const rows = [...day.querySelectorAll('table > tbody > tr')];
+		const busy = rows.map(r => !!r.querySelector('.pair_info .dis'));
+		const first = busy.indexOf(true);
+		rows.forEach((row, i) => {
+			if (busy[i]) return;
+			row.classList.add(first === -1 || i < first ? 'pair-row--lead' : 'pair-row--empty');
+		});
 	});
 
 	// Виджет и подсветка — после обработки строк, обновляются раз в минуту
@@ -898,7 +940,7 @@ function copyTimetable(span9) {
 		const title = day.querySelector('h3')?.textContent.replace(/\s+/g,' ').trim() || '';
 		lines.push('\n' + title.toUpperCase());
 		day.querySelectorAll('table tbody tr').forEach(row => {
-			const num  = row.querySelector('.pair_num .eval')?.textContent.trim();
+			const num  = row.querySelector('.pair_num .eval')?.textContent.trim(); // время начала, «8:00»
 			const dis  = row.querySelector('.pair_info .dis a')?.textContent.trim();
 			const aud  = row.querySelector('.pair_info .aud')?.textContent.trim();
 			const tchr = row.querySelector('.pair_teacher a')?.textContent.trim();
