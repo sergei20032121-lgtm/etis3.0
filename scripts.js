@@ -641,18 +641,116 @@ function styleLoginPage(page) {
 	const brand = createEl('div', { className: 'login-branding', innerHTML: 'ЕТИС 3.0 <span>by Комар</span>' });
 	loginContainer.appendChild(brand);
 
-	const form = document.querySelector('.login form, .login #form');
-	if (form) {
-		form.style.cssText += 'opacity:0;transform:translateY(28px) scale(0.97)';
-		requestAnimationFrame(() => requestAnimationFrame(() => {
-			form.style.transition = 'opacity 0.45s ease, transform 0.45s ease';
-			form.style.opacity    = '1';
-			form.style.transform  = 'translateY(0) scale(1)';
-		}));
-	}
+	buildLoginScene(loginContainer, page);
 
 	// Анимированный фон — частицы
 	initLoginParticles(loginContainer);
+}
+
+// ---------- Сцена входа: аврора, приветствие, живая карточка ----------
+
+function loginGreeting(h) {
+	if (h >= 5 && h < 12)  return 'Доброе утро';
+	if (h >= 12 && h < 17) return 'Добрый день';
+	if (h >= 17 && h < 23) return 'Добрый вечер';
+	return 'Доброй ночи';
+}
+
+function buildLoginScene(container, page) {
+	const reduced = !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+	const login   = container.querySelector('.login');
+	const form    = container.querySelector('.login form, .login #form');
+	if (!login || !form) return;
+	document.documentElement.classList.add('etis3-login-page');
+
+	// Аврора: большие размытые пятна света за стеклом
+	const aurora = createEl('div', { id: 'etis3-aurora', 'aria-hidden': 'true' });
+	aurora.innerHTML = ['a', 'b', 'c', 'd'].map(k => `<div class="orb-wrap orb-wrap--${k}"><div class="orb orb--${k}"></div></div>`).join('')
+		+ '<div class="aurora-grain"></div>';
+	container.prepend(aurora);
+
+	// Герой: приветствие, большое название и живые часы
+	const recovery = page === 'stu_email_pkg.send_r_email';
+	const hero = createEl('div', { className: 'login-hero' });
+	hero.innerHTML = `
+		<div class="lh-greeting">${recovery ? 'Восстановим доступ' : loginGreeting(new Date().getHours())}</div>
+		<h1 class="lh-title" aria-label="ЕТИС 3.0">${[...'ЕТИС'].map((ch, i) => `<span style="--i:${i}">${ch}</span>`).join('')}<sup>3.0</sup></h1>
+		<div class="lh-sub">Личный кабинет студента ПГНИУ</div>
+		<div class="lh-clock"><span class="lh-time"></span><span class="lh-date"></span></div>
+	`;
+	const stage = createEl('div', { className: 'login-stage' });
+	login.before(stage);
+	stage.append(hero, login);
+
+	const timeEl = hero.querySelector('.lh-time'), dateEl = hero.querySelector('.lh-date');
+	const tick = () => {
+		const d = new Date();
+		timeEl.textContent = formatTime(d.getHours(), d.getMinutes());
+		dateEl.textContent = d.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
+	};
+	tick();
+	setInterval(tick, 10 * 1000);
+
+	// Пароль: показать / скрыть и предупреждение о Caps Lock
+	const pass = form.querySelector('input[type="password"]');
+	if (pass) {
+		const item = pass.closest('.item');
+		const eye  = createEl('button', { type: 'button', className: 'login-eye', title: 'Показать пароль', 'aria-label': 'Показать пароль' });
+		eye.innerHTML = '<span class="material-icons">visibility</span>';
+		eye.addEventListener('click', () => {
+			const show = pass.type === 'password';
+			pass.type = show ? 'text' : 'password';
+			eye.firstChild.textContent = show ? 'visibility_off' : 'visibility';
+			eye.title = show ? 'Скрыть пароль' : 'Показать пароль';
+			pass.focus();
+		});
+		const caps = createEl('div', { className: 'login-caps', textContent: 'Включён Caps Lock' });
+		item?.append(eye, caps);
+		const checkCaps = e => { if (e.getModifierState) caps.classList.toggle('show', e.getModifierState('CapsLock')); };
+		pass.addEventListener('keydown', checkCaps);
+		pass.addEventListener('keyup', checkCaps);
+		pass.addEventListener('blur', () => caps.classList.remove('show'));
+	}
+
+	// Кнопка: состояние «входим…». Сабмит не трогаем — его делает скрипт ЕТИСа.
+	const btn = form.querySelector('#sbmt');
+	if (btn) btn.addEventListener('click', () => {
+		const filled = [...form.querySelectorAll('input[type="text"], input[type="password"], input[type="email"]')].every(i => i.value.trim());
+		if (!filled) return;
+		btn.classList.add('is-loading');
+		setTimeout(() => btn.classList.remove('is-loading'), 8000);
+	});
+
+	// Ошибка входа — карточка «встряхивается»
+	if (container.querySelector(':scope > .error_message')) form.classList.add('login-shake');
+
+	// Фокус сразу в первое пустое поле
+	setTimeout(() => form.querySelector('input:not([type="hidden"])')?.focus({ preventScroll: true }), reduced ? 0 : 900);
+
+	if (reduced) return;
+
+	// Карточка следит за курсором: лёгкий 3D-наклон и блик там, где мышь.
+	// Аврора чуть смещается — эффект глубины.
+	let raf = 0, mx = 0.5, my = 0.5, gx = 0, gy = 0;
+	const apply = () => {
+		raf = 0;
+		const r = form.getBoundingClientRect();
+		const lx = (mx * innerWidth - r.left) / r.width, ly = (my * innerHeight - r.top) / r.height;
+		const inside = lx > -0.15 && lx < 1.15 && ly > -0.15 && ly < 1.15;
+		form.style.setProperty('--mx', (lx * 100).toFixed(1) + '%');
+		form.style.setProperty('--my', (ly * 100).toFixed(1) + '%');
+		form.style.setProperty('--ry', inside ? ((lx - 0.5) * 7).toFixed(2) + 'deg' : '0deg');
+		form.style.setProperty('--rx', inside ? ((0.5 - ly) * 6).toFixed(2) + 'deg' : '0deg');
+		form.classList.toggle('is-hover', inside);
+		aurora.style.setProperty('--px', gx.toFixed(3));
+		aurora.style.setProperty('--py', gy.toFixed(3));
+	};
+	window.addEventListener('mousemove', e => {
+		mx = e.clientX / innerWidth; my = e.clientY / innerHeight;
+		gx = mx - 0.5; gy = my - 0.5;
+		if (!raf) raf = requestAnimationFrame(apply);
+	});
+	document.addEventListener('mouseleave', () => { mx = my = -1; gx = gy = 0; if (!raf) raf = requestAnimationFrame(apply); });
 }
 
 

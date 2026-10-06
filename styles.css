@@ -2991,3 +2991,384 @@ tr.row-red:hover   td { background: rgba(255,59,48,0.14) !important; }
 }
 .ewg-pair { position: relative !important; }
 .ewg-pair > * { position: relative !important; z-index: 1 !important; }
+
+
+/* ============================================================
+   ВХОД 3.8 — аврора, герой, живая стеклянная карточка
+   ============================================================ */
+
+html.etis3-login-page, html.etis3-login-page body { overflow-x: hidden !important; }
+html.etis3-login-page body { background: #0b0b12 !important; }
+html.etis3-login-page[theme="light"] body { background: #eef0f8 !important; }
+
+/* ---------- Аврора ---------- */
+#etis3-aurora {
+	position: fixed !important;
+	inset: 0 !important;
+	z-index: 0 !important;
+	overflow: hidden !important;
+	pointer-events: none !important;
+	--px: 0; --py: 0;
+}
+#etis3-aurora .orb-wrap {
+	position: absolute !important;
+	transition: transform 1.2s cubic-bezier(.2,.7,.2,1) !important;
+}
+.orb-wrap--a { left: -12vmax; top: -16vmax;  transform: translate(calc(var(--px) * -60px), calc(var(--py) * -60px)); }
+.orb-wrap--b { right: -14vmax; top: -10vmax; transform: translate(calc(var(--px) * 90px),  calc(var(--py) * -40px)); }
+.orb-wrap--c { left: 10vmax; bottom: -22vmax; transform: translate(calc(var(--px) * -40px), calc(var(--py) * 80px)); }
+.orb-wrap--d { right: 6vmax; bottom: -18vmax; transform: translate(calc(var(--px) * 70px),  calc(var(--py) * 60px)); }
+#etis3-aurora .orb {
+	width: 56vmax; height: 56vmax;
+	border-radius: 50% !important;
+	filter: blur(70px) !important;
+	opacity: 0.85;
+	mix-blend-mode: screen;
+	animation: orb-drift 26s ease-in-out infinite alternate;
+}
+.orb--a { background: radial-gradient(circle at 50% 50%, rgba(var(--color-accent-rgb, 124,111,212), 0.95), rgba(var(--color-accent-rgb, 124,111,212), 0) 65%) !important; }
+.orb--b { background: radial-gradient(circle at 50% 50%, rgba(236,72,153,0.70), rgba(236,72,153,0) 65%) !important; width: 46vmax !important; height: 46vmax !important; animation-duration: 31s !important; animation-delay: -8s !important; }
+.orb--c { background: radial-gradient(circle at 50% 50%, rgba(34,180,230,0.70), rgba(34,180,230,0) 65%) !important; animation-duration: 35s !important; animation-delay: -14s !important; }
+.orb--d { background: radial-gradient(circle at 50% 50%, rgba(255,170,80,0.45), rgba(255,170,80,0) 65%) !important; width: 40vmax !important; height: 40vmax !important; animation-duration: 29s !important; animation-delay: -4s !important; }
+[theme="light"] #etis3-aurora .orb { mix-blend-mode: normal; opacity: 0.55; }
+
+@keyframes orb-drift {
+	0%   { transform: translate(0, 0) scale(1) rotate(0deg); }
+	33%  { transform: translate(8vmax, 5vmax) scale(1.12) rotate(40deg); }
+	66%  { transform: translate(-4vmax, 9vmax) scale(0.92) rotate(-20deg); }
+	100% { transform: translate(6vmax, -4vmax) scale(1.06) rotate(25deg); }
+}
+.aurora-grain {
+	position: absolute !important;
+	inset: 0 !important;
+	opacity: 0.06 !important;
+	mix-blend-mode: overlay !important;
+	background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E") !important;
+	background-size: 180px 180px !important;
+}
+html.etis3-login-page #etis3-particles { opacity: 0.55 !important; }
+
+/* ---------- Раскладка ---------- */
+html.etis3-login-page .login-container { min-height: 100vh !important; height: auto !important; }
+.login-stage {
+	flex: 1 0 auto !important;
+	display: grid !important;
+	grid-template-columns: minmax(0, 1fr) auto !important;
+	align-items: center !important;
+	gap: 6vw !important;
+	width: 100% !important;
+	max-width: 112rem !important;
+	margin: 0 auto !important;
+	padding: 6rem 4rem 2rem !important;
+}
+.login-stage > .login { margin: 0 !important; flex: none !important; }
+@media (max-width: 900px) {
+	.login-stage { grid-template-columns: 1fr !important; justify-items: center !important; text-align: center !important; gap: 3.2rem !important; padding-top: 4rem !important; }
+	.lh-clock { justify-content: center !important; }
+}
+
+/* ---------- Герой ---------- */
+.login-hero { color: var(--color-text-primary) !important; user-select: none !important; }
+.lh-greeting {
+	font-size: 1.8rem !important;
+	font-weight: 500 !important;
+	color: var(--color-text-secondary) !important;
+	letter-spacing: -0.01em !important;
+	animation: hero-in 0.9s cubic-bezier(.2,.8,.2,1) 0.15s both;
+}
+.lh-title {
+	margin: 0.4rem 0 0 !important;
+	font-size: clamp(7rem, 11vw, 15rem) !important;
+	line-height: 0.95 !important;
+	font-weight: 800 !important;
+	letter-spacing: -0.06em !important;
+	display: flex !important;
+	align-items: flex-start !important;
+}
+.login-stage .lh-title { justify-content: inherit; }
+@media (max-width: 900px) { .lh-title { justify-content: center !important; } }
+.lh-title > span {
+	display: inline-block !important;
+	background: linear-gradient(180deg, #fff 10%, rgba(255,255,255,0.55) 95%) !important;
+	-webkit-background-clip: text !important;
+	background-clip: text !important;
+	color: transparent !important;
+	filter: drop-shadow(0 10px 40px rgba(var(--color-accent-rgb, 124,111,212), 0.45));
+	animation: letter-in 1s cubic-bezier(.2,.8,.2,1) both;
+	animation-delay: calc(0.25s + var(--i) * 0.08s);
+}
+[theme="light"] .lh-title > span {
+	background: linear-gradient(180deg, rgba(20,18,40,0.92) 10%, rgba(var(--color-accent-rgb, 124,111,212), 0.85) 100%) !important;
+	-webkit-background-clip: text !important;
+	background-clip: text !important;
+	filter: drop-shadow(0 10px 30px rgba(var(--color-accent-rgb, 124,111,212), 0.25));
+}
+.lh-title sup {
+	margin: 1.4rem 0 0 1.2rem !important;
+	padding: 0.5rem 1.1rem !important;
+	font-size: 1.6rem !important;
+	font-weight: 700 !important;
+	letter-spacing: 0 !important;
+	line-height: 1 !important;
+	border-radius: 10rem !important;
+	color: #fff !important;
+	background: linear-gradient(135deg, rgba(var(--color-accent-rgb, 124,111,212), 0.95), rgba(236,72,153,0.85)) !important;
+	box-shadow: 0 6px 24px rgba(var(--color-accent-rgb, 124,111,212), 0.45), inset 0 1px 0 rgba(255,255,255,0.45) !important;
+	animation: hero-in 0.8s cubic-bezier(.2,.8,.2,1) 0.75s both;
+}
+.lh-sub {
+	margin-top: 1.4rem !important;
+	font-size: 1.7rem !important;
+	color: var(--color-text-secondary) !important;
+	animation: hero-in 0.9s cubic-bezier(.2,.8,.2,1) 0.55s both;
+}
+.lh-clock {
+	display: flex !important;
+	align-items: baseline !important;
+	gap: 1.4rem !important;
+	margin-top: 3.6rem !important;
+	animation: hero-in 0.9s cubic-bezier(.2,.8,.2,1) 0.7s both;
+}
+.lh-time {
+	font-size: 4.2rem !important;
+	font-weight: 300 !important;
+	letter-spacing: -0.03em !important;
+	font-variant-numeric: tabular-nums !important;
+	color: var(--color-text-primary) !important;
+}
+.lh-date { font-size: 1.5rem !important; color: var(--color-text-secondary) !important; }
+.lh-date::first-letter { text-transform: uppercase; }
+
+@keyframes hero-in {
+	from { opacity: 0; transform: translateY(18px); filter: blur(8px); }
+	to   { opacity: 1; transform: none; filter: none; }
+}
+@keyframes letter-in {
+	from { opacity: 0; transform: translateY(0.35em) scale(0.92); }
+	to   { opacity: 1; transform: none; }
+}
+
+/* ---------- Карточка ---------- */
+.login-stage > .login { animation: card-in 1.1s cubic-bezier(.16,.84,.24,1) 0.35s both; perspective: 1100px; }
+@keyframes card-in {
+	from { opacity: 0; transform: translateY(40px) scale(0.94); filter: blur(14px); }
+	to   { opacity: 1; transform: none; filter: none; }
+}
+html.etis3-login-page .login form,
+html.etis3-login-page .login #form {
+	width: 40rem !important;
+	padding: 4rem 3.6rem 3.4rem !important;
+	border-radius: 3rem !important;
+	transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) !important;
+	transform-style: preserve-3d !important;
+	transition: transform 0.5s cubic-bezier(.2,.7,.2,1), box-shadow 0.4s ease !important;
+	background:
+		linear-gradient(180deg, rgba(255,255,255,0.10) 0, rgba(255,255,255,0.02) 6rem, rgba(255,255,255,0) 14rem),
+		rgba(22,22,34,0.30) !important;
+	border: 1px solid rgba(255,255,255,0.14) !important;
+	backdrop-filter: blur(34px) saturate(210%) brightness(1.08) !important;
+	-webkit-backdrop-filter: blur(34px) saturate(210%) brightness(1.08) !important;
+	box-shadow:
+		0 30px 80px rgba(0,0,0,0.45),
+		0 8px 24px rgba(0,0,0,0.25),
+		inset 0 1px 0 rgba(255,255,255,0.32),
+		inset 0 -1px 0 rgba(255,255,255,0.08),
+		inset 1px 0 0 rgba(255,255,255,0.10),
+		inset 0 -3rem 5rem -4rem rgba(255,255,255,0.12) !important;
+}
+html.etis3-login-page[theme="light"] .login form,
+html.etis3-login-page[theme="light"] .login #form {
+	background:
+		linear-gradient(180deg, rgba(255,255,255,0.80) 0, rgba(255,255,255,0.30) 6rem, rgba(255,255,255,0.12) 14rem),
+		rgba(255,255,255,0.28) !important;
+	border: 1px solid rgba(255,255,255,0.85) !important;
+	box-shadow:
+		0 30px 80px rgba(60,50,140,0.18),
+		0 8px 24px rgba(60,50,140,0.10),
+		inset 0 1px 0 #fff,
+		inset 0 -1px 0 rgba(255,255,255,0.6),
+		inset 0 -3rem 5rem -4rem rgba(255,255,255,0.7) !important;
+}
+/* Блик за курсором */
+html.etis3-login-page .login form::before,
+html.etis3-login-page .login #form::before {
+	background: radial-gradient(28rem circle at var(--mx, 50%) var(--my, 0%), rgba(255,255,255,0.16), rgba(255,255,255,0) 60%) !important;
+	opacity: 0.6 !important;
+	transition: opacity 0.4s ease !important;
+}
+html.etis3-login-page .login form.is-hover::before,
+html.etis3-login-page .login #form.is-hover::before { opacity: 1 !important; }
+html.etis3-login-page[theme="light"] .login #form::before { background: radial-gradient(28rem circle at var(--mx, 50%) var(--my, 0%), rgba(255,255,255,0.75), rgba(255,255,255,0) 60%) !important; }
+/* Светящаяся кромка, тоже за курсором */
+html.etis3-login-page .login #form > .items::before {
+	content: '' !important;
+	position: absolute !important;
+	inset: -1px !important;
+	border-radius: 3rem !important;
+	padding: 1px !important;
+	background: radial-gradient(22rem circle at var(--mx, 50%) var(--my, 0%), rgba(var(--color-accent-rgb, 124,111,212), 0.9), rgba(255,255,255,0.15) 45%, transparent 70%) !important;
+	-webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0) !important;
+	-webkit-mask-composite: xor !important;
+	mask-composite: exclude !important;
+	pointer-events: none !important;
+	z-index: 3 !important;
+}
+html.etis3-login-page .login #form > .items { position: static !important; }
+html.etis3-login-page .login #form > * { position: relative; z-index: 4; }
+html.etis3-login-page .login #form > .items { z-index: 4 !important; }
+html.etis3-login-page .psu-logo {
+	height: 9rem !important;
+	background-size: 9rem !important;
+	margin-bottom: 3.6rem !important;
+	opacity: 0.55 !important;
+	animation: logo-breathe 5s ease-in-out infinite !important;
+}
+
+/* Поля */
+html.etis3-login-page form > .items > .item { margin-bottom: 3rem !important; }
+html.etis3-login-page .items > .item > input {
+	font-size: 1.6rem !important;
+	padding: 0.4rem 3.2rem 1rem 0 !important;
+	border-bottom: 1.5px solid rgba(255,255,255,0.14) !important;
+	background: transparent !important;
+}
+html.etis3-login-page[theme="light"] .items > .item > input { border-bottom-color: rgba(0,0,0,0.12) !important; }
+html.etis3-login-page .items > .item::after {
+	content: '' !important;
+	position: absolute !important;
+	left: 0; right: 0; bottom: 0;
+	height: 2px !important;
+	border-radius: 2px !important;
+	background: linear-gradient(90deg, rgba(var(--color-accent-rgb, 124,111,212), 1), rgba(236,72,153,0.9)) !important;
+	transform: scaleX(0) !important;
+	transform-origin: left !important;
+	transition: transform 0.45s cubic-bezier(.2,.8,.2,1) !important;
+	box-shadow: 0 0 14px rgba(var(--color-accent-rgb, 124,111,212), 0.7) !important;
+	pointer-events: none !important;
+}
+html.etis3-login-page .items > .item:focus-within::after { transform: scaleX(1) !important; }
+html.etis3-login-page .items > .item > input:focus { border-bottom-color: transparent !important; }
+
+.login-eye {
+	position: absolute !important;
+	right: -0.4rem !important;
+	bottom: 0.5rem !important;
+	width: 3.2rem !important;
+	height: 3.2rem !important;
+	padding: 0 !important;
+	border: 0 !important;
+	border-radius: 50% !important;
+	background: transparent !important;
+	color: var(--color-text-tertiary) !important;
+	cursor: pointer !important;
+	display: flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	transition: color 0.2s, background 0.2s !important;
+}
+.login-eye:hover { color: var(--color-text-primary) !important; background: rgba(255,255,255,0.08) !important; }
+.login-eye .material-icons { font-size: 1.9rem !important; }
+.login-caps {
+	position: absolute !important;
+	left: 0 !important;
+	top: calc(100% + 0.6rem) !important;
+	font-size: 1.1rem !important;
+	font-weight: 600 !important;
+	color: var(--color-yellow) !important;
+	opacity: 0 !important;
+	transform: translateY(-4px) !important;
+	transition: opacity 0.2s, transform 0.2s !important;
+	pointer-events: none !important;
+}
+.login-caps.show { opacity: 1 !important; transform: none !important; }
+
+/* Кнопка */
+html.etis3-login-page .login-actions { margin-top: 1.6rem !important; gap: 1.6rem !important; }
+html.etis3-login-page #sbmt {
+	position: relative !important;
+	overflow: hidden !important;
+	min-width: 13rem !important;
+	padding: 1.25rem 3rem !important;
+	border-radius: 1.6rem !important;
+	font-size: 1.5rem !important;
+	font-weight: 600 !important;
+	background: linear-gradient(135deg, rgba(var(--color-accent-rgb, 124,111,212), 1), rgba(236,72,153,0.92)) !important;
+	box-shadow:
+		0 10px 30px rgba(var(--color-accent-rgb, 124,111,212), 0.45),
+		inset 0 1px 0 rgba(255,255,255,0.45),
+		inset 0 -2px 6px rgba(0,0,0,0.12) !important;
+	transition: transform 0.25s cubic-bezier(.2,.8,.2,1), box-shadow 0.25s, filter 0.25s !important;
+}
+html.etis3-login-page #sbmt:hover {
+	opacity: 1 !important;
+	transform: translateY(-2px) !important;
+	filter: brightness(1.08) !important;
+	box-shadow: 0 16px 40px rgba(var(--color-accent-rgb, 124,111,212), 0.6), inset 0 1px 0 rgba(255,255,255,0.5) !important;
+}
+html.etis3-login-page #sbmt:active { transform: translateY(0) scale(0.97) !important; }
+html.etis3-login-page #sbmt::after {
+	content: '' !important;
+	position: absolute !important;
+	top: 0; bottom: 0; left: -60%;
+	width: 50% !important;
+	background: linear-gradient(100deg, transparent, rgba(255,255,255,0.45), transparent) !important;
+	transform: skewX(-20deg) !important;
+	animation: btn-shine 4.5s ease-in-out 2s infinite !important;
+	pointer-events: none !important;
+}
+@keyframes btn-shine {
+	0%, 70% { left: -60%; }
+	100%    { left: 130%; }
+}
+html.etis3-login-page #sbmt.is-loading span { opacity: 0 !important; }
+html.etis3-login-page #sbmt.is-loading::before {
+	content: '' !important;
+	position: absolute !important;
+	left: 50%; top: 50%;
+	width: 1.8rem !important; height: 1.8rem !important;
+	margin: -0.9rem 0 0 -0.9rem !important;
+	border-radius: 50% !important;
+	border: 2px solid rgba(255,255,255,0.35) !important;
+	border-top-color: #fff !important;
+	animation: btn-spin 0.7s linear infinite !important;
+}
+@keyframes btn-spin { to { transform: rotate(360deg); } }
+
+/* Ошибка входа */
+html.etis3-login-page .login-container > .error_message {
+	left: 50% !important; right: auto !important; top: 2.4rem !important;
+	transform: translateX(-50%) !important;
+	padding: 1.1rem 2.2rem !important;
+	border-radius: 10rem !important;
+	background: rgba(255,59,48,0.82) !important;
+	backdrop-filter: blur(20px) saturate(180%) !important;
+	box-shadow: 0 10px 30px rgba(255,59,48,0.35), inset 0 1px 0 rgba(255,255,255,0.35) !important;
+	animation: hero-in 0.6s cubic-bezier(.2,.8,.2,1) both;
+}
+.login-shake { animation: shake 0.55s cubic-bezier(.36,.07,.19,.97) 1.3s both !important; }
+@keyframes shake {
+	10%, 90% { translate: -2px 0; }
+	20%, 80% { translate: 4px 0; }
+	30%, 50%, 70% { translate: -8px 0; }
+	40%, 60% { translate: 8px 0; }
+}
+
+/* Подвал */
+html.etis3-login-page .footer { position: relative !important; z-index: 2 !important; color: var(--color-text-tertiary) !important; animation: hero-in 1s ease 1s both; }
+html.etis3-login-page .login-branding { padding-bottom: 2rem !important; animation: hero-in 1s ease 1.1s both; }
+
+@media (prefers-reduced-motion: reduce) {
+	#etis3-aurora .orb, .lh-greeting, .lh-title > span, .lh-title sup, .lh-sub, .lh-clock,
+	.login-stage > .login, html.etis3-login-page #sbmt::after, .login-shake { animation: none !important; }
+}
+.login-container > #etis3-aurora { position: fixed !important; z-index: 0 !important; }
+.login-container > #etis3-particles { z-index: 1 !important; }
+html.etis3-login-page .forgot-password { text-decoration: none !important; }
+html.etis3-login-page .forgot-password:hover { text-decoration: underline !important; text-underline-offset: 3px !important; }
+html.etis3-login-page .login #form > .items::before { padding: 1.5px !important; }
+.login-eye:focus-visible { outline: 2px solid var(--color-accent) !important; outline-offset: 1px !important; }
+@media (max-width: 900px) {
+	html.etis3-login-page .login-stage { padding: 4rem 1.6rem 2rem !important; }
+	html.etis3-login-page .login-stage > .login { width: 100% !important; display: flex !important; justify-content: center !important; }
+	html.etis3-login-page .login #form { width: 100% !important; max-width: 40rem !important; padding: 3.2rem 2.4rem 2.8rem !important; }
+}
