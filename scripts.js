@@ -54,6 +54,20 @@ function formatDuration(mins) {
 	return m ? `${h} ч ${m} мин` : `${h} ч`;
 }
 
+// Стабильный оттенок для дисциплины: одна и та же дисциплина одного цвета
+// и в расписании, и в оценках
+function disciplineHue(name) {
+	const key = String(name || '').toLowerCase().replace(/\(.*?\)|\[.*?\]/g, '').replace(/\s+/g, ' ').trim();
+	let h = 5381;
+	for (let i = 0; i < key.length; i++) h = ((h << 5) + h + key.charCodeAt(i)) >>> 0;
+	return Math.round((h * 137.508) % 360);
+}
+
+function paintDiscipline(el, name) {
+	el.style.setProperty('--dis-h', disciplineHue(name));
+	el.classList.add('etis3-dis');
+}
+
 function escapeHtml(str) {
 	return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
@@ -153,6 +167,7 @@ function syncThemeSwitcher() {
 	const txt  = btn.querySelector('.theme-label');
 	if (icon) icon.textContent = themeIcon(settings.theme);
 	if (txt)  txt.textContent  = THEME_LABELS[settings.theme];
+	btn.title = 'Тема: ' + THEME_LABELS[settings.theme];
 }
 
 
@@ -278,12 +293,14 @@ function addSidebarSearch(sidebar) {
 	wrap.appendChild(input);
 	sidebar.insertBefore(wrap, sidebar.firstChild);
 
-	const allLinks = sidebar.querySelectorAll('.nav.nav-tabs.nav-stacked > li');
+	const allLinks = sidebar.querySelectorAll('.nav.nav-tabs.nav-stacked:not(.etis3-quickbar) > li:not(.etis3-nav-head)');
 	input.addEventListener('input', () => {
 		const q = input.value.trim().toLowerCase();
+		// Во время поиска свёрнутые группы раскрываются, заголовки групп прячутся
+		sidebar.classList.toggle('etis3-searching', !!q);
 		allLinks.forEach(li => {
 			const match = !q || li.textContent.trim().toLowerCase().includes(q);
-			li.style.display    = match ? '' : 'none';
+			li.classList.toggle('etis3-nav-miss', !match);
 			li.style.background = (match && q) ? 'var(--color-accent-bg)' : '';
 		});
 	});
@@ -341,18 +358,19 @@ function styleSidebar(sidebar) {
 			'stu.logout':                 'exit_to_app',
 		};
 		nav.querySelectorAll('li > a').forEach(a => {
-			const name = iconMap[a.getAttribute('href')];
+			const name = iconMap[navKey(a)];
 			if (name) a.prepend(createEl('span', { className: 'material-icons', textContent: name }));
 		});
 	}
 
 	sidebar.querySelectorAll('li').forEach(li => {
 		const a    = li.querySelector('a');
-		const href = a && a.getAttribute('href');
+		const href = a ? navKey(a) : '';
 		if (href === 'stu_plus.add_snils' || href === 'ebl_stu.ebl_choice' || li.classList.contains('warn_menu'))
 			a.appendChild(createEl('span', { className: 'badge-point' }));
 	});
 
+	groupSidebarNav(sidebar);
 	addSidebarSearch(sidebar);
 	addProfileCard(sidebar);
 
@@ -369,11 +387,135 @@ function styleSidebar(sidebar) {
 		a.addEventListener('click', e => { e.preventDefault(); openSettingsPanel(); });
 		li.appendChild(a);
 		lastNav.appendChild(li);
+
+		// Нижний блок (тема, пароль, email, выход, настройки) — строка иконок с подсказками
+		lastNav.classList.add('etis3-quickbar');
+		lastNav.querySelectorAll('li > a').forEach(link => { link.title = link.textContent.replace(/\s+/g, ' ').trim().replace(/^\S+\s/, ''); });
 	}
 
 	// Подпись ЕТИС 3.0 by Комар внизу сайдбара
 	const branding = createEl('div', { className: 'etis3-branding', innerHTML: 'ЕТИС 3.0 <span>by Комар</span>' });
 	sidebar.appendChild(branding);
+}
+
+
+// ============================================================
+// ГРУППЫ В САЙДБАРЕ
+// ============================================================
+
+// Ключ пункта меню: имя страницы (+ режим для учебного плана)
+const NAV_ITEMS = {
+	'stu.timetable':                ['main',  'event'],
+	'stu.signs':                    ['main',  'grade'],
+	'stu.teacher_notes':            ['main',  'forum'],
+	'stu_ann.announces':            ['main',  'campaign'],
+	'stu.teach_plan':               ['study', 'menu_book'],
+	'stu.teach_plan?choose_dis':    ['study', 'playlist_add_check'],
+	'ebl_stu.ebl_choice':           ['study', 'how_to_vote'],
+	'stu.fcl_choice':               ['study', 'extension'],
+	'stu.absence':                  ['study', 'event_busy'],
+	'stu_jour.group_tt':            ['study', 'fact_check'],
+	'stu.ses':                      ['study', 'verified'],
+	'stu.teachers':                 ['study', 'school'],
+	'est_pkg.show_list':            ['study', 'rate_review'],
+	'stu.orders':                   ['docs',  'gavel'],
+	'cert_pkg.stu_certif':          ['docs',  'assignment'],
+	'stu_pay.contract_list':        ['docs',  'receipt_long'],
+	'stu_plus.blank_forms':         ['docs',  'file_copy'],
+	'stu.sc_portfolio':             ['docs',  'emoji_events'],
+	'stu.library':                  ['res',   'local_library'],
+	'stu.electr':                   ['res',   'cloud'],
+	'stu_plus.advice':              ['res',   'lightbulb'],
+	'stu.about':                    ['res',   'info'],
+};
+
+const NAV_GROUPS = [
+	['study', 'Учёба',     'school'],
+	['docs',  'Документы', 'folder'],
+	['res',   'Ресурсы',   'auto_stories'],
+];
+
+function navKey(a) {
+	try {
+		const u = new URL(a.href, location.href);
+		const mode = u.searchParams.get('p_mode');
+		const page = u.pathname.split('/').pop();
+		return mode && NAV_ITEMS[`${page}?${mode}`] ? `${page}?${mode}` : page;
+	} catch (e) { return ''; }
+}
+
+function readOpenGroups() {
+	try { return JSON.parse(localStorage.getItem('etis3-nav-open')) || []; } catch (e) { return []; }
+}
+
+function groupSidebarNav(sidebar) {
+	const nav = [...sidebar.querySelectorAll('.nav.nav-tabs.nav-stacked')]
+		.find(ul => ul.querySelector('a[href*="stu.timetable"]'));
+	if (!nav) return;
+	nav.classList.add('etis3-main-nav');
+
+	const buckets = { main: [], study: [], docs: [], res: [] };
+	[...nav.children].forEach(li => {
+		const a = li.querySelector('a');
+		if (!a) return;
+		const [group, icon] = NAV_ITEMS[navKey(a)] || ['res', 'chevron_right'];
+		decorateNavLink(a, icon);
+		li.dataset.group = group;
+		buckets[group].push(li);
+	});
+
+	// Главное — сверху всегда, в заданном порядке
+	const mainOrder = Object.keys(NAV_ITEMS).filter(k => NAV_ITEMS[k][0] === 'main');
+	buckets.main.sort((x, y) => mainOrder.indexOf(navKey(x.querySelector('a'))) - mainOrder.indexOf(navKey(y.querySelector('a'))));
+	buckets.main.forEach(li => nav.appendChild(li));
+
+	const open = readOpenGroups();
+	NAV_GROUPS.forEach(([key, title, icon]) => {
+		const items = buckets[key];
+		if (!items.length) return;
+		const hasActive = items.some(li => li.classList.contains('active'));
+		const isOpen = hasActive || open.includes(key);
+
+		const head = createEl('li', { className: 'etis3-nav-head' });
+		const btn  = createEl('a', { className: 'etis3-nav-head__btn' });
+		btn.innerHTML = `<span class="material-icons">${icon}</span><span class="etis3-nav-label">${title}</span><span class="etis3-nav-head__count">${items.length}</span><span class="material-icons etis3-nav-head__chevron">expand_more</span>`;
+		head.appendChild(btn);
+		head.classList.toggle('etis3-nav-head--open', isOpen);
+		nav.appendChild(head);
+		items.forEach(li => { li.classList.toggle('etis3-nav-closed', !isOpen); nav.appendChild(li); });
+
+		btn.addEventListener('click', e => {
+			e.preventDefault();
+			const nowOpen = !head.classList.contains('etis3-nav-head--open');
+			head.classList.toggle('etis3-nav-head--open', nowOpen);
+			items.forEach(li => li.classList.toggle('etis3-nav-closed', !nowOpen));
+			const state = new Set(readOpenGroups());
+			nowOpen ? state.add(key) : state.delete(key);
+			try { localStorage.setItem('etis3-nav-open', JSON.stringify([...state])); } catch (err) {}
+		});
+	});
+}
+
+// Иконка слева, подпись по центру, счётчик «(3)» — бейджем справа
+function decorateNavLink(a, icon) {
+	const point = a.querySelector('.badge-point');
+	const label = createEl('span', { className: 'etis3-nav-label' });
+	[...a.childNodes].forEach(n => { if (n !== point) label.appendChild(n); });
+
+	const last = label.lastChild;
+	if (last && last.nodeType === Node.TEXT_NODE) {
+		const m = last.textContent.match(/\s*\(([\d/]+)\)\s*$/);
+		if (m) {
+			last.textContent = last.textContent.slice(0, m.index);
+			const count = createEl('span', { className: 'etis3-nav-count', textContent: m[1] });
+			if (!/[1-9]/.test(m[1])) count.classList.add('etis3-nav-count--zero');
+			a.append(createEl('span', { className: 'material-icons', textContent: icon }), label, count);
+			if (point) a.appendChild(point);
+			return;
+		}
+	}
+	a.append(createEl('span', { className: 'material-icons', textContent: icon }), label);
+	if (point) a.appendChild(point);
 }
 
 
@@ -805,6 +947,7 @@ function buildNextPairWidget(pairs) {
 			<div class="npw-progress-bar"><div class="npw-progress-fill" style="width:${pairProgress()}%"></div></div>
 		`;
 		widget.classList.add('npw--active');
+		paintDiscipline(widget, info.name);
 	} else if (upcoming) {
 		const info  = pairs[upcoming.num];
 		const until = upcoming.start[0] * 60 + upcoming.start[1] - now;
@@ -818,6 +961,7 @@ function buildNextPairWidget(pairs) {
 			${audHtml(info)}
 		`;
 		widget.classList.add('npw--next');
+		paintDiscipline(widget, info.name);
 	} else {
 		widget.innerHTML = `
 			<div class="npw-label">
@@ -883,6 +1027,7 @@ function stylePage_timetable(span9) {
 		// он виден при выключенных иконках и попадает в копирование.
 		const disLink = row.querySelector('.pair_info .dis a');
 		const type    = disLink && parsePairType(disLink.textContent);
+		if (disLink) paintDiscipline(row, type ? type.name : disLink.textContent);
 		if (type) {
 			disLink.dataset.name = type.name;
 			disLink.textContent  = type.name + ' ';
@@ -1255,6 +1400,7 @@ function styleSignsTable(d) {
 
 	// Сводка по дисциплине рядом с заголовком
 	if (!d.heading) return;
+	paintDiscipline(d.heading, d.name);
 	const pct = d.max ? Math.round(d.cur / d.max * 100) : 0;
 	const sum = createEl('div', { className: 'etis3-dis-summary' });
 	sum.innerHTML = `
@@ -1563,7 +1709,7 @@ function buildSignsStats(span9, disciplines) {
 		<div class="esw-dis-list">
 			${rows.map(d => {
 				const pct = d.max ? Math.round(d.cur / d.max * 100) : 0;
-				return `<div class="esw-dis${d.failed ? ' esw-dis--bad' : ''}">
+				return `<div class="esw-dis etis3-dis${d.failed ? ' esw-dis--bad' : ''}" style="--dis-h:${disciplineHue(d.name)}">
 					<div class="esw-dis-name" title="${escapeHtml(d.name)}">${escapeHtml(d.name)}</div>
 					<div class="esw-dis-bar"><span style="width:${pct}%"></span></div>
 					<div class="esw-dis-val">${d.cur} / ${d.max}${d.failed ? ` · <b>${d.failed} не сдано</b>` : ''}</div>

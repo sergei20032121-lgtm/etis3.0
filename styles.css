@@ -95,7 +95,7 @@
 	--color-divider:          rgba(0,0,0,0.06);
 
 	--bg-gradient:
-		radial-gradient(ellipse at 10% 10%, rgba(160,140,255,0.28) 0%, transparent 45%),
+		radial-gradient(ellipse at 10% 10%, rgba(var(--color-accent-rgb, 160,140,255), 0.28) 0%, transparent 45%),
 		radial-gradient(ellipse at 85% 20%, rgba(100,160,255,0.22) 0%, transparent 40%),
 		radial-gradient(ellipse at 50% 90%, rgba(180,220,255,0.18) 0%, transparent 40%),
 		#eeeef4;
@@ -160,7 +160,7 @@
 	--color-divider:          rgba(255,255,255,0.07);
 
 	--bg-gradient:
-		radial-gradient(ellipse at 15% 10%, rgba(80,65,160,0.30) 0%, transparent 40%),
+		radial-gradient(ellipse at 15% 10%, rgba(var(--color-accent-rgb, 120,100,220), 0.22) 0%, transparent 40%),
 		radial-gradient(ellipse at 85% 15%, rgba(40,60,130,0.22) 0%, transparent 40%),
 		radial-gradient(ellipse at 50% 85%, rgba(60,40,120,0.20) 0%, transparent 40%),
 		#16161a;
@@ -2561,3 +2561,138 @@ tr.pair-row--empty .pair_info::after {
 .esw-dis-val { text-align: right !important; color: var(--color-text-secondary) !important; font-variant-numeric: tabular-nums !important; }
 .esw-dis-val b { color: var(--color-red) !important; font-weight: 600 !important; }
 .esw-dis--bad .esw-dis-bar > span { background: var(--color-red) !important; }
+
+
+/* ============================================================
+   САЙДБАР 3.5: группы, иконки, бейджи, строка быстрых действий
+   ============================================================ */
+
+.etis3-main-nav > li > a { justify-content: flex-start !important; gap: 1rem !important; }
+.etis3-main-nav > li > a > .material-icons {
+	margin: 0 !important;
+	font-size: 1.8rem !important;
+	width: 1.8rem !important;
+	flex-shrink: 0 !important;
+	color: var(--color-text-tertiary) !important;
+	transition: color 0.12s ease !important;
+}
+.etis3-main-nav > li > a:hover > .material-icons,
+.etis3-main-nav > .active > a > .material-icons { color: var(--color-accent) !important; }
+.etis3-nav-label { flex: 1 !important; min-width: 0 !important; line-height: 1.3 !important; }
+.etis3-nav-count {
+	flex-shrink: 0 !important;
+	min-width: 2rem !important;
+	padding: 0.1rem 0.7rem !important;
+	border-radius: 10rem !important;
+	background: var(--color-accent-bg) !important;
+	color: var(--color-accent) !important;
+	font-size: 1.1rem !important;
+	font-weight: 600 !important;
+	text-align: center !important;
+	font-variant-numeric: tabular-nums !important;
+}
+.etis3-nav-count--zero { background: none !important; color: var(--color-text-tertiary) !important; font-weight: 500 !important; }
+
+/* Заголовок группы */
+.etis3-main-nav > li.etis3-nav-head { border-top: 1px solid var(--color-divider) !important; }
+.etis3-main-nav > li.etis3-nav-head > a {
+	padding-top: 1rem !important;
+	padding-bottom: 1rem !important;
+	font-size: 1.1rem !important;
+	font-weight: 600 !important;
+	letter-spacing: 0.06em !important;
+	text-transform: uppercase !important;
+	color: var(--color-text-secondary) !important;
+	user-select: none !important;
+}
+.etis3-main-nav > li.etis3-nav-head > a:hover { padding-left: 1.4rem !important; color: var(--color-text-primary) !important; }
+.etis3-nav-head__count {
+	font-size: 1.05rem !important;
+	font-weight: 500 !important;
+	letter-spacing: 0 !important;
+	color: var(--color-text-tertiary) !important;
+}
+.etis3-main-nav > li.etis3-nav-head > a > .etis3-nav-head__chevron {
+	width: auto !important;
+	font-size: 2rem !important;
+	transition: transform 0.2s ease !important;
+}
+.etis3-nav-head--open .etis3-nav-head__chevron { transform: rotate(180deg) !important; }
+.etis3-nav-head--open + li:not(.etis3-nav-head) { border-top: none !important; }
+
+/* Свёрнутые пункты; при поиске всё раскрыто, несовпадения скрыты */
+.etis3-main-nav > li.etis3-nav-closed { display: none !important; }
+.etis3-searching .etis3-main-nav > li.etis3-nav-closed { display: block !important; }
+.etis3-searching .etis3-main-nav > li.etis3-nav-head { display: none !important; }
+.span3 .nav.nav-tabs.nav-stacked > li.etis3-nav-miss,
+.etis3-searching .etis3-main-nav > li.etis3-nav-miss { display: none !important; }
+
+/* Строка быстрых действий */
+.span3 > .nav.nav-tabs.nav-stacked.etis3-quickbar {
+	display: flex !important;
+	justify-content: space-between !important;
+	padding: 0.4rem !important;
+}
+.etis3-quickbar > li { flex: 1 !important; display: block !important; }
+.etis3-quickbar > li::before { display: none !important; }
+.span3 > .nav.nav-tabs.nav-stacked.etis3-quickbar > li > a {
+	justify-content: center !important;
+	padding: 0.9rem 0 !important;
+	font-size: 0 !important;
+	border-radius: var(--radius-medium) !important;
+}
+.span3 > .nav.nav-tabs.nav-stacked.etis3-quickbar > li > a:hover { padding-left: 0 !important; background: var(--color-accent-bg) !important; }
+.span3 > .nav.nav-tabs.nav-stacked.etis3-quickbar > li > a > .material-icons {
+	margin: 0 !important;
+	font-size: 2rem !important;
+	color: var(--color-text-secondary) !important;
+}
+.span3 > .nav.nav-tabs.nav-stacked.etis3-quickbar > li > a:hover > .material-icons { color: var(--color-accent) !important; }
+.etis3-quickbar > .etis3-settings-li { border: none !important; margin: 0 !important; padding: 0 !important; }
+.etis3-quickbar .theme-label,
+.etis3-quickbar .etis3-settings-btn > span:not(.material-icons) { display: none !important; }
+.etis3-main-nav > li.etis3-nav-head > a > .material-icons { text-transform: none !important; letter-spacing: 0 !important; }
+
+
+/* ============================================================
+   ЦВЕТ ДИСЦИПЛИН (--dis-h задаётся из JS по названию)
+   ============================================================ */
+
+.etis3-dis { --dis-color: hsl(var(--dis-h) 70% 64%); --dis-soft: hsla(var(--dis-h), 70%, 64%, 0.12); }
+[theme="light"] .etis3-dis { --dis-color: hsl(var(--dis-h) 62% 46%); --dis-soft: hsla(var(--dis-h), 62%, 46%, 0.09); }
+
+/* Расписание: цветная полоска у пары */
+tr.etis3-dis td.pair_info { box-shadow: inset 3px 0 0 var(--dis-color) !important; padding-left: 1.4rem !important; }
+html:not(.etis3-no-highlight) tr.pair-row--active.etis3-dis td { background: var(--dis-soft) !important; }
+
+/* Виджет пары: акцент в цвет дисциплины */
+.next-pair-widget.etis3-dis { border-left: 3px solid var(--dis-color) !important; }
+.next-pair-widget.etis3-dis .npw-progress-fill { background: var(--dis-color) !important; }
+
+/* Оценки: точка у названия дисциплины, полоска в сводке */
+h3.etis3-dis { display: flex !important; align-items: center !important; gap: 0.9rem !important; }
+h3.etis3-dis::before {
+	content: '' !important;
+	flex-shrink: 0 !important;
+	width: 1rem !important;
+	height: 1rem !important;
+	border-radius: 50% !important;
+	background: var(--dis-color) !important;
+	box-shadow: 0 0 0 4px var(--dis-soft) !important;
+}
+.esw-dis.etis3-dis .esw-dis-bar > span { background: var(--dis-color) !important; }
+.esw-dis.etis3-dis .esw-dis-name::before {
+	content: '' !important;
+	display: inline-block !important;
+	width: 0.8rem !important;
+	height: 0.8rem !important;
+	margin-right: 0.8rem !important;
+	border-radius: 50% !important;
+	background: var(--dis-color) !important;
+	vertical-align: 0.05em !important;
+}
+
+/* Таблицы: итоговые строки и подзаголовки групп */
+table.common tr > td[colspan="5"][align="right"],
+table.common tr > td[colspan="5"][align="right"] ~ td { font-weight: 700 !important; color: var(--color-text-primary) !important; }
+table.common td[colspan="10"] { text-transform: uppercase !important; letter-spacing: 0.06em !important; font-size: 1.05rem !important; font-weight: 600 !important; color: var(--color-text-tertiary) !important; }
