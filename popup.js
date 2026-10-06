@@ -74,3 +74,23 @@ etis3StorageGet().then(stored => {
 	render();
 });
 render();
+
+// ---------- Фоновая проверка: статус и «Проверить» ----------
+function renderBgStatus(state) {
+	const box = document.getElementById('bg-status'), txt = document.getElementById('bg-status-text');
+	if (!box || !state) return;
+	box.className = 'bg-status ' + (state.status || '');
+	const ago = state.lastCheck ? Math.round((Date.now() - state.lastCheck) / 60000) : null;
+	const when = ago === null ? '' : ago < 1 ? 'только что' : ago < 60 ? `${ago} мин назад` : `${Math.round(ago / 60)} ч назад`;
+	const unseen = Object.values(state.unseen || {}).reduce((a, b) => a + b, 0);
+	txt.textContent = !state.lastCheck ? 'Ещё не проверялось'
+		: state.status === 'login' ? `Нужно войти в ЕТИС · ${when}`
+		: state.status === 'error' ? `ЕТИС не ответил · ${when}`
+		: `${unseen ? 'Новое: ' + unseen : 'Ничего нового'} · ${when}`;
+}
+try { chrome.runtime.sendMessage({ type: 'etis3-bg-state' }, renderBgStatus); } catch (e) {}
+document.getElementById('bg-check')?.addEventListener('click', e => {
+	const btn = e.currentTarget;
+	btn.classList.add('spin');
+	chrome.runtime.sendMessage({ type: 'etis3-check-now' }, state => { btn.classList.remove('spin'); renderBgStatus(state); });
+});

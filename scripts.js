@@ -617,6 +617,11 @@ function stylePages() {
 
 	animatePageIn();
 
+	// Открыл страницу — фоновый счётчик по ней обнуляется
+	const seenKinds = { 'stu.teacher_notes': ['notes'], 'stu_ann.announces': ['ann'], 'stu.announce': ['ann'] }[page]
+		|| (page === 'stu.signs' && pageMode === 'current' && !/p_term=/.test(location.search) ? ['grades'] : null);
+	if (seenKinds) { try { chrome.runtime.sendMessage({ type: 'etis3-seen', kinds: seenKinds }).catch?.(() => {}); } catch (e) {} }
+
 	switch (page) {
 		case 'stu.teach_plan':             stylePage_teachPlan(span9, pageMode); if (!pageMode) buildPlanView(span9); break;
 		case 'stu.tpr':                    stylePage_tpr(span9);                  break;
@@ -1951,6 +1956,7 @@ const SETTINGS_TOGGLES = {
 	'ИНТЕРФЕЙС': [
 		['aurora',    'blur_on',       'Живой фон',              'Аврора за стеклом на всех страницах'],
 		['sky',       'wb_twilight',   'Небо по времени суток',  'Утро, день, вечер и ночь — свои цвета'],
+		['notify',    'notifications_active', 'Уведомления о новом', 'Оценки, сообщения и объявления — даже когда ЕТИС закрыт'],
 		['compact',   'compress',      'Компактный режим',       'Меньше отступов, больше контента'],
 		['scoreDots', 'grade',         'Цветные точки у оценок', 'Индикаторы рядом с баллом'],
 	],
