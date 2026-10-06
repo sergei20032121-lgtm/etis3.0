@@ -136,11 +136,14 @@ function applySettings() {
 	document.getElementById('etis3-sp-panel')?.etis3Render?.();
 }
 
+let etis3FirstRun = false;
+
 async function initSettings() {
 	const stored = await etis3StorageGet();
 	if (stored) {
 		settings = etis3Normalize(stored);
 	} else {
+		etis3FirstRun = !readSettingsMirror() && !etis3FromLegacy(localStorage);
 		// Первый запуск или миграция со старых ключей localStorage
 		etis3StorageSet(settings);
 	}
@@ -240,7 +243,7 @@ function buildAurora(parent, extraClass = '') {
 }
 
 applySettings();
-initSettings();
+const settingsReady = initSettings();
 
 
 // ============================================================
@@ -607,6 +610,7 @@ function stylePages() {
 		buildTopbar(sidebar);
 		initCommandPalette(sidebar);
 		greetAfterLogin();
+		showWhatsNew();
 	}
 
 	const span9    = document.querySelector('div.span9');
@@ -1219,6 +1223,7 @@ function stylePage_timetable(span9) {
 	// Вид «неделя сеткой»
 	const week = readWeek(span9);
 	cacheWeek(week);
+	const daysView = buildTimetableDays(span9, week);
 	let grid = null;
 	if (week.some(d => d.pairs.length)) {
 		grid = buildWeekGrid(week);
@@ -1242,7 +1247,7 @@ function stylePage_timetable(span9) {
 		if (widget) {
 			widget.replaceWith(fresh);
 		} else {
-			const anchor = grid || span9.querySelector('div.day');
+			const anchor = daysView || grid || span9.querySelector('div.day');
 			if (anchor) anchor.before(fresh);
 			else span9.prepend(fresh);
 		}
@@ -1254,7 +1259,10 @@ function stylePage_timetable(span9) {
 	initHomeRoute(span9);
 
 	if (todayBlock && !span9.classList.contains('etis3-tt-grid') && !isHomeRoute()) {
-		setTimeout(() => todayBlock.scrollIntoView({ behavior: 'smooth', block: 'start' }), 500);
+		setTimeout(() => {
+			const target = settings.layout === 'modern' ? daysView?.querySelector('.ttv-day--today') : todayBlock;
+			target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		}, 500);
 	}
 }
 
@@ -2654,25 +2662,7 @@ function renderHome(span9) {
 		const dayPairs = showDay ? showDay.pairs : [];
 		const m = t => t[0] * 60 + t[1];
 		const nowM = nowMinutes();
-		const timeline = dayPairs.map(p => {
-			const slot = PAIR_SCHEDULE.find(x => x.num === p.num);
-			let state = '';
-			if (showDay === today && slot) state = nowM > m(slot.end) ? 'past' : nowM >= m(slot.start) ? 'now' : '';
-			const pct = state === 'now' ? Math.round((nowM - m(slot.start)) / (m(slot.end) - m(slot.start)) * 100) : 0;
-			return `<div class="hm-pair etis3-dis ${state ? 'hm-pair--' + state : ''}" style="--dis-h:${disciplineHue(p.name)}">
-				<div class="hm-pair-time"><b>${slot ? formatTime(...slot.start) : p.num + ' пара'}</b><span>${slot ? formatTime(...slot.end) : ''}</span></div>
-				<div class="hm-pair-line"><i></i></div>
-				<div class="hm-pair-body">
-					<div class="hm-pair-name">${escapeHtml(p.name)}</div>
-					<div class="hm-pair-meta">
-						${p.type ? `<span class="hm-tag"><span class="material-icons">${p.type.icon}</span>${p.type.label}</span>` : ''}
-						${p.aud ? `<span><span class="material-icons">room</span>${escapeHtml(p.aud.replace(/^ауд\.\s*/i, ''))}</span>` : ''}
-						${p.teacher ? `<span><span class="material-icons">person</span>${escapeHtml(p.teacher)}</span>` : ''}
-					</div>
-					${state === 'now' ? `<div class="hm-pair-progress"><i style="width:${pct}%"></i></div>` : ''}
-				</div>
-			</div>`;
-		}).join('');
+		const timeline = timelineHtml(dayPairs, showDay === today);
 
 		// --- оценки ---
 		const gradesHtml = !g ? skeleton(loading, data.gradesErr) : `
@@ -3029,4 +3019,152 @@ function buildAbsenceView(span9) {
 	// «Всего пропущено занятий: N» — текстовый узел после таблицы
 	let n = table.nextSibling;
 	while (n) { if (n.nodeType === 3 && /Всего пропущено/.test(n.textContent)) { const sp = createEl('span', { className: 'etis3-orig', textContent: n.textContent }); n.replaceWith(sp); break; } n = n.nextSibling; }
+}
+
+
+// Лента пар дня: время, точка-линия, карточка; прошедшие приглушены,
+// текущая подсвечена с прогрессом, «окна» между парами подписаны
+function timelineHtml(pairs, isToday, withGaps = false) {
+	const m = t => t[0] * 60 + t[1];
+	const nowM = nowMinutes();
+	let prevEnd = null;
+	return pairs.map(p => {
+		const slot = PAIR_SCHEDULE.find(x => x.num === p.num);
+		let state = '';
+		if (isToday && slot) state = nowM > m(slot.end) ? 'past' : nowM >= m(slot.start) ? 'now' : '';
+		const pct = state === 'now' ? Math.round((nowM - m(slot.start)) / (m(slot.end) - m(slot.start)) * 100) : 0;
+		let gap = '';
+		if (withGaps && slot && prevEnd !== null && m(slot.start) - prevEnd >= 30) {
+			const inGap = isToday && nowM > prevEnd && nowM < m(slot.start);
+			gap = `<div class="hm-gap${inGap ? ' hm-gap--now' : ''}"><span></span><em>окно ${formatDuration(m(slot.start) - prevEnd)}</em></div>`;
+		}
+		if (slot) prevEnd = Math.max(prevEnd ?? 0, m(slot.end));
+		return gap + `<div class="hm-pair etis3-dis ${state ? 'hm-pair--' + state : ''}" style="--dis-h:${disciplineHue(p.name)}">
+			<div class="hm-pair-time"><b>${slot ? formatTime(...slot.start) : p.num + ' пара'}</b><span>${slot ? formatTime(...slot.end) : ''}</span></div>
+			<div class="hm-pair-line"><i></i></div>
+			<div class="hm-pair-body">
+				<div class="hm-pair-name">${escapeHtml(p.name)}<span class="hm-pair-num">${p.num} пара</span></div>
+				<div class="hm-pair-meta">
+					${p.type ? `<span class="hm-tag"><span class="material-icons">${p.type.icon}</span>${p.type.label}</span>` : ''}
+					${p.aud ? `<span><span class="material-icons">room</span>${escapeHtml(p.aud.replace(/^ауд\.\s*/i, ''))}</span>` : ''}
+					${p.teacher ? `<span><span class="material-icons">person</span>${escapeHtml(p.teacher)}</span>` : ''}
+				</div>
+				${state === 'now' ? `<div class="hm-pair-progress"><i style="width:${pct}%"></i></div>` : ''}
+			</div>
+		</div>`;
+	}).join('');
+}
+
+// ---------- Расписание: дни лентой (новый вид, режим «Список») ----------
+function buildTimetableDays(span9, week) {
+	const days = [...span9.querySelectorAll('div.day')];
+	if (!days.length) return;
+	const wrap = createEl('div', { className: 'etis3-view ttv' });
+	const render = () => {
+		const m = t => t[0] * 60 + t[1];
+		wrap.innerHTML = week.map((d, i) => {
+			const slots = d.pairs.map(p => PAIR_SCHEDULE.find(x => x.num === p.num)).filter(Boolean);
+			const span = slots.length ? `${formatTime(...slots[0].start)}–${formatTime(...slots[slots.length - 1].end)}` : '';
+			const [wd, ...rest] = d.title.split(',');
+			const past = d.date && !d.isToday && d.date < new Date(new Date().setHours(0, 0, 0, 0));
+			const count = d.pairs.length;
+			return `<section class="ttv-day${d.isToday ? ' ttv-day--today' : ''}${past ? ' ttv-day--past' : ''}${count ? '' : ' ttv-day--free'}" data-i="${i}">
+				<header class="ttv-head">
+					<div class="ttv-date"><b>${d.date ? d.date.getDate() : ''}</b><span>${escapeHtml(rest.join(',').trim().replace(/^\d+\s*/, ''))}</span></div>
+					<div class="ttv-title"><h3>${escapeHtml(wd.trim())}</h3>${d.isToday ? '<span class="ttv-badge">сегодня</span>' : ''}</div>
+					<div class="ttv-info">${count ? `${count} ${count === 1 ? 'пара' : count < 5 ? 'пары' : 'пар'}${span ? ' · ' + span : ''}` : 'пар нет'}</div>
+				</header>
+				${count ? `<div class="hm-timeline">${timelineHtml(d.pairs, d.isToday, true)}</div>` : ''}
+			</section>`;
+		}).join('');
+	};
+	render();
+	setInterval(render, 60 * 1000);
+	days[0].before(wrap);
+	days.forEach(d => d.classList.add('etis3-orig'));
+	return wrap;
+}
+
+
+// ============================================================
+// ЧТО НОВОГО — один раз после обновления
+// ============================================================
+
+const CHANGELOG = [
+	['4.3.0', [
+		['view_agenda', 'Расписание лентой', 'Дни — карточками, пары — таймлайном: что прошло, что идёт, «окна» между парами'],
+		['new_releases', 'Это окно', 'Теперь после обновления видно, что поменялось'],
+	]],
+	['4.2.0', [
+		['notifications_active', 'Уведомления о новом', 'Оценки, сообщения и объявления — счётчик на иконке и уведомление, даже когда ЕТИС закрыт'],
+	]],
+	['4.1.0', [
+		['grade', 'Оценки карточками', 'Каждая дисциплина — карточка со списком КТ, долгами и целью'],
+		['menu_book', 'Учебный план, преподаватели, пропуски', 'Перерисованы в новом стиле'],
+	]],
+	['4.0.0', [
+		['home', 'Главная', 'Пары на сегодня, рейтинг, последние оценки, сообщения и объявления на одном экране'],
+	]],
+	['3.9.0', [
+		['dashboard', 'Новый интерфейс', 'Рельс навигации, верхняя панель с текущей парой и меню профиля'],
+		['search', 'Поиск по Ctrl+K', 'Быстрый переход на любую страницу ЕТИСа'],
+		['blur_on', 'Живой фон', 'Аврора за стеклом, цвета меняются по времени суток'],
+	]],
+];
+
+function cmpVersion(a, b) {
+	const pa = String(a).split('.').map(Number), pb = String(b).split('.').map(Number);
+	for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) - (pb[i] || 0);
+	return 0;
+}
+
+async function showWhatsNew() {
+	let current;
+	try { current = chrome.runtime.getManifest().version; } catch (e) { return; }
+	const KEY = 'etis3-version-seen';
+	await settingsReady;
+	const got = await new Promise(r => { try { chrome.storage.local.get([KEY, ETIS3_STORAGE_KEY], r); } catch (e) { r({}); } });
+	const seen = got?.[KEY];
+	try { chrome.storage.local.set({ [KEY]: current }); } catch (e) {}
+	if (seen && cmpVersion(seen, current) >= 0) return;
+
+	// Свежая установка (настроек ещё не было) — короткое приветствие вместо списка изменений
+	const fresh = !seen && etis3FirstRun;
+	const entries = fresh ? [] : CHANGELOG.filter(([v]) => !seen || cmpVersion(v, seen) > 0).slice(0, 4);
+	const items = fresh ? [
+		['home', 'Главная', 'Пары, рейтинг, оценки и сообщения на одном экране — логотип «Е» слева сверху'],
+		['search', 'Ctrl+K или /', 'Поиск по всем страницам ЕТИСа'],
+		['notifications_active', 'Уведомления', 'Новые оценки и сообщения — даже когда ЕТИС закрыт'],
+		['tune', 'Настройки', 'Тема, акцент, вид и фон — в иконке расширения'],
+	] : entries.flatMap(([, list]) => list);
+	if (!items.length) return;
+
+	const wrap = createEl('div', { id: 'etis3-whatsnew', role: 'dialog', 'aria-label': 'Что нового' });
+	wrap.innerHTML = `
+		<div class="wn-box">
+			<div class="wn-glow"></div>
+			<div class="wn-head">
+				<div class="wn-logo">Е</div>
+				<div>
+					<div class="wn-kicker">${fresh ? 'Добро пожаловать' : 'Обновление ' + escapeHtml(current)}</div>
+					<h2>${fresh ? 'Это ЕТИС 3.0' : 'Что нового'}</h2>
+				</div>
+			</div>
+			<div class="wn-list">
+				${items.map(([icon, title, text], i) => `
+					<div class="wn-item" style="--i:${i}">
+						<span class="material-icons">${icon}</span>
+						<div><b>${escapeHtml(title)}</b><span>${escapeHtml(text)}</span></div>
+					</div>`).join('')}
+			</div>
+			<button type="button" class="wn-ok">${fresh ? 'Поехали' : 'Круто'}</button>
+		</div>`;
+	document.body.appendChild(wrap);
+	requestAnimationFrame(() => requestAnimationFrame(() => wrap.classList.add('show')));
+	const close = () => { wrap.classList.remove('show'); setTimeout(() => wrap.remove(), 300); document.removeEventListener('keydown', onKey); };
+	const onKey = e => { if (e.key === 'Escape' || e.key === 'Enter') close(); };
+	document.addEventListener('keydown', onKey);
+	wrap.querySelector('.wn-ok').addEventListener('click', close);
+	wrap.addEventListener('mousedown', e => { if (e.target === wrap) close(); });
+	setTimeout(() => wrap.querySelector('.wn-ok')?.focus({ preventScroll: true }), 400);
 }

@@ -4170,3 +4170,119 @@ html.etis3-modern a.etis3-file::before { content: 'description'; font-family: 'M
 html.etis3-modern .span9 > .teach-plan { display: block !important; width: 100% !important; }
 .pv-choice { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 1.1rem; font-weight: 600; color: var(--color-accent); margin-top: -0.4rem; }
 .pv-choice .material-icons { font-size: 1.5rem; }
+
+
+/* ============================================================
+   РАСПИСАНИЕ — дни лентой (4.3)
+   ============================================================ */
+
+.span9.etis3-tt-grid .ttv { display: none !important; }
+.ttv { display: flex; flex-direction: column; gap: 1.6rem; }
+.ttv-day {
+	scroll-margin-top: 11rem;
+	padding: 1.8rem 2.2rem 1rem;
+	border-radius: 2.4rem;
+	background: var(--glass-bg-card);
+	backdrop-filter: var(--glass-filter); -webkit-backdrop-filter: var(--glass-filter);
+	border: var(--glass-border);
+	box-shadow: var(--glass-shadow-card);
+	animation: hm-in 0.5s cubic-bezier(.2,.8,.2,1) both;
+}
+.ttv-day--today {
+	background:
+		radial-gradient(70% 120% at 0% 0%, rgba(var(--color-accent-rgb, 124,111,212), 0.16), transparent 70%),
+		var(--glass-bg-card);
+	box-shadow: 0 0 0 1.5px rgba(var(--color-accent-rgb, 124,111,212), 0.55), var(--glass-shadow-card);
+}
+.ttv-day--past { opacity: 0.62; }
+.ttv-day--past:hover { opacity: 1; }
+.ttv-day--free { padding-bottom: 1.8rem; }
+.ttv-head { display: flex; align-items: center; gap: 1.4rem; margin-bottom: 1.4rem; }
+.ttv-day--free .ttv-head { margin-bottom: 0; }
+.ttv-date {
+	flex: none; width: 5.6rem; height: 5.6rem; border-radius: 1.6rem;
+	display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.05;
+	background: rgba(127,127,127,0.10);
+}
+.ttv-date b { font-size: 2.2rem; font-weight: 800; letter-spacing: -0.03em; }
+.ttv-date span { font-size: 1.05rem; color: var(--color-text-secondary); }
+.ttv-day--today .ttv-date { background: var(--color-accent); color: #fff; box-shadow: 0 6px 18px rgba(var(--color-accent-rgb, 124,111,212), 0.45); }
+.ttv-day--today .ttv-date span { color: rgba(255,255,255,0.85); }
+.ttv-title { flex: 1; display: flex; align-items: center; gap: 1rem; min-width: 0; }
+.ttv-title h3 { margin: 0 !important; padding: 0 !important; font-size: 1.9rem !important; font-weight: 700 !important; letter-spacing: -0.02em !important; color: var(--color-text-primary) !important; border: 0 !important; text-transform: none !important; background: none !important; }
+.ttv-title h3::first-letter { text-transform: uppercase; }
+.ttv-badge { padding: 0.2rem 0.9rem; border-radius: 10rem; font-size: 1.1rem; font-weight: 700; color: var(--color-accent); background: rgba(var(--color-accent-rgb, 124,111,212), 0.14); }
+.ttv-info { flex: none; font-size: 1.25rem; color: var(--color-text-secondary); font-variant-numeric: tabular-nums; }
+.ttv-day--free .ttv-info { color: var(--color-text-tertiary); }
+
+.hm-pair-num { margin-left: 0.8rem; font-size: 1.05rem; font-weight: 600; color: var(--color-text-tertiary); white-space: nowrap; }
+.hm-gap { display: grid; grid-template-columns: 5.6rem 2.4rem 1fr; align-items: center; min-height: 3rem; }
+.hm-gap span { grid-column: 2; justify-self: center; width: 2px; height: 100%; background: repeating-linear-gradient(180deg, var(--color-divider) 0 4px, transparent 4px 8px); }
+.hm-gap em { grid-column: 3; margin-left: 0.8rem; font-style: normal; font-size: 1.15rem; color: var(--color-text-tertiary); }
+.hm-gap--now em { color: var(--color-accent); font-weight: 600; }
+.hm-gap--now em::before { content: 'сейчас · '; }
+html.etis3-modern .span9 .next-pair-widget { margin-bottom: 1.6rem !important; }
+@media (max-width: 760px) {
+	.ttv-day { padding: 1.4rem 1.4rem 0.6rem; }
+	.ttv-info { display: none; }
+}
+
+
+/* ============================================================
+   ЧТО НОВОГО
+   ============================================================ */
+
+#etis3-whatsnew {
+	position: fixed; inset: 0; z-index: 10001;
+	display: grid; place-items: center; padding: 2rem;
+	background: rgba(0,0,0,0.30);
+	backdrop-filter: blur(8px) saturate(120%); -webkit-backdrop-filter: blur(8px) saturate(120%);
+	opacity: 0; transition: opacity 0.3s ease;
+	color: var(--color-text-primary); font-size: 1.4rem;
+}
+#etis3-whatsnew.show { opacity: 1; }
+.wn-box {
+	position: relative; overflow: hidden;
+	width: min(52rem, 100%);
+	padding: 2.8rem 2.8rem 2.4rem;
+	border-radius: 3rem;
+	background: var(--glass-bg-active);
+	backdrop-filter: blur(44px) saturate(200%); -webkit-backdrop-filter: blur(44px) saturate(200%);
+	border: var(--glass-border-light);
+	box-shadow: 0 40px 120px rgba(0,0,0,0.45), var(--glass-border-inner);
+	transform: translateY(18px) scale(0.96); transition: transform 0.45s cubic-bezier(.2,.8,.2,1);
+}
+#etis3-whatsnew.show .wn-box { transform: none; }
+.wn-glow { position: absolute; inset: -40% -20% auto -20%; height: 26rem; pointer-events: none;
+	background: radial-gradient(50% 60% at 30% 50%, rgba(var(--color-accent-rgb, 124,111,212), 0.35), transparent 70%),
+	            radial-gradient(40% 50% at 75% 40%, rgba(var(--orb-b, 236,72,153), 0.25), transparent 70%); }
+.wn-head, .wn-list, .wn-ok { position: relative; }
+.wn-head { display: flex; align-items: center; gap: 1.6rem; margin-bottom: 2.2rem; }
+.wn-logo {
+	width: 5.6rem; height: 5.6rem; flex: none; border-radius: 1.8rem;
+	display: grid; place-items: center; font-size: 2.8rem; font-weight: 800; color: #fff;
+	background: linear-gradient(135deg, rgba(var(--color-accent-rgb, 124,111,212), 1), rgba(var(--orb-b, 236,72,153), 0.9));
+	box-shadow: 0 10px 30px rgba(var(--color-accent-rgb, 124,111,212), 0.5), inset 0 1px 0 rgba(255,255,255,0.45);
+}
+.wn-kicker { font-size: 1.15rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-accent); }
+.wn-head h2 { margin: 0.2rem 0 0 !important; font-size: 2.8rem !important; font-weight: 800 !important; letter-spacing: -0.04em !important; color: var(--color-text-primary) !important; }
+.wn-list { display: flex; flex-direction: column; gap: 1.4rem; max-height: 50vh; overflow-y: auto; }
+.wn-item { display: flex; gap: 1.4rem; align-items: flex-start; opacity: 0; animation: hm-in 0.5s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(0.15s + var(--i) * 0.07s); }
+.wn-item .material-icons {
+	flex: none; width: 4rem; height: 4rem; display: grid; place-items: center;
+	border-radius: 1.2rem; font-size: 2.1rem;
+	color: var(--color-accent); background: rgba(var(--color-accent-rgb, 124,111,212), 0.14);
+}
+.wn-item b { display: block; font-size: 1.5rem; }
+.wn-item span:not(.material-icons) { display: block; margin-top: 0.2rem; font-size: 1.3rem; line-height: 1.45; color: var(--color-text-secondary); }
+#etis3-whatsnew .wn-ok {
+	text-align: center !important;
+	display: flex !important; justify-content: center !important; width: 100%; margin-top: 2.4rem;
+	padding: 1.3rem !important; border: 0 !important; border-radius: 1.6rem !important;
+	font: inherit !important; font-size: 1.5rem !important; font-weight: 700 !important; color: #fff !important; cursor: pointer;
+	background: linear-gradient(135deg, rgba(var(--color-accent-rgb, 124,111,212), 1), rgba(var(--orb-b, 236,72,153), 0.9)) !important;
+	box-shadow: 0 10px 30px rgba(var(--color-accent-rgb, 124,111,212), 0.45), inset 0 1px 0 rgba(255,255,255,0.4) !important;
+	transition: transform 0.2s, filter 0.2s;
+}
+#etis3-whatsnew .wn-ok:hover { transform: translateY(-1px); filter: brightness(1.08); }
+@media (prefers-reduced-motion: reduce) { .wn-item { animation: none !important; opacity: 1; } }
