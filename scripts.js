@@ -242,6 +242,23 @@ function buildAurora(parent, extraClass = '') {
 	return aurora;
 }
 
+// ЕТИС не задаёт viewport — на телефоне страница рисуется как десктоп в 980px.
+// Ставим нормальный, с учётом выреза iPhone (viewport-fit=cover).
+function ensureViewport() {
+	const apply = () => {
+		let meta = document.querySelector('meta[name="viewport"]');
+		if (!meta) {
+			meta = document.createElement('meta');
+			meta.name = 'viewport';
+			(document.head || document.documentElement).prepend(meta);
+		}
+		meta.content = 'width=device-width, initial-scale=1, viewport-fit=cover';
+	};
+	apply();
+	if (!document.head) document.addEventListener('DOMContentLoaded', apply, { once: true });
+}
+ensureViewport();
+
 applySettings();
 const settingsReady = initSettings();
 
@@ -1955,6 +1972,9 @@ function addSemesterProgress(sidebar) {
 // ПАНЕЛЬ НАСТРОЕК
 // ============================================================
 
+// В userscript-версии нет фоновой проверки (только в расширении)
+const IS_USERSCRIPT = typeof ETIS3_USERSCRIPT !== 'undefined';
+
 const SETTINGS_TOGGLES = {
 	'РАСПИСАНИЕ': [
 		['highlight', 'play_circle',   'Подсветка текущей пары', 'Выделяет пару, которая идёт сейчас'],
@@ -2024,7 +2044,7 @@ function openSettingsPanel() {
 				</div>
 			</div>
 
-			${Object.entries(SETTINGS_TOGGLES).map(([title, rows]) => `
+			${Object.entries(SETTINGS_TOGGLES).map(([title, rows]) => [title, rows.filter(r => !(IS_USERSCRIPT && r[0] === 'notify'))]).map(([title, rows]) => `
 				<div class="etis3-sp-section">
 					<div class="etis3-sp-section-label">${title}</div>
 					<div class="etis3-sp-toggles">
@@ -2258,6 +2278,24 @@ function buildTopbar(sidebar) {
 		li.innerHTML = '<a href="stu.timetable#home"><span class="material-icons">home</span><span class="etis3-nav-label">Главная</span></a>';
 		mainNav.prepend(li);
 	}
+	// «Ещё» — на телефоне открывает всю навигацию снизу листом
+	if (mainNav && !mainNav.querySelector('.etis3-more-li')) {
+		const more = createEl('li', { className: 'etis3-more-li' });
+		more.dataset.group = 'main';
+		more.innerHTML = '<a href="#"><span class="material-icons">menu</span><span class="etis3-nav-label">Ещё</span></a>';
+		const firstHead = mainNav.querySelector('.etis3-nav-head');
+		firstHead ? firstHead.before(more) : mainNav.appendChild(more);
+		const backdrop = createEl('div', { id: 'etis3-sheet-backdrop' });
+		document.body.appendChild(backdrop);
+		const toggle = open => {
+			document.documentElement.classList.toggle('etis3-sheet-open', open);
+			if (open) sidebar.scrollTop = 0;
+		};
+		more.querySelector('a').addEventListener('click', e => { e.preventDefault(); toggle(!document.documentElement.classList.contains('etis3-sheet-open')); });
+		backdrop.addEventListener('click', () => toggle(false));
+		sidebar.addEventListener('click', e => { if (e.target.closest('a[href]:not([href="#"])')) toggle(false); });
+		document.addEventListener('keydown', e => { if (e.key === 'Escape') toggle(false); });
+	}
 	if (isHomeRoute()) {
 		sidebar.querySelectorAll('.etis3-main-nav > li.active').forEach(li => li.classList.remove('active'));
 		mainNav?.querySelector('.etis3-home-li')?.classList.add('active');
@@ -2365,6 +2403,7 @@ function buildTopbar(sidebar) {
 		${sem ? `<div class="tbm-sem">${sem.innerHTML}</div>` : ''}
 		<div class="tbm-links">
 			${quick.map(a => `<a href="${escapeHtml(a.href)}" class="${/logout/.test(a.href) ? 'tbm-danger' : ''}${a.classList.contains('need_redirect') ? ' need_redirect' : ''}"><span class="material-icons">${a.querySelector('.material-icons')?.textContent || 'chevron_right'}</span>${escapeHtml(a.title || navLabel(a))}</a>`).join('')}
+			<a href="#" class="tbm-theme"><span class="material-icons">contrast</span>Тема: <span class="tbm-theme-name">${THEME_LABELS[settings.theme]}</span></a>
 			<a href="#" class="tbm-settings"><span class="material-icons">tune</span>Настройки ЕТИС 3.0</a>
 		</div>
 	`;
@@ -2372,6 +2411,10 @@ function buildTopbar(sidebar) {
 	const logout = menu.querySelector('.tbm-danger');
 	if (logout) menu.querySelector('.tbm-links').appendChild(logout);
 	menu.querySelector('.tbm-settings').addEventListener('click', e => { e.preventDefault(); menu.hidden = true; openSettingsPanel(); });
+	menu.querySelector('.tbm-theme').addEventListener('click', e => {
+		e.preventDefault(); switchTheme(); syncTheme();
+		menu.querySelector('.tbm-theme-name').textContent = THEME_LABELS[settings.theme];
+	});
 	document.body.appendChild(menu);
 	const avatar = bar.querySelector('.tb-avatar');
 	avatar.addEventListener('click', e => { e.stopPropagation(); menu.hidden = !menu.hidden; });
@@ -3091,6 +3134,10 @@ function buildTimetableDays(span9, week) {
 // ============================================================
 
 const CHANGELOG = [
+	['4.5.0', [
+		['smartphone', 'Мобильная версия', 'Под телефон: нижний док с «Ещё», компактная шапка, учёт выреза iPhone'],
+		['phone_iphone', 'Работает на iPhone', 'Через Stay в Safari — без компьютера и магазина расширений'],
+	]],
 	['4.4.0', [
 		['insights', 'Оценки за сессии', 'Средний балл, график по семестрам, распределение оценок и семестры карточками'],
 	]],
