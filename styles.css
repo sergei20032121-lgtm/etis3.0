@@ -4487,3 +4487,7 @@ ul.nav.msg li, .hm-feed-text, .ssv-note { overflow-wrap: anywhere; }
 @media (max-width: 900px) {
 	html.etis3-modern .span3 > .nav.nav-tabs.nav-stacked.etis3-main-nav { width: 100% !important; justify-content: space-around !important; }
 }
+
+/* Заголовок «Вход» внутри формы: на нашей сцене он лишний — есть герой */
+html.etis3-login-page .login-form-title { display: none !important; }
+html.etis3-login-page form .item > label { pointer-events: none; }
