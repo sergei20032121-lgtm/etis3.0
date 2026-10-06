@@ -54,13 +54,32 @@ function formatDuration(mins) {
 	return m ? `${h} ч ${m} мин` : `${h} ч`;
 }
 
-// Стабильный оттенок для дисциплины: одна и та же дисциплина одного цвета
-// и в расписании, и в оценках
+// Цвет дисциплины — из фиксированной палитры контрастных оттенков. Назначение
+// запоминается, так что дисциплина одного цвета и в расписании, и в оценках,
+// а новая дисциплина получает первый из наименее занятых цветов.
+// Порядок важен: первые цвета максимально далеки друг от друга
+const DIS_PALETTE   = [212, 28, 145, 280, 338, 182, 48, 250, 8, 100, 196, 306];
+const DIS_COLORS_KEY = 'etis3-dis-colors';
+let disColors = null;
+
+function disciplineKey(name) {
+	return String(name || '').toLowerCase().replace(/\(.*?\)|\[.*?\]/g, '').replace(/\s+/g, ' ').trim();
+}
+
 function disciplineHue(name) {
-	const key = String(name || '').toLowerCase().replace(/\(.*?\)|\[.*?\]/g, '').replace(/\s+/g, ' ').trim();
-	let h = 5381;
-	for (let i = 0; i < key.length; i++) h = ((h << 5) + h + key.charCodeAt(i)) >>> 0;
-	return Math.round((h * 137.508) % 360);
+	const key = disciplineKey(name);
+	if (!disColors) {
+		try { disColors = JSON.parse(localStorage.getItem(DIS_COLORS_KEY)) || {}; } catch (e) { disColors = {}; }
+		if (typeof disColors !== 'object' || Array.isArray(disColors)) disColors = {};
+	}
+	if (key in disColors && DIS_PALETTE[disColors[key]] !== undefined) return DIS_PALETTE[disColors[key]];
+
+	const used = DIS_PALETTE.map(() => 0);
+	Object.values(disColors).forEach(i => { if (used[i] !== undefined) used[i]++; });
+	const idx = used.indexOf(Math.min(...used));
+	disColors[key] = idx;
+	try { localStorage.setItem(DIS_COLORS_KEY, JSON.stringify(disColors)); } catch (e) {}
+	return DIS_PALETTE[idx];
 }
 
 function paintDiscipline(el, name) {
@@ -1013,6 +1032,11 @@ function stylePage_timetable(span9) {
 	copyBtn.addEventListener('click', () => copyTimetable(span9));
 	buttonbar.appendChild(copyBtn);
 
+	const icsBtn = createEl('a', { className: 'timetable-btn icon-button icon-event', textContent: 'В календарь', title: 'Скачать неделю в формате .ics для Google / Apple / Outlook' });
+	icsBtn.style.cursor = 'pointer';
+	icsBtn.addEventListener('click', () => exportTimetableIcs(span9));
+	buttonbar.appendChild(icsBtn);
+
 	span9.querySelectorAll('div.day > table > tbody > tr').forEach(row => {
 		// Перенос преподавателя
 		const teacher = row.querySelector('span.teacher');
@@ -1051,6 +1075,16 @@ function stylePage_timetable(span9) {
 		});
 	});
 
+	// Вид «неделя сеткой»
+	const week = readWeek(span9);
+	let grid = null;
+	if (week.some(d => d.pairs.length)) {
+		grid = buildWeekGrid(week);
+		const firstDay = span9.querySelector('div.day');
+		if (firstDay) firstDay.before(grid); else span9.appendChild(grid);
+		buttonbar.prepend(buildViewSwitch(span9));
+	}
+
 	// Виджет и подсветка — после обработки строк, обновляются раз в минуту
 	const todayBlock = findTodayBlock(span9);
 	let widget = null;
@@ -1058,6 +1092,7 @@ function stylePage_timetable(span9) {
 	function refresh() {
 		const pairs = readPairs(todayBlock);
 		highlightCurrentPair(span9, pairs);
+		if (grid) highlightGridNow(grid);
 
 		// Виджет показываем только на неделе, где есть сегодняшний день
 		if (!todayBlock) return;
@@ -1065,8 +1100,8 @@ function stylePage_timetable(span9) {
 		if (widget) {
 			widget.replaceWith(fresh);
 		} else {
-			const firstDay = span9.querySelector('div.day');
-			if (firstDay) firstDay.before(fresh);
+			const anchor = grid || span9.querySelector('div.day');
+			if (anchor) anchor.before(fresh);
 			else span9.prepend(fresh);
 		}
 		widget = fresh;
@@ -1074,9 +1109,167 @@ function stylePage_timetable(span9) {
 	refresh();
 	setInterval(refresh, 60 * 1000);
 
-	if (todayBlock) {
+	if (todayBlock && !span9.classList.contains('etis3-tt-grid')) {
 		setTimeout(() => todayBlock.scrollIntoView({ behavior: 'smooth', block: 'start' }), 500);
 	}
+}
+
+// ---------- Неделя целиком: данные, сетка, экспорт ----------
+
+// Дни недели со всеми парами: [{ title, date, isToday, pairs: [{ num, name, type, aud, teacher }] }]
+function readWeek(span9) {
+	return [...span9.querySelectorAll('div.day')].map(day => {
+		const title = day.querySelector('h3')?.textContent.replace(/\s+/g, ' ').trim() || '';
+		const pairs = [];
+		day.querySelectorAll('table > tbody > tr').forEach(row => {
+			const num = readPairNum(row);
+			if (isNaN(num)) return;
+			row.querySelectorAll('.pair_info .dis a').forEach(a => {
+				const full = a.dataset.name ? a.dataset.name + ' ' + (a.querySelector('.pair-type-raw')?.textContent || '') : a.textContent;
+				const type = parsePairType(full.trim());
+				const box  = a.closest('.pair_info > div') || row;
+				pairs.push({
+					num,
+					name:    type ? type.name : full.trim(),
+					type,
+					aud:     (box.querySelector('.aud') || row.querySelector('.aud'))?.textContent.replace(/\s+/g, ' ').trim() || '',
+					teacher: row.querySelector('.pair_teacher a')?.textContent.trim() || '',
+				});
+			});
+		});
+		return { title, date: parseDayDate(title), isToday: isTodayTitle(title), pairs };
+	});
+}
+
+// «Вторник, 6 октября» → Date. Год берём ближайший к сегодняшнему дню.
+function parseDayDate(title) {
+	const t = title.toLowerCase();
+	let d, m;
+	const numeric = t.match(/(\d{1,2})\.(\d{1,2})/);
+	const worded  = t.match(/(\d{1,2})\s+([а-яё]+)/);
+	if (numeric) { d = +numeric[1]; m = +numeric[2] - 1; }
+	else if (worded) { d = +worded[1]; m = MONTH_RES.findIndex(re => re.test(worded[2])); }
+	if (!d || m === undefined || m < 0) return null;
+	const now = new Date();
+	let y = now.getFullYear();
+	if (m - now.getMonth() > 6) y--;
+	if (now.getMonth() - m > 6) y++;
+	return new Date(y, m, d);
+}
+
+const TT_VIEW_KEY = 'etis3-tt-view';
+
+function buildViewSwitch(span9) {
+	const sw = createEl('div', { className: 'timetable-btn etis3-view-switch', role: 'group' });
+	const views = [['list', 'view_agenda', 'Список'], ['grid', 'view_week', 'Неделя']];
+	const set = (v, save) => {
+		span9.classList.toggle('etis3-tt-grid', v === 'grid');
+		sw.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.view === v));
+		if (save) try { localStorage.setItem(TT_VIEW_KEY, v); } catch (e) {}
+	};
+	views.forEach(([v, icon, label]) => {
+		const b = createEl('button', { type: 'button', title: label });
+		b.dataset.view = v;
+		b.innerHTML = `<span class="material-icons">${icon}</span><span>${label}</span>`;
+		b.addEventListener('click', () => set(v, true));
+		sw.appendChild(b);
+	});
+	let saved = 'list';
+	try { saved = localStorage.getItem(TT_VIEW_KEY) || 'list'; } catch (e) {}
+	set(saved === 'grid' ? 'grid' : 'list', false);
+	return sw;
+}
+
+const WEEKDAY_SHORT = { 'понедельник': 'Пн', 'вторник': 'Вт', 'среда': 'Ср', 'четверг': 'Чт', 'пятница': 'Пт', 'суббота': 'Сб', 'воскресенье': 'Вс' };
+
+function buildWeekGrid(week) {
+	const nums = week.flatMap(d => d.pairs.map(p => p.num));
+	const from = Math.min(...nums), to = Math.max(...nums);
+	const grid = createEl('div', { className: 'etis3-week-grid', lang: 'ru' });
+	grid.style.setProperty('--days', week.length);
+
+	const cell = (cls, html = '') => { const c = createEl('div', { className: cls, innerHTML: html }); grid.appendChild(c); return c; };
+
+	cell('ewg-corner');
+	week.forEach(d => {
+		const wd   = d.title.split(',')[0].trim();
+		const date = d.title.split(',').slice(1).join(',').trim();
+		const c = cell('ewg-day' + (d.isToday ? ' ewg-today' : ''),
+			`<b>${escapeHtml(WEEKDAY_SHORT[wd.toLowerCase()] || wd)}</b><span>${escapeHtml(date)}</span>`);
+		c.title = d.title;
+	});
+
+	for (let n = from; n <= to; n++) {
+		const slot = PAIR_SCHEDULE.find(p => p.num === n);
+		cell('ewg-num', `<b>${n}</b>${slot ? `<span>${formatTime(slot.start[0], slot.start[1])}</span>` : ''}`);
+		week.forEach(d => {
+			const here = d.pairs.filter(p => p.num === n);
+			const c = cell('ewg-cell' + (d.isToday ? ' ewg-today' : '') + (here.length ? '' : ' ewg-empty'));
+			c.dataset.num = n;
+			here.forEach(p => {
+				const item = createEl('div', { className: 'ewg-pair' });
+				paintDiscipline(item, p.name);
+				item.innerHTML = `
+					<div class="ewg-name">${escapeHtml(p.name)}</div>
+					<div class="ewg-meta">
+						${p.type ? `<span class="material-icons" title="${p.type.label}">${p.type.icon}</span>` : ''}
+						${p.aud ? `<span class="ewg-aud">${escapeHtml(p.aud.replace(/^ауд\.\s*/i, '').replace(/\s*\(.*\)$/, ''))}</span>` : ''}
+					</div>`;
+				item.title = [p.name, p.type?.label, p.aud, p.teacher].filter(Boolean).join('\n');
+				c.appendChild(item);
+			});
+		});
+	}
+	return grid;
+}
+
+function highlightGridNow(grid) {
+	grid.querySelectorAll('.ewg-now').forEach(c => c.classList.remove('ewg-now'));
+	const num = getCurrentPairNum();
+	if (num) grid.querySelector(`.ewg-cell.ewg-today[data-num="${num}"]:not(.ewg-empty)`)?.classList.add('ewg-now');
+}
+
+// Экспорт недели в iCalendar. Время «плавающее» (без часового пояса) — календарь
+// покажет его как местное, что для расписания и нужно.
+function exportTimetableIcs(span9) {
+	const week = readWeek(span9);
+	const pad  = n => String(n).padStart(2, '0');
+	const dt   = (date, [h, m]) => `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}T${pad(h)}${pad(m)}00`;
+	const esc  = str => String(str).replace(/[\\;,]/g, c => '\\' + c).replace(/\n/g, '\\n');
+	const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+
+	const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//ETIS 3.0//RU', 'CALSCALE:GREGORIAN'];
+	let count = 0;
+	week.forEach(d => {
+		if (!d.date) return;
+		d.pairs.forEach(p => {
+			const slot = PAIR_SCHEDULE.find(s => s.num === p.num);
+			if (!slot) return;
+			const start = dt(d.date, slot.start);
+			lines.push('BEGIN:VEVENT',
+				`UID:${start}-${p.num}-${count}@etis3`,
+				`DTSTAMP:${stamp}`,
+				`DTSTART:${start}`,
+				`DTEND:${dt(d.date, slot.end)}`,
+				`SUMMARY:${esc(p.name + (p.type ? ` (${p.type.label.toLowerCase()})` : ''))}`);
+			if (p.aud) lines.push(`LOCATION:${esc(p.aud)}`);
+			if (p.teacher) lines.push(`DESCRIPTION:${esc(p.teacher)}`);
+			lines.push('END:VEVENT');
+			count++;
+		});
+	});
+	lines.push('END:VCALENDAR');
+	if (!count) { showToast('На этой неделе пар нет'); return; }
+
+	const first = week.find(d => d.date)?.date;
+	const name  = first ? `etis-${first.getFullYear()}-${pad(first.getMonth() + 1)}-${pad(first.getDate())}.ics` : 'etis.ics';
+	const url   = URL.createObjectURL(new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' }));
+	const a     = createEl('a', { href: url, download: name });
+	document.body.appendChild(a);
+	a.click();
+	a.remove();
+	setTimeout(() => URL.revokeObjectURL(url), 1000);
+	showToast(`📅 ${count} пар — файл ${name}`);
 }
 
 function copyTimetable(span9) {
@@ -1276,8 +1469,10 @@ function stylePage_certif(span9) {
 function stylePage_signs(span9, pageMode) {
 	if (!span9 || pageMode !== 'current') return;
 	const disciplines = [...span9.querySelectorAll('table.common')].map(parseSignsTable).filter(Boolean);
-	buildSignsStats(span9, disciplines);
+	const fresh = markNewGrades(disciplines);
+	buildSignsStats(span9, disciplines, fresh);
 	disciplines.forEach(styleSignsTable);
+	updateGoalHints(disciplines);
 
 	let tooltipWrapper;
 	const tooltipElem     = createEl('div', { className: 'sign-tooltip' });
@@ -1367,6 +1562,7 @@ function parseSignsTable(table) {
 		const pass  = num(cells[col.pass]);
 		const status = grade === null ? 'pending' : (pass === null || grade >= pass ? 'passed' : 'failed');
 		kts.push({ row: tr, gradeCell: cells[col.grade], grade, pass, status,
+			topic: cells[0]?.textContent.replace(/\s+/g, ' ').trim() || '',
 			cur: col.cur !== undefined ? num(cells[col.cur]) : null,
 			max: col.cur !== undefined ? num(cells[col.max]) : null });
 	});
@@ -1381,6 +1577,7 @@ function parseSignsTable(table) {
 		kts,
 		cur: total?.cur ?? sum('cur'),
 		max: total?.max ?? sum('max'),
+		left:    kts.filter(k => k.status === 'pending').reduce((s, k) => s + (k.max || 0), 0),
 		passed:  kts.filter(k => k.status === 'passed').length,
 		failed:  kts.filter(k => k.status === 'failed').length,
 		pending: kts.filter(k => k.status === 'pending').length,
@@ -1407,10 +1604,75 @@ function styleSignsTable(d) {
 		<span class="eds-chip">рейтинг <b>${d.cur}</b> / ${d.max}</span>
 		<span class="eds-chip eds-chip--ok">сдано ${d.passed}</span>
 		${d.failed ? `<span class="eds-chip eds-chip--bad">не сдано ${d.failed}</span>` : ''}
-		${d.pending ? `<span class="eds-chip">впереди ${d.pending}</span>` : ''}
+		${d.pending ? `<span class="eds-chip">впереди ${d.pending} · до +${d.left}</span>` : ''}
+		${d.fresh ? `<span class="eds-chip eds-chip--new">новых ${d.fresh}</span>` : ''}
+		<span class="eds-chip eds-chip--goal" hidden></span>
 		<span class="eds-bar"><span class="eds-bar-fill" style="width:${pct}%"></span></span>
 	`;
 	d.heading.after(sum);
+	d.goalChip = sum.querySelector('.eds-chip--goal');
+}
+
+// ---------- Новые оценки ----------
+// Запоминаем, какие оценки уже видели. Оценка, появившаяся с прошлого визита,
+// подсвечивается три дня. При самом первом запуске ничего не подсвечиваем.
+const SEEN_GRADES_KEY = 'etis3-seen-grades';
+const NEW_GRADE_DAYS  = 3;
+
+function markNewGrades(disciplines) {
+	let seen = null;
+	try { seen = JSON.parse(localStorage.getItem(SEEN_GRADES_KEY)); } catch (e) {}
+	const first = !seen || typeof seen !== 'object';
+	if (first) seen = {};
+
+	const now = Date.now();
+	let fresh = 0;
+	disciplines.forEach(d => {
+		d.fresh = 0;
+		d.kts.forEach((k, i) => {
+			if (k.grade === null) return;
+			const key  = `${disciplineKey(d.name)}|${i}|${k.topic.slice(0, 60)}`;
+			const prev = seen[key];
+			if (!prev || prev.g !== k.grade) seen[key] = { g: k.grade, t: first ? 0 : now };
+			if (now - seen[key].t < NEW_GRADE_DAYS * 864e5) {
+				k.row.classList.add('kt-new');
+				k.gradeCell.prepend(createEl('span', { className: 'kt-new-badge', textContent: 'new', title: 'Новая оценка' }));
+				d.fresh++; fresh++;
+			}
+		});
+	});
+	try { localStorage.setItem(SEEN_GRADES_KEY, JSON.stringify(seen)); } catch (e) {}
+	return fresh;
+}
+
+// ---------- Цель по баллам ----------
+// Сколько ещё нужно набрать до цели и реально ли это с оставшимися КТ.
+const GOAL_KEY = 'etis3-grade-goal';
+
+function readGoal() {
+	try { const g = parseInt(localStorage.getItem(GOAL_KEY), 10); return g > 0 ? g : null; } catch (e) { return null; }
+}
+
+function goalHint(d, goal) {
+	if (!goal) return null;
+	const need = goal - d.cur;
+	if (need <= 0) return { cls: 'ok', text: 'цель есть ✓' };
+	if (need > d.left) return { cls: 'bad', text: `до ${goal} не добрать: максимум ${d.cur + d.left}${d.failed ? ' без пересдач' : ''}` };
+	const share = d.left ? Math.round(need / d.left * 100) : 100;
+	return { cls: share > 80 ? 'warn' : '', text: `нужно ещё ${need} из ${d.left} (${share}%)` };
+}
+
+function updateGoalHints(disciplines) {
+	const goal = readGoal();
+	disciplines.forEach(d => {
+		const h = goalHint(d, goal);
+		[d.goalChip, d.goalCell].forEach(el => {
+			if (!el) return;
+			el.hidden = !h;
+			el.className = el.className.replace(/\s*goal--\w+/g, '') + (h && h.cls ? ' goal--' + h.cls : '');
+			el.textContent = h ? h.text : '';
+		});
+	});
 }
 
 
@@ -1670,7 +1932,7 @@ function openSettingsPanel() {
 // СТАТИСТИКА ОЦЕНОК
 // ============================================================
 
-function buildSignsStats(span9, disciplines) {
+function buildSignsStats(span9, disciplines, fresh = 0) {
 	if (!disciplines.length) return;
 
 	const cur     = disciplines.reduce((s, d) => s + d.cur, 0);
@@ -1687,6 +1949,11 @@ function buildSignsStats(span9, disciplines) {
 		<div class="esw-header">
 			<span class="material-icons">analytics</span>
 			<span class="esw-title">Сводка по семестру</span>
+			${fresh ? `<span class="esw-new">новых оценок: ${fresh}</span>` : ''}
+			<label class="esw-goal" title="Цель по баллам в рейтинг для каждой дисциплины — покажу, сколько ещё нужно набрать">
+				<span class="material-icons">flag</span>цель
+				<input type="number" min="1" max="100" step="1" placeholder="—" inputmode="numeric">
+			</label>
 		</div>
 		<div class="esw-grid">
 			<div class="esw-card">
@@ -1713,10 +1980,26 @@ function buildSignsStats(span9, disciplines) {
 					<div class="esw-dis-name" title="${escapeHtml(d.name)}">${escapeHtml(d.name)}</div>
 					<div class="esw-dis-bar"><span style="width:${pct}%"></span></div>
 					<div class="esw-dis-val">${d.cur} / ${d.max}${d.failed ? ` · <b>${d.failed} не сдано</b>` : ''}</div>
+					<div class="esw-dis-goal" hidden></div>
 				</div>`;
 			}).join('')}
 		</div>
 	`;
+
+	const disEls = w.querySelectorAll('.esw-dis');
+	rows.forEach((d, i) => { d.goalCell = disEls[i].querySelector('.esw-dis-goal'); });
+
+	const input = w.querySelector('.esw-goal input');
+	const goal  = readGoal();
+	if (goal) input.value = goal;
+	input.addEventListener('input', () => {
+		const v = parseInt(input.value, 10);
+		try {
+			if (v > 0) localStorage.setItem(GOAL_KEY, String(Math.min(v, 1000)));
+			else localStorage.removeItem(GOAL_KEY);
+		} catch (e) {}
+		updateGoalHints(disciplines);
+	});
 
 	// После вкладок «оценки за сессии / в семестре / …» и выбора семестра
 	const menus = span9.querySelectorAll(':scope > .submenu');
