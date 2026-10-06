@@ -255,7 +255,7 @@ function ensureViewport() {
 		meta.content = 'width=device-width, initial-scale=1, viewport-fit=cover';
 	};
 	apply();
-	if (!document.head) document.addEventListener('DOMContentLoaded', apply, { once: true });
+	if (!document.head && document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply, { once: true });
 }
 ensureViewport();
 
@@ -616,7 +616,9 @@ function addProfileCard(sidebar) {
 
 function stylePages() {
 	const page  = window.location.pathname.split('/').pop();
-	const login = document.querySelector('body > div.login');
+	// Страница входа: форма с паролем и без меню кабинета
+	const login = document.querySelector('div.login form') && document.querySelector('input[type="password"], #sbmt') && !document.querySelector('div.span3')
+		|| document.querySelector('body > div.login');
 
 	if (login) { styleLoginPage(page); return; }
 
@@ -670,36 +672,63 @@ function stylePages() {
 function styleLoginPage(page) {
 	document.body.innerHTML = '<div class="login-container">' + document.body.innerHTML + '</div>';
 	const loginContainer = document.querySelector('div.login-container');
-	const loginItems     = document.querySelector('#form > div.items');
-	if (!loginItems) return;
-	const loginActions   = createEl('div', { className: 'login-actions' });
+	// Разметка входа бывает разной (десктоп / мобильная / восстановление) — ищем по смыслу
+	const form = document.querySelector('.login form') || document.querySelector('input[type="password"]')?.form || document.querySelector('form');
+	if (!form) return;
+	if (!form.id) form.id = 'form';
+	let loginItems = form.querySelector(':scope > div.items') || form.querySelector('div.items');
+	if (!loginItems) {
+		// Нет привычной обёртки полей — создаём, стили рассчитаны на form > .items > .item
+		loginItems = createEl('div', { className: 'items' });
+		const firstField = form.querySelector('input:not([type="hidden"])');
+		firstField ? firstField.before(loginItems) : form.appendChild(loginItems);
+	}
+	const loginActions = createEl('div', { className: 'login-actions' });
 	loginItems.appendChild(loginActions);
+	const recovery = page === 'stu_email_pkg.send_r_email';
 
-	if (page !== 'stu_email_pkg.send_r_email') {
+	form.querySelectorAll(':scope > h1, :scope > h2, :scope > h3').forEach(h => h.classList.add('login-form-title'));
+	if (!recovery) {
 		document.querySelector('div.choose')?.remove();
-		document.getElementById('form').prepend(createEl('div', { className: 'psu-logo' }));
-		const forgot = loginItems.querySelector('a');
+		form.prepend(createEl('div', { className: 'psu-logo' }));
+		const forgot = [...form.querySelectorAll('a')].find(a => /забыл|восстанов|send_r_email/i.test(a.textContent + a.href));
 		if (forgot) { forgot.className = 'forgot-password'; loginActions.appendChild(forgot); }
 	}
-	document.getElementById('sbmt') && loginActions.appendChild(document.getElementById('sbmt'));
+	const btn = form.querySelector('#sbmt') || form.querySelector('button, input[type="submit"]');
+	if (btn) { btn.id = btn.id || 'sbmt'; loginActions.appendChild(btn); }
 
-	loginItems.querySelectorAll('div.item').forEach(item => {
+	// Поля: обёртка .item, подпись после поля (плавающий label), placeholder для :placeholder-shown
+	form.querySelectorAll('input[type="text"], input[type="password"], input[type="email"], input:not([type])').forEach(inp => {
+		let item = inp.closest('div.item');
+		if (!item || !form.contains(item)) {
+			item = createEl('div', { className: 'item' });
+			inp.before(item);
+			item.appendChild(inp);
+		}
+		const lbl = (inp.id && form.querySelector(`label[for="${inp.id}"]`)) || item.querySelector('label');
+		if (lbl) {
+			item.appendChild(lbl);
+		} else if (inp.placeholder && inp.placeholder.trim()) {
+			item.appendChild(createEl('label', { textContent: inp.placeholder.trim(), for: inp.id || '' }));
+		}
+		inp.placeholder = ' ';
+		if (item.parentElement !== loginItems) loginItems.insertBefore(item, loginActions);
+	});
+	form.querySelectorAll('div.item').forEach(item => {
 		const err = item.querySelector('div.error_message');
-		if (err) { loginContainer.prepend(err); item.remove(); return; }
-		const inp = item.querySelector('input');
-		if (inp) inp.placeholder = ' ';
-		const lbl = item.querySelector('label');
-		if (lbl) item.appendChild(lbl);
+		if (err) { loginContainer.prepend(err); item.remove(); }
 	});
 
-	if (page !== 'stu_email_pkg.send_r_email') {
-		const infoStr = loginItems.textContent.split('\n').slice(-3)[0].trim();
+	if (!recovery) {
+		const infoStr = (loginItems.textContent.match(/По всем вопросам[^\n]*/) || [''])[0].trim();
 		const footer  = document.querySelector('div.header_message');
 		if (footer) {
 			footer.className = 'footer';
-			footer.innerHTML = '<p>' + footer.innerHTML + '</p><p>' + escapeHtml(infoStr) + '</p>';
+			footer.innerHTML = '<p>' + footer.innerHTML + '</p>' + (infoStr ? '<p>' + escapeHtml(infoStr) + '</p>' : '');
 			loginContainer.appendChild(footer);
 		}
+		// Текст «По всем вопросам…» внутри формы больше не нужен — он в подвале
+		[...loginItems.childNodes].forEach(n => { if (n.nodeType === 3 && /По всем вопросам/.test(n.textContent)) n.remove(); });
 	}
 
 	// Бренд на странице входа
@@ -1870,7 +1899,14 @@ function updateGoalHints(disciplines) {
 // MAIN
 // ============================================================
 
-document.addEventListener('DOMContentLoaded', () => {
+// Расширение запускается до DOMContentLoaded, а менеджеры скриптов (Stay на iPhone)
+// могут подключить нас уже после — тогда событие не придёт, запускаемся сразу
+function onReady(fn) {
+	if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn, { once: true });
+	else setTimeout(fn, 0); // после того, как весь скрипт объявит свои переменные
+}
+
+onReady(() => {
 	setIcon();
 	stylePages();
 	initPageTransitions();
@@ -3134,6 +3170,9 @@ function buildTimetableDays(span9, week) {
 // ============================================================
 
 const CHANGELOG = [
+	['4.5.1', [
+		['build', 'Исправления для iPhone', 'Экран входа и интерфейс запускаются в Stay, даже если скрипт подключился после загрузки страницы'],
+	]],
 	['4.5.0', [
 		['smartphone', 'Мобильная версия', 'Под телефон: нижний док с «Ещё», компактная шапка, учёт выреза iPhone'],
 		['phone_iphone', 'Работает на iPhone', 'Через Stay в Safari — без компьютера и магазина расширений'],
