@@ -15,6 +15,9 @@ const ETIS3_DEFAULTS = {
 	pairTypes: true,     // чипы типов пар
 	scoreDots: true,     // цветные точки у оценок
 	compact:   false,    // компактный режим
+	layout:    'modern', // modern — рельс + верхняя панель, classic — сайдбар
+	aurora:    true,     // живой фон-аврора на всех страницах
+	sky:       true,     // цвета фона по времени суток
 };
 
 const ETIS3_ACCENTS = {
@@ -39,7 +42,8 @@ function etis3Normalize(raw) {
 	if (raw.accent in ETIS3_ACCENTS) s.accent = raw.accent;
 	const fs = parseFloat(raw.fontSize);
 	if (!isNaN(fs)) s.fontSize = Math.min(ETIS3_FONT_MAX, Math.max(ETIS3_FONT_MIN, fs));
-	['highlight', 'widget', 'pairTypes', 'scoreDots', 'compact'].forEach(k => {
+	if (['modern', 'classic'].includes(raw.layout)) s.layout = raw.layout;
+	['highlight', 'widget', 'pairTypes', 'scoreDots', 'compact', 'aurora', 'sky'].forEach(k => {
 		if (typeof raw[k] === 'boolean') s[k] = raw[k];
 	});
 	return s;

@@ -8,7 +8,8 @@
 
 let settings = { ...ETIS3_DEFAULTS };
 
-const themeBtns  = document.querySelectorAll('.theme-btn');
+const themeBtns  = document.querySelectorAll('.theme-btn[data-theme-val]');
+const layoutBtns = document.querySelectorAll('.layout-btn');
 const accentRow  = document.getElementById('accent-row');
 const fontRange  = document.getElementById('font-size-range');
 const fontVal    = document.getElementById('font-size-val');
@@ -37,6 +38,7 @@ function render() {
 	root.style.setProperty('--accent-bg',   `rgba(${rgb},0.12)`);
 
 	themeBtns.forEach(b => b.classList.toggle('active', b.dataset.themeVal === settings.theme));
+	layoutBtns.forEach(b => b.classList.toggle('active', b.dataset.layoutVal === settings.layout));
 	accentRow.querySelectorAll('.accent-swatch').forEach(s => s.classList.toggle('active', s.dataset.accent === settings.accent));
 	fontRange.value     = settings.fontSize;
 	fontVal.textContent = settings.fontSize + 'px';
@@ -51,6 +53,7 @@ function save(patch, notice = '✓ Сохранено') {
 }
 
 themeBtns.forEach(btn => btn.addEventListener('click', () => save({ theme: btn.dataset.themeVal })));
+layoutBtns.forEach(btn => btn.addEventListener('click', () => save({ layout: btn.dataset.layoutVal })));
 fontRange.addEventListener('input', () => save({ fontSize: parseFloat(fontRange.value) }));
 toggles.forEach(el => el.addEventListener('change', () => save({ [el.dataset.setting]: el.checked })));
 document.getElementById('btn-reset').addEventListener('click', () => save({ ...ETIS3_DEFAULTS }, '↺ Сброшено'));
