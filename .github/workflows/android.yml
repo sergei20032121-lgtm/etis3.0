@@ -65,6 +65,16 @@ jobs:
           cp android/app/build/outputs/apk/release/app-release.apk out/etis3.apk
           cp out/etis3.apk "out/etis3-${{ steps.v.outputs.version }}.apk"
 
+      - name: Проверка APK
+        run: |
+          APK=out/etis3.apk
+          unzip -l "$APK" | grep -q 'assets/etis3.user.js' || { echo "Нет assets/etis3.user.js в APK"; exit 1; }
+          unzip -p "$APK" assets/etis3.user.js | grep -m1 '@version'
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/apksigner" verify --print-certs "$APK" | head -3
+          "$BT/aapt2" dump badging "$APK" | grep -E "^package|launchable-activity|sdkVersion|application-label:" || true
+          ls -la out/
+
       - uses: actions/upload-artifact@v4
         with:
           name: etis3-apk-${{ steps.v.outputs.version }}
