@@ -8,10 +8,15 @@ jobs:
     steps:
       - name: chain
         run: |
-          echo | timeout 30 openssl s_client -connect student.psu.ru:443 -servername student.psu.ru -showcerts 2>&1 | grep -E "s:|i:|Verify|verify|depth" || true
-          curl -sSI -m 30 https://student.psu.ru/pls/stu_cus_et/stu.timetable || true
-      - name: certs
-        run: |
-          for u in https://gu-st.ru/content/lending/russian_trusted_root_ca_pem.crt https://gu-st.ru/content/lending/russian_trusted_sub_ca_pem.crt; do
-            echo "== $u"; curl -sSL -m 30 "$u" -o c.crt && openssl x509 -in c.crt -noout -subject -issuer -fingerprint -sha256 -dates && cat c.crt || true
-          done
+          echo | openssl s_client -connect student.psu.ru:443 -servername student.psu.ru 2>/dev/null | openssl x509 > leaf.pem
+          openssl x509 -in leaf.pem -noout -subject -issuer -dates -ext subjectAltName,authorityInfoAccess
+          AIA=$(openssl x509 -in leaf.pem -noout -ext authorityInfoAccess | grep -o 'CA Issuers - URI:[^ ]*' | sed 's/CA Issuers - URI://')
+          echo "AIA=$AIA"
+          curl -sSL -m 30 "$AIA" -o inter.der
+          openssl x509 -inform der -in inter.der -out inter.pem 2>/dev/null || cp inter.der inter.pem
+          openssl x509 -in inter.pem -noout -subject -issuer -dates -fingerprint -sha256
+          openssl verify -untrusted inter.pem leaf.pem
+          curl -sSL -m 30 https://secure.globalsign.com/cacert/root-r6.crt -o r6.der
+          openssl x509 -inform der -in r6.der -out r6.pem && openssl x509 -in r6.pem -noout -subject -fingerprint -sha256 -dates
+          echo "--- INTER"; cat inter.pem; echo "--- R6"; cat r6.pem
+          curl -sS -o /dev/null -w "with chain: %{http_code}\n" --cacert <(cat inter.pem /etc/ssl/certs/ca-certificates.crt) -m 30 https://student.psu.ru/pls/stu_cus_et/stu.timetable || true
