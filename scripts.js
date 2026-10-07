@@ -174,6 +174,44 @@ prefersDark?.addEventListener('change', () => { if (settings.theme === 'auto') a
 function applyTheme() {
 	document.documentElement.setAttribute('theme', etis3IsDark(settings.theme) ? 'dark' : 'light');
 	applyAccent(settings.accent);
+	syncAppMeta();
+}
+
+// ---------- «Как приложение»: экран «Домой» на iPhone, цвет панелей браузера ----------
+const APP_ICON_URL = 'https://raw.githubusercontent.com/sergei20032121-lgtm/etis3.0/main/icons/apple-touch-icon.png';
+
+function setMeta(name, content, attr = 'name') {
+	let m = document.querySelector(`meta[${attr}="${name}"]`);
+	if (!m) {
+		m = document.createElement('meta');
+		m.setAttribute(attr, name);
+		(document.head || document.documentElement).appendChild(m);
+	}
+	m.content = content;
+}
+
+function syncAppMeta() {
+	const dark = document.documentElement.getAttribute('theme') === 'dark';
+	// Цвет строки состояния и панелей Safari / Chrome на телефоне — под фон темы
+	setMeta('theme-color', dark ? '#0d0d14' : '#ecebf4');
+	setMeta('color-scheme', dark ? 'dark' : 'light');
+}
+
+function setupAppMeta() {
+	// Полноэкранный режим («web-app-capable») не включаем: в веб-приложениях с экрана «Домой»
+	// iOS не запускает расширения Safari, и userscript (Stay) там не работает.
+	// Иконка и название есть — ярлык открывает ЕТИС в Safari, где всё работает.
+	setMeta('apple-mobile-web-app-title', 'ЕТИС');
+	setMeta('application-name', 'ЕТИС');
+	if (!document.querySelector('link[rel="apple-touch-icon"]')) {
+		const link = document.createElement('link');
+		link.rel = 'apple-touch-icon';
+		link.href = APP_ICON_URL;
+		(document.head || document.documentElement).appendChild(link);
+	}
+	// Запущено с экрана «Домой» — без интерфейса браузера
+	const standalone = window.navigator.standalone === true || window.matchMedia?.('(display-mode: standalone)').matches;
+	document.documentElement.classList.toggle('etis3-standalone', !!standalone);
 }
 
 function themeIcon(t) {
@@ -258,6 +296,7 @@ function ensureViewport() {
 	if (!document.head && document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply, { once: true });
 }
 ensureViewport();
+setupAppMeta();
 
 applySettings();
 const settingsReady = initSettings();
@@ -1270,6 +1309,9 @@ function stylePage_timetable(span9) {
 	const week = readWeek(span9);
 	cacheWeek(week);
 	const daysView = buildTimetableDays(span9, week);
+	const weekNav  = buildWeekNav(span9, week, todayBtn);
+	if (weekNav) (daysView || span9.querySelector('div.day'))?.before(weekNav);
+	initWeekSwipe(span9);
 	let grid = null;
 	if (week.some(d => d.pairs.length)) {
 		grid = buildWeekGrid(week);
@@ -3170,6 +3212,11 @@ function buildTimetableDays(span9, week) {
 // ============================================================
 
 const CHANGELOG = [
+	['4.6.0', [
+		['swipe', 'Свайпы в расписании', 'Листай недели пальцем; сверху — «‹ неделя ›» и «Сегодня»'],
+		['add_to_home_screen', 'Иконка на экране «Домой»', 'Safari → «Поделиться» → «На экран Домой» — ЕТИС в один тап, панели Safari в цвет темы'],
+		['palette', 'Новая иконка', 'И для расширения, и для экрана «Домой»'],
+	]],
 	['4.5.1', [
 		['build', 'Исправления для iPhone', 'Экран входа и интерфейс запускаются в Stay, даже если скрипт подключился после загрузки страницы'],
 	]],
@@ -3369,4 +3416,75 @@ function buildSessionView(span9) {
 		note.after(det);
 		note.classList.add('etis3-orig');
 	}
+}
+
+
+// ---------- Неделя: «‹ неделя ›», «Сегодня» и свайпы ----------
+function weekLinks() {
+	const cur = document.querySelector('.weeks li.current');
+	const link = li => li?.querySelector('a')?.href || null;
+	return { cur, prev: link(cur?.previousElementSibling), next: link(cur?.nextElementSibling) };
+}
+
+function buildWeekNav(span9, week, todayBtn) {
+	const { cur, prev, next } = weekLinks();
+	if (!cur) return null;
+	const dates = week.map(d => d.date).filter(Boolean);
+	const fmt = d => d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+	let range = '';
+	if (dates.length) {
+		const a = dates[0], b = dates[dates.length - 1];
+		range = a.getMonth() === b.getMonth() ? `${a.getDate()}–${fmt(b)}` : `${fmt(a)} – ${fmt(b)}`;
+	}
+	const isCurrentWeek = week.some(d => d.isToday);
+	const kind = cur.title ? ` · ${cur.title.toLowerCase()}` : '';
+	const nav = createEl('div', { className: 'etis3-view ttw' });
+	nav.innerHTML = `
+		<a class="ttw-arrow${prev ? '' : ' ttw-arrow--off'}" ${prev ? `href="${escapeHtml(prev)}"` : ''} aria-label="Предыдущая неделя"><span class="material-icons">chevron_left</span></a>
+		<div class="ttw-mid">
+			<b>${escapeHtml(cur.textContent.trim())} неделя${isCurrentWeek ? ' <span class="ttw-now">текущая</span>' : ''}</b>
+			<span>${escapeHtml(range + kind)}</span>
+		</div>
+		${!isCurrentWeek && todayBtn?.href ? `<a class="ttw-today" href="${escapeHtml(todayBtn.href)}">Сегодня</a>` : ''}
+		<a class="ttw-arrow${next ? '' : ' ttw-arrow--off'}" ${next ? `href="${escapeHtml(next)}"` : ''} aria-label="Следующая неделя"><span class="material-icons">chevron_right</span></a>`;
+	return nav;
+}
+
+// Свайп влево / вправо по расписанию — следующая / предыдущая неделя (только сенсорные экраны)
+function initWeekSwipe(span9) {
+	if (!('ontouchstart' in window)) return;
+	const { prev, next } = weekLinks();
+	if (!prev && !next) return;
+	let x0 = 0, y0 = 0, t0 = 0, active = false, dx = 0;
+	const target = () => span9.querySelector('.ttv') || span9.querySelector('.etis3-week-grid');
+	span9.addEventListener('touchstart', e => {
+		if (e.touches.length !== 1 || e.target.closest('.etis3-week-grid, .weeks, .submenu, input, textarea')) { active = false; return; }
+		x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now(); active = true; dx = 0;
+	}, { passive: true });
+	span9.addEventListener('touchmove', e => {
+		if (!active) return;
+		dx = e.touches[0].clientX - x0;
+		const dy = e.touches[0].clientY - y0;
+		if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 12) { active = false; resetSwipe(); return; }
+		if ((dx > 0 && !prev) || (dx < 0 && !next)) dx *= 0.25; // некуда листать — пружиним
+		const el = target();
+		if (el) { el.style.transition = 'none'; el.style.transform = `translateX(${dx * 0.6}px)`; el.style.opacity = String(1 - Math.min(Math.abs(dx) / 600, 0.4)); }
+	}, { passive: true });
+	const resetSwipe = () => {
+		const el = target();
+		if (!el) return;
+		el.style.transition = 'transform 0.3s cubic-bezier(.2,.8,.2,1), opacity 0.3s';
+		el.style.transform = ''; el.style.opacity = '';
+	};
+	span9.addEventListener('touchend', () => {
+		if (!active) return;
+		active = false;
+		const fast = Math.abs(dx) > 40 && Date.now() - t0 < 250;
+		const url = dx < 0 ? next : prev;
+		if (url && (Math.abs(dx) > 90 || fast)) {
+			const el = target();
+			if (el) { el.style.transition = 'transform 0.25s ease-in, opacity 0.25s'; el.style.transform = `translateX(${dx < 0 ? -40 : 40}vw)`; el.style.opacity = '0'; }
+			setTimeout(() => { location.href = url; }, 180);
+		} else resetSwipe();
+	});
 }

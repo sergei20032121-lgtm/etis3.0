@@ -4491,3 +4491,44 @@ ul.nav.msg li, .hm-feed-text, .ssv-note { overflow-wrap: anywhere; }
 /* Заголовок «Вход» внутри формы: на нашей сцене он лишний — есть герой */
 html.etis3-login-page .login-form-title { display: none !important; }
 html.etis3-login-page form .item > label { pointer-events: none; }
+
+
+/* ============================================================
+   НЕДЕЛИ И «КАК ПРИЛОЖЕНИЕ» (4.6)
+   ============================================================ */
+
+.ttw {
+	display: flex; align-items: center; gap: 1rem;
+	margin-bottom: 1.6rem; padding: 0.8rem;
+	border-radius: 2rem;
+	background: var(--glass-bg-card);
+	backdrop-filter: var(--glass-filter); -webkit-backdrop-filter: var(--glass-filter);
+	border: var(--glass-border); box-shadow: var(--glass-shadow-card);
+}
+.span9.etis3-tt-grid .ttw { display: flex !important; }
+.ttw-arrow {
+	flex: none; width: 4.4rem; height: 4.4rem; display: grid; place-items: center;
+	border-radius: 1.4rem; color: var(--color-text-primary) !important; text-decoration: none !important;
+	background: rgba(127,127,127,0.10); transition: background 0.2s, transform 0.15s;
+}
+.ttw-arrow:hover { background: rgba(var(--color-accent-rgb, 124,111,212), 0.16); }
+.ttw-arrow:active { transform: scale(0.94); }
+.ttw-arrow .material-icons { font-size: 2.6rem; }
+.ttw-arrow--off { opacity: 0.3; pointer-events: none; }
+.ttw-mid { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; line-height: 1.25; text-align: center; }
+.ttw-mid b { font-size: 1.6rem; font-weight: 700; color: var(--color-text-primary); }
+.ttw-mid > span { font-size: 1.2rem; color: var(--color-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.ttw-now { margin-left: 0.4rem; padding: 0.1rem 0.7rem; border-radius: 10rem; font-size: 1.05rem; font-weight: 700; color: var(--color-accent); background: rgba(var(--color-accent-rgb, 124,111,212), 0.14); vertical-align: 0.15em; }
+.ttw-today {
+	flex: none; padding: 0.8rem 1.4rem; border-radius: 1.2rem;
+	font-size: 1.3rem; font-weight: 600; color: #fff !important; text-decoration: none !important;
+	background: var(--color-accent); box-shadow: 0 4px 14px rgba(var(--color-accent-rgb, 124,111,212), 0.4);
+}
+/* Родной блок недель в новом виде прячем на телефоне — есть стрелки и свайпы */
+@media (max-width: 900px) {
+	html.etis3-modern .span9 .week-select { display: none !important; }
+	html.etis3-modern .span9 > div[style*="float: right"], html.etis3-modern .span9 > a[href*="schedule_detail"] { float: none !important; display: inline-block !important; margin: 0 1.2rem 1rem 0 !important; }
+	.ttv, .etis3-week-grid { will-change: transform; }
+}
+/* Запуск с экрана «Домой» (iPhone): строка состояния поверх — отступ сверху всегда */
+html.etis3-standalone.etis3-modern #etis3-topbar { top: max(1rem, env(safe-area-inset-top)) !important; }
