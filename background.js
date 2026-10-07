@@ -131,7 +131,7 @@ async function notify(found) {
 	for (const [kind, items] of Object.entries(byKind)) {
 		const title = items.length > 1 ? `${KIND_TITLE[kind]}: ${items.length}`.replace('Новая оценка', 'Новые оценки').replace('Новое сообщение', 'Новые сообщения').replace('Новое объявление', 'Новые объявления') : KIND_TITLE[kind];
 		chrome.notifications.create('etis3-' + kind + '-' + Date.now(), {
-			type: 'basic', iconUrl: 'logo.png', title,
+			type: 'basic', iconUrl: 'icons/icon-128.png', title,
 			message: items.slice(0, 3).join('\n') + (items.length > 3 ? `\n…и ещё ${items.length - 3}` : ''),
 			priority: 1,
 		});
