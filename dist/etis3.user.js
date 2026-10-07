@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ЕТИС 3.0
 // @namespace    https://github.com/sergei20032121-lgtm/etis3.0
-// @version      4.7.0
+// @version      4.7.1
 // @description  Современный редизайн ЕТИСа ПГНИУ: liquid glass, виджет пар, тёмная тема, настройки. by Комар
 // @author       Комар
 // @homepageURL  https://github.com/sergei20032121-lgtm/etis3.0
@@ -56,7 +56,7 @@
 			storage: { local, onChanged: { addListener: fn => listeners.push(fn) } },
 			runtime: {
 				lastError: undefined,
-				getManifest: () => ({ version: "4.7.0" }),
+				getManifest: () => ({ version: "4.7.1" }),
 				getURL: p => p === 'icon.svg' ? "data:image/svg+xml;base64,PHN2ZyBpZD0iTGF5ZXJfMSIgZGF0YS1uYW1lPSJMYXllciAxIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjggMTI4Ij48ZGVmcz48c3R5bGU+LmNscy0xe2ZpbGw6I2M2MmUzZTt9LmNscy0ye2ZpbGw6I2ZmZjt9PC9zdHlsZT48L2RlZnM+PHRpdGxlPmljb248L3RpdGxlPjxyZWN0IGNsYXNzPSJjbHMtMSIgd2lkdGg9IjEyOCIgaGVpZ2h0PSIxMjgiIHJ4PSIzMiIvPjxwYXRoIGNsYXNzPSJjbHMtMiIgZD0iTTMyLDY5LjRWODcuNzJMNjQsMTA1LjIxLDk2LjA1LDg3LjcyVjY5LjRMNjQsODYuODlaTTY0LDIyLjc5LDEzLjYzLDUwLjI2LDY0LDc3Ljc0bDQxLjIxLTIyLjQ5Vjg2Ljg5aDkuMTZWNTAuMjZaIi8+PC9zdmc+" : p,
 				sendMessage: () => Promise.resolve(),
 			},

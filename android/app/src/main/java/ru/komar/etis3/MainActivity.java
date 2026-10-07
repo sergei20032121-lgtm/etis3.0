@@ -1,7 +1,6 @@
 package ru.komar.etis3;
 
 import android.app.Activity;
-import android.app.DownloadManager;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
@@ -47,6 +46,7 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyStore;
 import java.security.cert.CertPathValidator;
 import java.security.cert.CertificateFactory;
 import java.security.cert.PKIXParameters;
@@ -75,8 +75,12 @@ public class MainActivity extends Activity {
     private static final int FILE_CHOOSER = 1;
     /** Сколько ждём первую отрисовку, прежде чем показать экран «не грузится». */
     private static final long LOAD_TIMEOUT_MS = 45000;
-    /** Корневой и выпускающий сертификаты НУЦ Минцифры (res/raw), которым не доверяет Android. */
-    private static final String[] RU_CA_FILES = {"russian_trusted_root_ca", "russian_trusted_sub_ca"};
+    /**
+     * student.psu.ru отдаёт только свой сертификат, без промежуточного GlobalSign AlphaSSL.
+     * Браузеры докачивают его сами, а WebView — нет, и страница остаётся белой.
+     * Поэтому промежуточный (и корень R6 для старых Android) лежат в res/raw.
+     */
+    private static final String[] CA_FILES = {"globalsign_alphassl_2025", "globalsign_root_r6"};
 
     private WebView web;
     private String script = "";
@@ -164,14 +168,13 @@ public class MainActivity extends Activity {
 
             @Override
             public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
-                // student.psu.ru подписан сертификатом НУЦ Минцифры, которого нет в Android.
-                // Пропускаем только если цепочка реально ведёт к встроенному корню Минцифры.
-                if (isEtis(error.getUrl()) && trustedByRussianCa(error.getCertificate())) {
+                // Достраиваем цепочку встроенным промежуточным сертификатом и проверяем её сами.
+                if (isEtis(error.getUrl()) && trustedWithBundledChain(error.getCertificate())) {
                     handler.proceed();
                     return;
                 }
                 handler.cancel();
-                showError("Небезопасное соединение",
+                if (isEtis(error.getUrl())) showError("Небезопасное соединение",
                         "Сертификат сайта не прошёл проверку (код " + error.getPrimaryError() + "). "
                                 + "Проверьте дату и время на телефоне или откройте ЕТИС в браузере.");
             }
@@ -211,20 +214,8 @@ public class MainActivity extends Activity {
                 toast("Этот файл можно скачать только в браузере");
                 return;
             }
-            try {
-                String name = URLUtil.guessFileName(url, contentDisposition, mimeType);
-                DownloadManager.Request req = new DownloadManager.Request(Uri.parse(url));
-                req.addRequestHeader("Cookie", CookieManager.getInstance().getCookie(url));
-                req.addRequestHeader("User-Agent", userAgent);
-                req.setMimeType(mimeType);
-                req.setTitle(name);
-                req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-                req.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name);
-                ((DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE)).enqueue(req);
-                toast("Скачивание: " + name);
-            } catch (Exception e) {
-                openExternal(Uri.parse(url));
-            }
+            String name = URLUtil.guessFileName(url, contentDisposition, mimeType);
+            download(url, userAgent, mimeType, name);
         });
 
         Uri data = getIntent() != null ? getIntent().getData() : null;
@@ -321,59 +312,68 @@ public class MainActivity extends Activity {
         }
     }
 
-    // ---------- Сертификаты Минцифры ----------
+    // ---------- Достраивание цепочки сертификатов ----------
 
-    private Set<TrustAnchor> ruAnchors;
-    private List<X509Certificate> ruIntermediates;
+    private Set<TrustAnchor> anchors;
+    private List<X509Certificate> intermediates;
 
-    private void loadRussianCa() {
-        if (ruAnchors != null) return;
-        ruAnchors = new HashSet<>();
-        ruIntermediates = new ArrayList<>();
+    private void loadAnchors() {
+        if (anchors != null) return;
+        anchors = new HashSet<>();
+        intermediates = new ArrayList<>();
         try {
             CertificateFactory cf = CertificateFactory.getInstance("X.509");
-            for (String name : RU_CA_FILES) {
+            for (String name : CA_FILES) {
                 int id = getResources().getIdentifier(name, "raw", getPackageName());
                 if (id == 0) continue;
                 try (InputStream in = getResources().openRawResource(id)) {
                     X509Certificate c = (X509Certificate) cf.generateCertificate(in);
-                    if (c.getSubjectX500Principal().equals(c.getIssuerX500Principal())) ruAnchors.add(new TrustAnchor(c, null));
-                    else ruIntermediates.add(c);
+                    if (c.getSubjectX500Principal().equals(c.getIssuerX500Principal())) anchors.add(new TrustAnchor(c, null));
+                    else intermediates.add(c);
                 }
+            }
+        } catch (Exception ignored) { }
+        // Плюс системные корни телефона
+        try {
+            KeyStore ks = KeyStore.getInstance("AndroidCAStore");
+            ks.load(null, null);
+            for (java.util.Enumeration<String> e = ks.aliases(); e.hasMoreElements(); ) {
+                java.security.cert.Certificate c = ks.getCertificate(e.nextElement());
+                if (c instanceof X509Certificate) anchors.add(new TrustAnchor((X509Certificate) c, null));
             }
         } catch (Exception ignored) { }
     }
 
-    private boolean trustedByRussianCa(SslCertificate sslCert) {
+    private boolean trustedWithBundledChain(SslCertificate sslCert) {
         try {
             X509Certificate leaf = toX509(sslCert);
             if (leaf == null) return false;
-            loadRussianCa();
-            if (ruAnchors.isEmpty()) return false;
+            loadAnchors();
+            if (anchors.isEmpty()) return false;
             leaf.checkValidity();
             List<X509Certificate> chain = new ArrayList<>();
             chain.add(leaf);
-            // Строим цепочку лист → промежуточные (Sub CA) по издателю
             X509Certificate cur = leaf;
             for (int i = 0; i < 4; i++) {
                 X509Certificate next = null;
-                for (X509Certificate c : ruIntermediates) {
+                for (X509Certificate c : intermediates) {
                     if (c.getSubjectX500Principal().equals(cur.getIssuerX500Principal()) && !chain.contains(c)) { next = c; break; }
                 }
                 if (next == null) break;
                 chain.add(next);
                 cur = next;
             }
-            PKIXParameters params = new PKIXParameters(ruAnchors);
+            PKIXParameters params = new PKIXParameters(anchors);
             params.setRevocationEnabled(false);
             CertPathValidator.getInstance("PKIX").validate(
                     CertificateFactory.getInstance("X.509").generateCertPath(chain), params);
-            // Имя в сертификате должно совпадать с ЕТИС
-            String names = String.valueOf(leaf.getSubjectX500Principal().getName());
+            // Сертификат должен быть выписан на ЕТИС (*.psu.ru / student.psu.ru)
             java.util.Collection<List<?>> alt = leaf.getSubjectAlternativeNames();
-            if (alt != null) for (List<?> e : alt) names += " " + e.get(1);
-            return names.toLowerCase(java.util.Locale.ROOT).contains(HOST)
-                    || names.toLowerCase(java.util.Locale.ROOT).contains("*.psu.ru");
+            if (alt != null) for (List<?> e : alt) {
+                String n = String.valueOf(e.get(1)).toLowerCase(java.util.Locale.ROOT);
+                if (n.equals(HOST) || n.equals("*.psu.ru")) return true;
+            }
+            return false;
         } catch (Exception e) {
             return false;
         }
@@ -495,6 +495,69 @@ public class MainActivity extends Activity {
 
     private int dp(int v) {
         return Math.round(v * getResources().getDisplayMetrics().density);
+    }
+
+    // ---------- Скачивание файлов ----------
+
+    /**
+     * Качаем сами, а не через DownloadManager: системный загрузчик не знает
+     * промежуточного сертификата ЕТИС и падает с ошибкой SSL.
+     */
+    private void download(String url, String userAgent, String mimeType, String name) {
+        if (Build.VERSION.SDK_INT < 29
+                && checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, 2);
+            toast("Разрешите доступ к файлам и нажмите «скачать» ещё раз");
+            return;
+        }
+        String cookie = CookieManager.getInstance().getCookie(url);
+        toast("Скачивание: " + name);
+        new Thread(() -> {
+            String result;
+            try {
+                HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+                c.setConnectTimeout(15000);
+                c.setReadTimeout(60000);
+                if (cookie != null) c.setRequestProperty("Cookie", cookie);
+                c.setRequestProperty("User-Agent", userAgent);
+                if (c.getResponseCode() >= 400) throw new java.io.IOException("HTTP " + c.getResponseCode());
+                String type = mimeType != null && !mimeType.isEmpty() ? mimeType : c.getContentType();
+                try (InputStream in = c.getInputStream(); java.io.OutputStream out = openDownload(name, type)) {
+                    byte[] buf = new byte[16384];
+                    int n;
+                    while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                }
+                result = "Сохранено в «Загрузки»: " + name;
+            } catch (Exception e) {
+                result = null;
+            }
+            String done = result;
+            ui.post(() -> {
+                if (done != null) toast(done);
+                else {
+                    toast("Не получилось скачать — открываю в браузере");
+                    openExternal(Uri.parse(url));
+                }
+            });
+        }).start();
+    }
+
+    private java.io.OutputStream openDownload(String name, String type) throws java.io.IOException {
+        if (Build.VERSION.SDK_INT >= 29) {
+            android.content.ContentValues v = new android.content.ContentValues();
+            v.put(android.provider.MediaStore.Downloads.DISPLAY_NAME, name);
+            if (type != null) v.put(android.provider.MediaStore.Downloads.MIME_TYPE, type.split(";")[0].trim());
+            Uri uri = getContentResolver().insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, v);
+            if (uri == null) throw new java.io.IOException("MediaStore");
+            java.io.OutputStream out = getContentResolver().openOutputStream(uri);
+            if (out == null) throw new java.io.IOException("MediaStore");
+            return out;
+        }
+        File dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+        //noinspection ResultOfMethodCallIgnored
+        dir.mkdirs();
+        return new FileOutputStream(new File(dir, name));
     }
 
     // ---------- Разное ----------

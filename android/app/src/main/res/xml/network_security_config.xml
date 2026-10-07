@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- student.psu.ru не отдаёт промежуточный сертификат GlobalSign AlphaSSL — добавляем его сами,
+     чтобы скачивание файлов из ЕТИС работало (браузеры докачивают его автоматически, Android — нет). -->
+<network-security-config>
+    <domain-config>
+        <domain includeSubdomains="true">psu.ru</domain>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="@raw/globalsign_alphassl_2025" />
+            <certificates src="@raw/globalsign_root_r6" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>
