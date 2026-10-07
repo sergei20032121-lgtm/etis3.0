@@ -2744,10 +2744,16 @@ function renderHome(span9) {
 	}
 	const week   = readWeek(span9);
 	const cache  = readHomeCache();
+	let lastData = cache, lastLoading = true;
 	draw(cache, true);
 	refreshHomeData().then(fresh => { if (isHomeRoute()) draw(fresh, false); });
+	if (!home.dataset.notesHooked) {
+		home.dataset.notesHooked = '1';
+		document.addEventListener('etis3-notes-changed', () => { if (isHomeRoute() && document.getElementById('etis3-home')) draw(lastData, lastLoading); });
+	}
 
 	function draw(data, loading) {
+		lastData = data; lastLoading = loading;
 		let seenFeed = {};
 		try { seenFeed = JSON.parse(localStorage.getItem(SEEN_FEED_KEY)) || {}; } catch (e) {}
 		const name  = (document.querySelector('.etis3-profile')?.title || '').split(/\s+/)[1] || '';
@@ -2783,7 +2789,7 @@ function renderHome(span9) {
 		const dayPairs = showDay ? showDay.pairs : [];
 		const m = t => t[0] * 60 + t[1];
 		const nowM = nowMinutes();
-		const timeline = timelineHtml(dayPairs, showDay === today);
+		const timeline = timelineHtml(dayPairs, showDay === today, false, showDay?.date || null);
 
 		// --- оценки ---
 		const gradesHtml = !g ? skeleton(loading, data.gradesErr) : `
@@ -2837,13 +2843,18 @@ function renderHome(span9) {
 				<div class="hm-hero-side">${semesterRing()}</div>
 			</section>
 
-			<section class="hm-card hm-today">
+			<section class="hm-card hm-today${dayPairs.length >= 3 ? ' hm-today--tall' : ''}">
 				<div class="hm-card-head">
 					<span class="material-icons">event</span>
 					<h2>${showDay === today ? 'Сегодня' : showDay ? escapeHtml(showDay.title.split(',')[0]) : 'Расписание'}</h2>
 					<a class="hm-more" href="stu.timetable" data-tt-link>вся неделя<span class="material-icons">arrow_forward</span></a>
 				</div>
 				${timeline ? `<div class="hm-timeline">${timeline}</div>` : '<div class="hm-empty hm-empty--big"><span class="material-icons">weekend</span>На этой неделе пар больше нет</div>'}
+			</section>
+
+			<section class="hm-card hm-tasks">
+				<div class="hm-card-head"><span class="material-icons">assignment</span><h2>Заметки и ДЗ</h2></div>
+				${tasksHtml()}
 			</section>
 
 			<section class="hm-card hm-grades">
@@ -3145,7 +3156,7 @@ function buildAbsenceView(span9) {
 
 // Лента пар дня: время, точка-линия, карточка; прошедшие приглушены,
 // текущая подсвечена с прогрессом, «окна» между парами подписаны
-function timelineHtml(pairs, isToday, withGaps = false) {
+function timelineHtml(pairs, isToday, withGaps = false, date = null) {
 	const m = t => t[0] * 60 + t[1];
 	const nowM = nowMinutes();
 	let prevEnd = null;
@@ -3160,7 +3171,9 @@ function timelineHtml(pairs, isToday, withGaps = false) {
 			gap = `<div class="hm-gap${inGap ? ' hm-gap--now' : ''}"><span></span><em>окно ${formatDuration(m(slot.start) - prevEnd)}</em></div>`;
 		}
 		if (slot) prevEnd = Math.max(prevEnd ?? 0, m(slot.end));
-		return gap + `<div class="hm-pair etis3-dis ${state ? 'hm-pair--' + state : ''}" style="--dis-h:${disciplineHue(p.name)}">
+		const key  = registerPair(p, date);
+		const note = pairNotes[key];
+		return gap + `<div class="hm-pair etis3-dis ${state ? 'hm-pair--' + state : ''}${note ? ' hm-pair--note' : ''}" style="--dis-h:${disciplineHue(p.name)}" data-key="${escapeHtml(key)}" tabindex="0" role="button" title="Заметка к паре">
 			<div class="hm-pair-time"><b>${slot ? formatTime(...slot.start) : p.num + ' пара'}</b><span>${slot ? formatTime(...slot.end) : ''}</span></div>
 			<div class="hm-pair-line"><i></i></div>
 			<div class="hm-pair-body">
@@ -3170,6 +3183,7 @@ function timelineHtml(pairs, isToday, withGaps = false) {
 					${p.aud ? `<span><span class="material-icons">room</span>${escapeHtml(p.aud.replace(/^ауд\.\s*/i, ''))}</span>` : ''}
 					${p.teacher ? `<span><span class="material-icons">person</span>${escapeHtml(p.teacher)}</span>` : ''}
 				</div>
+				${note ? `<div class="hm-pair-note${note.done ? ' hm-pair-note--done' : ''}"><span class="material-icons">${note.done ? 'check_circle' : 'assignment'}</span><span>${escapeHtml(note.text.split('\n')[0])}</span></div>` : ''}
 				${state === 'now' ? `<div class="hm-pair-progress"><i style="width:${pct}%"></i></div>` : ''}
 			</div>
 		</div>`;
@@ -3195,12 +3209,13 @@ function buildTimetableDays(span9, week) {
 					<div class="ttv-title"><h3>${escapeHtml(wd.trim())}</h3>${d.isToday ? '<span class="ttv-badge">сегодня</span>' : ''}</div>
 					<div class="ttv-info">${count ? `${count} ${count === 1 ? 'пара' : count < 5 ? 'пары' : 'пар'}${span ? ' · ' + span : ''}` : 'пар нет'}</div>
 				</header>
-				${count ? `<div class="hm-timeline">${timelineHtml(d.pairs, d.isToday, true)}</div>` : ''}
+				${count ? `<div class="hm-timeline">${timelineHtml(d.pairs, d.isToday, true, d.date)}</div>` : ''}
 			</section>`;
 		}).join('');
 	};
 	render();
 	setInterval(render, 60 * 1000);
+	document.addEventListener('etis3-notes-changed', render);
 	days[0].before(wrap);
 	days.forEach(d => d.classList.add('etis3-orig'));
 	return wrap;
@@ -3212,6 +3227,9 @@ function buildTimetableDays(span9, week) {
 // ============================================================
 
 const CHANGELOG = [
+	['4.7.0', [
+		['assignment', 'Заметки и ДЗ к парам', 'Нажми на пару — запиши, что задали или что взять. Видно на паре и на Главной, можно отметить «выполнено»'],
+	]],
 	['4.6.0', [
 		['swipe', 'Свайпы в расписании', 'Листай недели пальцем; сверху — «‹ неделя ›» и «Сегодня»'],
 		['add_to_home_screen', 'Иконка на экране «Домой»', 'Safari → «Поделиться» → «На экран Домой» — ЕТИС в один тап, панели Safari в цвет темы'],
@@ -3488,3 +3506,161 @@ function initWeekSwipe(span9) {
 		} else resetSwipe();
 	});
 }
+
+
+// ============================================================
+// ЗАМЕТКИ И ДЗ К ПАРАМ
+// ============================================================
+// Хранятся в chrome.storage.local (в userscript — в localStorage), ключ —
+// дата | номер пары | дисциплина. Вместе с текстом сохраняем данные пары,
+// чтобы заметку можно было открыть и с другой недели, и с Главной.
+
+const NOTES_KEY = 'etis3-notes';
+let pairNotes = {};
+const pairRegistry = new Map();
+
+function noteKey(date, num, name) { return `${date ? ymd(date) : '—'}|${num}|${disciplineKey(name)}`; }
+
+function registerPair(p, date) {
+	const key = noteKey(date, p.num, p.name);
+	pairRegistry.set(key, { name: p.name, num: p.num, type: p.type ? p.type.label : '', icon: p.type ? p.type.icon : '',
+		aud: p.aud || '', teacher: p.teacher || '', date: date ? ymd(date) : '' });
+	return key;
+}
+
+try {
+	chrome.storage.local.get(NOTES_KEY, r => {
+		pairNotes = (r && r[NOTES_KEY]) || {};
+		if (Object.keys(pairNotes).length) document.dispatchEvent(new CustomEvent('etis3-notes-changed'));
+	});
+	chrome.storage.onChanged.addListener((changes, area) => {
+		if (area !== 'local' || !changes[NOTES_KEY]) return;
+		pairNotes = changes[NOTES_KEY].newValue || {};
+		document.dispatchEvent(new CustomEvent('etis3-notes-changed'));
+	});
+} catch (e) {}
+
+function saveNote(key, patch) {
+	const pair = pairRegistry.get(key) || pairNotes[key]?.pair;
+	const next = { ...(pairNotes[key] || {}), ...patch, pair, updated: Date.now() };
+	if (!next.text?.trim() && !next.done) delete pairNotes[key];
+	else { next.text = next.text || ''; pairNotes[key] = next; }
+	// Старые выполненные заметки (больше 60 дней) убираем
+	const cutoff = ymd(new Date(Date.now() - 60 * 864e5));
+	Object.keys(pairNotes).forEach(k => { const n = pairNotes[k]; if (n.done && n.pair?.date && n.pair.date < cutoff) delete pairNotes[k]; });
+	try { chrome.storage.local.set({ [NOTES_KEY]: pairNotes }); } catch (e) {}
+	document.dispatchEvent(new CustomEvent('etis3-notes-changed'));
+}
+
+function dateFromYmd(s) { const m = (s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; }
+
+function relDay(s) {
+	const d = dateFromYmd(s);
+	if (!d) return '';
+	const today = new Date(new Date().setHours(0, 0, 0, 0));
+	const diff = Math.round((d - today) / 864e5);
+	if (diff === 0) return 'сегодня';
+	if (diff === 1) return 'завтра';
+	if (diff === -1) return 'вчера';
+	if (diff > 1 && diff < 7) return d.toLocaleDateString('ru-RU', { weekday: 'long' });
+	return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }).replace('.', '');
+}
+
+// Блок «Заметки и ДЗ» на Главной: невыполненное (включая просроченное) и выполненное за сегодня
+function tasksHtml() {
+	const today = ymd(new Date());
+	const list = Object.entries(pairNotes)
+		.filter(([, n]) => n.text?.trim() && (!n.done || n.pair?.date === today))
+		.sort((a, b) => (a[1].done - b[1].done) || String(a[1].pair?.date).localeCompare(String(b[1].pair?.date)))
+		.slice(0, 6);
+	if (!list.length) return `<div class="hm-empty hm-tasks-empty"><span class="material-icons">touch_app</span><span>Нажми на любую пару в расписании — добавишь заметку или домашку. Они появятся здесь.</span></div>`;
+	return `<div class="hm-list">${list.map(([key, n]) => {
+		const late = !n.done && n.pair?.date && n.pair.date < today;
+		return `<div class="hm-task etis3-dis${n.done ? ' hm-task--done' : ''}${late ? ' hm-task--late' : ''}" style="--dis-h:${disciplineHue(n.pair?.name || '')}">
+			<button type="button" class="hm-task-check" data-note-toggle="${escapeHtml(key)}" title="${n.done ? 'Вернуть' : 'Выполнено'}"><span class="material-icons">${n.done ? 'check_circle' : 'radio_button_unchecked'}</span></button>
+			<div class="hm-task-body" data-key="${escapeHtml(key)}" role="button" tabindex="0">
+				<div class="hm-task-text">${escapeHtml(n.text.split('\n')[0])}</div>
+				<div class="hm-task-meta"><i></i>${escapeHtml(n.pair?.name || '')}<span>${escapeHtml(late ? 'просрочено · ' + relDay(n.pair.date) : relDay(n.pair?.date))}</span></div>
+			</div>
+		</div>`;
+	}).join('')}</div>`;
+}
+
+// ---------- Карточка пары ----------
+function openPairSheet(key) {
+	const p = pairRegistry.get(key) || pairNotes[key]?.pair;
+	if (!p || document.getElementById('etis3-pair-sheet')) return;
+	const note = pairNotes[key] || {};
+	const slot = PAIR_SCHEDULE.find(x => x.num === p.num);
+	const date = dateFromYmd(p.date);
+	const wrap = createEl('div', { id: 'etis3-pair-sheet', role: 'dialog', 'aria-label': p.name });
+	wrap.innerHTML = `
+		<div class="ps-box etis3-dis" style="--dis-h:${disciplineHue(p.name)}">
+			<div class="ps-grab"></div>
+			<header class="ps-head">
+				<i class="ps-dot"></i>
+				<div class="ps-title">
+					<h3>${escapeHtml(p.name)}</h3>
+					${p.type ? `<span class="ps-type"><span class="material-icons">${p.icon || 'class'}</span>${escapeHtml(p.type)}</span>` : ''}
+				</div>
+				<button type="button" class="ps-close" aria-label="Закрыть"><span class="material-icons">close</span></button>
+			</header>
+			<div class="ps-rows">
+				${date ? `<div><span class="material-icons">calendar_today</span>${escapeHtml(date.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' }))}</div>` : ''}
+				<div><span class="material-icons">schedule</span>${slot ? `${formatTime(...slot.start)}–${formatTime(...slot.end)} · ` : ''}${p.num} пара</div>
+				${p.aud ? `<div><span class="material-icons">room</span>${escapeHtml(p.aud)}</div>` : ''}
+				${p.teacher ? `<div><span class="material-icons">person</span>${escapeHtml(p.teacher)}</div>` : ''}
+			</div>
+			<label class="ps-label" for="ps-note">Заметка или домашнее задание</label>
+			<textarea id="ps-note" rows="4" placeholder="Что задали, что взять с собой, что не забыть…">${escapeHtml(note.text || '')}</textarea>
+			<div class="ps-actions">
+				<label class="ps-done"><input type="checkbox" ${note.done ? 'checked' : ''}><span class="ps-check"><span class="material-icons">check</span></span>Выполнено</label>
+				<button type="button" class="ps-copy"><span class="material-icons">content_copy</span>Скопировать</button>
+			</div>
+		</div>`;
+	document.body.appendChild(wrap);
+	requestAnimationFrame(() => requestAnimationFrame(() => wrap.classList.add('show')));
+
+	const ta = wrap.querySelector('textarea'), done = wrap.querySelector('.ps-done input');
+	let timer = null;
+	const persist = () => { clearTimeout(timer); saveNote(key, { text: ta.value, done: done.checked }); };
+	ta.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(persist, 400); });
+	done.addEventListener('change', persist);
+	wrap.querySelector('.ps-copy').addEventListener('click', () => {
+		const text = [p.name + (p.type ? ` (${p.type.toLowerCase()})` : ''),
+			[date ? date.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' }) : '', slot ? `${formatTime(...slot.start)}–${formatTime(...slot.end)}` : `${p.num} пара`].filter(Boolean).join(', '),
+			p.aud, p.teacher, ta.value.trim() ? '\n' + ta.value.trim() : ''].filter(Boolean).join('\n');
+		navigator.clipboard.writeText(text).then(() => showToast('📋 Скопировано')).catch(() => showToast('Не удалось скопировать'));
+	});
+	const close = () => {
+		persist();
+		wrap.classList.remove('show');
+		document.removeEventListener('keydown', onKey);
+		setTimeout(() => wrap.remove(), 300);
+	};
+	const onKey = e => { if (e.key === 'Escape') close(); };
+	document.addEventListener('keydown', onKey);
+	wrap.querySelector('.ps-close').addEventListener('click', close);
+	wrap.addEventListener('mousedown', e => { if (e.target === wrap) close(); });
+	// Не на телефоне — сразу в поле заметки (на телефоне клавиатура закрыла бы карточку)
+	if (!('ontouchstart' in window)) setTimeout(() => ta.focus({ preventScroll: true }), 250);
+}
+
+// Тап по паре или заметке открывает карточку; кружок на Главной отмечает «выполнено»
+document.addEventListener('click', e => {
+	const toggle = e.target.closest('[data-note-toggle]');
+	if (toggle) {
+		const key = toggle.dataset.noteToggle;
+		saveNote(key, { done: !pairNotes[key]?.done });
+		return;
+	}
+	const el = e.target.closest('.hm-pair[data-key], .hm-task-body[data-key]');
+	if (!el || e.target.closest('a')) return;
+	openPairSheet(el.dataset.key);
+});
+document.addEventListener('keydown', e => {
+	if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('.hm-pair[data-key], .hm-task-body[data-key]')) {
+		e.preventDefault();
+		openPairSheet(e.target.dataset.key);
+	}
+});
