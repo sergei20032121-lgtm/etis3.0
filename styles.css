@@ -4658,3 +4658,20 @@ html.etis3-standalone.etis3-modern #etis3-topbar { top: max(1rem, env(safe-area-
 @media (min-width: 761px) { .ps-grab { display: none; } }
 .hm-task-check { box-shadow: none !important; outline: none; border-radius: 50% !important; min-width: 0 !important; }
 .hm-task-check:focus-visible { box-shadow: 0 0 0 2px var(--color-accent) !important; }
+
+/* ============================================================
+   4.7.2 — телефон: широкие таблицы и смена viewport
+   ============================================================ */
+
+/* Пока Safari не применил мобильный viewport — не показываем десктопную вёрстку */
+html.etis3-vp-wait body { opacity: 0 !important; }
+
+/* Таблица шире экрана — листается вбок внутри своей карточки, а не обрезается */
+table.etis3-wide {
+	display: block !important;
+	max-width: 100% !important;
+	overflow-x: auto !important;
+	overscroll-behavior-x: contain;
+	-webkit-overflow-scrolling: touch;
+	scrollbar-width: thin;
+}
