@@ -294,8 +294,28 @@ function ensureViewport() {
 	};
 	apply();
 	if (!document.head && document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply, { once: true });
+	holdUntilMobileWidth();
 }
 ensureViewport();
+
+// Safari применяет новый viewport не сразу: пару кадров страница ещё 980px шириной,
+// и вместо мобильной вёрстки мелькает десктопная в натуральную величину.
+// Пока ширина не стала «телефонной», прячем страницу (фон остаётся).
+function holdUntilMobileWidth() {
+	const root = document.documentElement;
+	const coarse = window.matchMedia?.('(pointer: coarse)').matches;
+	const phone = Math.min(screen.width, screen.height) <= 900;
+	const wide = () => window.innerWidth > Math.max(screen.width, screen.height) + 40 || (window.innerWidth > 900 && Math.max(screen.width, screen.height) <= 900);
+	if (!coarse || !phone || !wide()) return;
+	root.classList.add('etis3-vp-wait');
+	const started = Date.now();
+	const check = () => {
+		if (!wide() || Date.now() - started > 1200) { root.classList.remove('etis3-vp-wait'); window.removeEventListener('resize', check); return; }
+		requestAnimationFrame(check);
+	};
+	window.addEventListener('resize', check);
+	requestAnimationFrame(check);
+}
 setupAppMeta();
 
 applySettings();
@@ -1952,7 +1972,24 @@ onReady(() => {
 	setIcon();
 	stylePages();
 	initPageTransitions();
+	initWideTables();
 });
+
+// Таблицы шире своей колонки (на телефоне) листаются вбок, а не обрезаются карточкой
+function initWideTables() {
+	const mark = () => {
+		document.querySelectorAll('.span9 table').forEach(t => {
+			if (t.classList.contains('etis3-orig') || t.closest('.etis3-view')) return;
+			t.classList.remove('etis3-wide');
+			const box = t.parentElement;
+			if (box && t.offsetWidth && t.scrollWidth > box.clientWidth + 2) t.classList.add('etis3-wide');
+		});
+	};
+	mark();
+	let timer;
+	window.addEventListener('resize', () => { clearTimeout(timer); timer = setTimeout(mark, 150); });
+	document.fonts?.ready?.then(mark);
+}
 
 
 // ============================================================
@@ -3227,6 +3264,10 @@ function buildTimetableDays(span9, week) {
 // ============================================================
 
 const CHANGELOG = [
+	['4.7.2', [
+		['swipe_left', 'Широкие таблицы на телефоне', 'Учебный план «детально», библиотека и другие таблицы листаются вбок, а не обрезаются'],
+		['phone_iphone', 'Без «прыжков» на iPhone', 'При переходе между вкладками больше не мелькает десктопная вёрстка'],
+	]],
 	['4.7.0', [
 		['assignment', 'Заметки и ДЗ к парам', 'Нажми на пару — запиши, что задали или что взять. Видно на паре и на Главной, можно отметить «выполнено»'],
 	]],
