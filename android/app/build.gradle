@@ -1,0 +1,67 @@
+import groovy.json.JsonSlurper
+
+plugins {
+    id 'com.android.application'
+}
+
+// Версия приложения = версия расширения из manifest.json
+def manifestJson = new JsonSlurper().parse(rootProject.file('../manifest.json'))
+def appVersion = manifestJson.version as String
+def parts = appVersion.tokenize('.').collect { it as int }
+def appVersionCode = parts[0] * 10000 + parts[1] * 100 + parts[2]
+
+android {
+    namespace 'ru.komar.etis3'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'ru.komar.etis3'
+        minSdk 24
+        targetSdk 35
+        versionCode appVersionCode
+        versionName appVersion
+    }
+
+    // Подпись: ключ из секретов CI, если задан, иначе публичный ключ проекта (android/etis3-public.keystore).
+    // Один и тот же ключ нужен, чтобы новые версии ставились поверх старых.
+    signingConfigs {
+        release {
+            storeFile file(System.getenv('ETIS3_KEYSTORE') ?: '../etis3-public.keystore')
+            storePassword System.getenv('ETIS3_KEYSTORE_PASSWORD') ?: 'etis3public'
+            keyAlias System.getenv('ETIS3_KEY_ALIAS') ?: 'etis3'
+            keyPassword System.getenv('ETIS3_KEY_PASSWORD') ?: 'etis3public'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    sourceSets {
+        main.assets.srcDirs += [file('build/generated/etis3-assets')]
+    }
+
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+}
+
+// Свежий userscript (dist/etis3.user.js) кладём в assets при каждой сборке
+def copyUserscript = tasks.register('copyUserscript', Copy) {
+    from rootProject.file('../dist/etis3.user.js')
+    into file('build/generated/etis3-assets')
+}
+tasks.named('preBuild') { dependsOn copyUserscript }
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.12.1'
+}
