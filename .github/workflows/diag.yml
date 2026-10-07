@@ -1,0 +1,17 @@
+name: diag
+on:
+  push:
+    branches: [claude/focused-brahmagupta-4sn7dx]
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: chain
+        run: |
+          echo | timeout 30 openssl s_client -connect student.psu.ru:443 -servername student.psu.ru -showcerts 2>&1 | grep -E "s:|i:|Verify|verify|depth" || true
+          curl -sSI -m 30 https://student.psu.ru/pls/stu_cus_et/stu.timetable || true
+      - name: certs
+        run: |
+          for u in https://gu-st.ru/content/lending/russian_trusted_root_ca_pem.crt https://gu-st.ru/content/lending/russian_trusted_sub_ca_pem.crt; do
+            echo "== $u"; curl -sSL -m 30 "$u" -o c.crt && openssl x509 -in c.crt -noout -subject -issuer -fingerprint -sha256 -dates && cat c.crt || true
+          done
