@@ -143,7 +143,7 @@ public class SyncWorker extends Worker {
     }
 
     private static String gradeShort(EtisClient.Grade g) {
-        return g.value + (g.max.isEmpty() ? "" : " из " + g.max);
+        return g.value + (g.max.isEmpty() || g.max.equals("0") ? "" : " из " + g.max);
     }
 
     private static String gradeLine(EtisClient.Grade g) {

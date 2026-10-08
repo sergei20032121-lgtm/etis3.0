@@ -2089,6 +2089,8 @@ function addSemesterProgress(sidebar) {
 
 // В userscript-версии нет фоновой проверки (только в расширении)
 const IS_USERSCRIPT = typeof ETIS3_USERSCRIPT !== 'undefined';
+// Внутри Android-приложения ЕТИС 3.0 (WebView добавляет ETIS3App к User-Agent)
+const IS_APP = /ETIS3App\//.test(navigator.userAgent);
 
 const SETTINGS_TOGGLES = {
 	'РАСПИСАНИЕ': [
@@ -3265,6 +3267,12 @@ function buildTimetableDays(span9, week) {
 // ============================================================
 
 const CHANGELOG = [
+	['4.9.0', [
+		['widgets', 'Виджет «Следующая пара»', 'Долгий тап по рабочему столу → Виджеты → ЕТИС 3.0. Текущая или следующая пара, аудитория и обратный отсчёт', 'app'],
+		['notifications_active', 'Уведомления о новых оценках', 'Приложение само проверяет ЕТИС раз в час и присылает пуш, когда появляется оценка', 'app'],
+		['cloud_off', 'Расписание без интернета', 'Если ЕТИС не открывается — на экране ошибки кнопка с сохранённым расписанием', 'app'],
+		['photo_library', 'Итоги семестра — в галерею', 'Картинка Wrapped сохраняется в «Галерею» и сразу открывается «Поделиться»', 'app'],
+	]],
 	['4.8.0', [
 		['auto_awesome', 'Итоги семестра · Wrapped', 'Сторис о твоём семестре: пары, контрольные, предмет-фаворит, главный босс, архетип — и картинка, чтобы скинуть в чат группы. Кнопка на Главной'],
 	]],
@@ -3335,7 +3343,7 @@ async function showWhatsNew() {
 		['search', 'Ctrl+K или /', 'Поиск по всем страницам ЕТИСа'],
 		['notifications_active', 'Уведомления', 'Новые оценки и сообщения — даже когда ЕТИС закрыт'],
 		['tune', 'Настройки', 'Тема, акцент, вид и фон — в иконке расширения'],
-	] : entries.flatMap(([, list]) => list);
+	] : entries.flatMap(([, list]) => list).filter(it => !it[3] || (it[3] === 'app') === IS_APP);
 	if (!items.length) return;
 
 	const wrap = createEl('div', { id: 'etis3-whatsnew', role: 'dialog', 'aria-label': 'Что нового' });

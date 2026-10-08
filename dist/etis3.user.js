@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ЕТИС 3.0
 // @namespace    https://github.com/sergei20032121-lgtm/etis3.0
-// @version      4.8.0
+// @version      4.9.0
 // @description  Современный редизайн ЕТИСа ПГНИУ: liquid glass, виджет пар, тёмная тема, настройки. by Комар
 // @author       Комар
 // @homepageURL  https://github.com/sergei20032121-lgtm/etis3.0
@@ -56,7 +56,7 @@
 			storage: { local, onChanged: { addListener: fn => listeners.push(fn) } },
 			runtime: {
 				lastError: undefined,
-				getManifest: () => ({ version: "4.8.0" }),
+				getManifest: () => ({ version: "4.9.0" }),
 				getURL: p => p === 'icon.svg' ? "data:image/svg+xml;base64,PHN2ZyBpZD0iTGF5ZXJfMSIgZGF0YS1uYW1lPSJMYXllciAxIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjggMTI4Ij48ZGVmcz48c3R5bGU+LmNscy0xe2ZpbGw6I2M2MmUzZTt9LmNscy0ye2ZpbGw6I2ZmZjt9PC9zdHlsZT48L2RlZnM+PHRpdGxlPmljb248L3RpdGxlPjxyZWN0IGNsYXNzPSJjbHMtMSIgd2lkdGg9IjEyOCIgaGVpZ2h0PSIxMjgiIHJ4PSIzMiIvPjxwYXRoIGNsYXNzPSJjbHMtMiIgZD0iTTMyLDY5LjRWODcuNzJMNjQsMTA1LjIxLDk2LjA1LDg3LjcyVjY5LjRMNjQsODYuODlaTTY0LDIyLjc5LDEzLjYzLDUwLjI2LDY0LDc3Ljc0bDQxLjIxLTIyLjQ5Vjg2Ljg5aDkuMTZWNTAuMjZaIi8+PC9zdmc+" : p,
 				sendMessage: () => Promise.resolve(),
 			},
@@ -2253,6 +2253,8 @@ function addSemesterProgress(sidebar) {
 
 // В userscript-версии нет фоновой проверки (только в расширении)
 const IS_USERSCRIPT = typeof ETIS3_USERSCRIPT !== 'undefined';
+// Внутри Android-приложения ЕТИС 3.0 (WebView добавляет ETIS3App к User-Agent)
+const IS_APP = /ETIS3App\//.test(navigator.userAgent);
 
 const SETTINGS_TOGGLES = {
 	'РАСПИСАНИЕ': [
@@ -3429,6 +3431,12 @@ function buildTimetableDays(span9, week) {
 // ============================================================
 
 const CHANGELOG = [
+	['4.9.0', [
+		['widgets', 'Виджет «Следующая пара»', 'Долгий тап по рабочему столу → Виджеты → ЕТИС 3.0. Текущая или следующая пара, аудитория и обратный отсчёт', 'app'],
+		['notifications_active', 'Уведомления о новых оценках', 'Приложение само проверяет ЕТИС раз в час и присылает пуш, когда появляется оценка', 'app'],
+		['cloud_off', 'Расписание без интернета', 'Если ЕТИС не открывается — на экране ошибки кнопка с сохранённым расписанием', 'app'],
+		['photo_library', 'Итоги семестра — в галерею', 'Картинка Wrapped сохраняется в «Галерею» и сразу открывается «Поделиться»', 'app'],
+	]],
 	['4.8.0', [
 		['auto_awesome', 'Итоги семестра · Wrapped', 'Сторис о твоём семестре: пары, контрольные, предмет-фаворит, главный босс, архетип — и картинка, чтобы скинуть в чат группы. Кнопка на Главной'],
 	]],
@@ -3499,7 +3507,7 @@ async function showWhatsNew() {
 		['search', 'Ctrl+K или /', 'Поиск по всем страницам ЕТИСа'],
 		['notifications_active', 'Уведомления', 'Новые оценки и сообщения — даже когда ЕТИС закрыт'],
 		['tune', 'Настройки', 'Тема, акцент, вид и фон — в иконке расширения'],
-	] : entries.flatMap(([, list]) => list);
+	] : entries.flatMap(([, list]) => list).filter(it => !it[3] || (it[3] === 'app') === IS_APP);
 	if (!items.length) return;
 
 	const wrap = createEl('div', { id: 'etis3-whatsnew', role: 'dialog', 'aria-label': 'Что нового' });
