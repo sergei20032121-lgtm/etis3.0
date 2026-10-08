@@ -128,6 +128,9 @@ public class MainActivity extends Activity {
         cookies.setAcceptCookie(true);
         cookies.setAcceptThirdPartyCookies(web, true);
 
+        // Мост для страницы: сохранить картинку «Итогов семестра» в галерею
+        web.addJavascriptInterface(new NativeBridge(), "ETIS3Native");
+
         script = wrap(loadScript());
         documentStartSupported = WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT);
         installScript();
@@ -186,6 +189,8 @@ public class MainActivity extends Activity {
                 // Старые WebView без document-start: подключаем после загрузки (скрипт умеет стартовать поздно)
                 if (!documentStartSupported && isEtis(url)) view.evaluateJavascript(script, null);
                 CookieManager.getInstance().flush();
+                // Зашёл в ЕТИС — обновим виджет и снимок оценок фоном
+                if (isEtis(url) && !url.contains("stu.login")) SyncWorker.syncSoon(MainActivity.this);
             }
         });
 
@@ -223,6 +228,73 @@ public class MainActivity extends Activity {
         else web.loadUrl(data != null && HOST.equalsIgnoreCase(data.getHost()) ? data.toString() : START_URL);
 
         updateScriptInBackground();
+        SyncWorker.schedule(this);
+        askNotificationsOnce();
+    }
+
+    /** Android 13+: разрешение на уведомления о новых оценках — один раз при первом запуске. */
+    private void askNotificationsOnce() {
+        SyncWorker.ensureChannel(this);
+        if (Build.VERSION.SDK_INT < 33 || EtisStore.askedNotifications(this)) return;
+        EtisStore.setAskedNotifications(this);
+        if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 3);
+        }
+    }
+
+    /** Методы, доступные странице ЕТИС как window.ETIS3Native. */
+    final class NativeBridge {
+        @android.webkit.JavascriptInterface
+        public void saveImage(String base64, String name) {
+            ui.post(() -> {
+                String url = web.getUrl();
+                if (url == null || !isEtis(url)) return;
+                new Thread(() -> {
+                    Uri saved = null;
+                    try {
+                        byte[] png = android.util.Base64.decode(base64, android.util.Base64.DEFAULT);
+                        saved = saveToGallery(png, name.replaceAll("[^\\w.\\-]", "_"));
+                    } catch (Exception ignored) { }
+                    Uri result = saved;
+                    ui.post(() -> {
+                        if (result == null) { toast("Не получилось сохранить картинку"); return; }
+                        toast("Картинка сохранена в «Галерею»");
+                        if (!"content".equals(result.getScheme())) return;   // file:// поделиться нельзя (Android 7+)
+                        Intent share = new Intent(Intent.ACTION_SEND).setType("image/png")
+                                .putExtra(Intent.EXTRA_STREAM, result)
+                                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        try { startActivity(Intent.createChooser(share, "Поделиться итогами")); } catch (Exception ignored) { }
+                    });
+                }).start();
+            });
+        }
+    }
+
+    private Uri saveToGallery(byte[] png, String name) throws java.io.IOException {
+        if (Build.VERSION.SDK_INT >= 29) {
+            android.content.ContentValues v = new android.content.ContentValues();
+            v.put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, name);
+            v.put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/png");
+            v.put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/ЕТИС 3.0");
+            Uri uri = getContentResolver().insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v);
+            if (uri == null) throw new java.io.IOException("MediaStore");
+            try (java.io.OutputStream out = getContentResolver().openOutputStream(uri)) {
+                if (out == null) throw new java.io.IOException("MediaStore");
+                out.write(png);
+            }
+            return uri;
+        }
+        if (checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            ui.post(() -> requestPermissions(new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, 2));
+            return null;
+        }
+        File dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "ЕТИС 3.0");
+        //noinspection ResultOfMethodCallIgnored
+        dir.mkdirs();
+        File f = new File(dir, name);
+        try (FileOutputStream out = new FileOutputStream(f)) { out.write(png); }
+        android.media.MediaScannerConnection.scanFile(this, new String[]{f.getAbsolutePath()}, new String[]{"image/png"}, null);
+        return Uri.fromFile(f);
     }
 
     // ---------- Скрипт ----------
@@ -430,6 +502,7 @@ public class MainActivity extends Activity {
         Button retry = button("Повторить", true);
         retry.setOnClickListener(v -> {
             hideError();
+            hideOffline();
             String url = web.getUrl();
             if (url == null || !isEtis(url)) web.loadUrl(START_URL);
             else web.reload();
@@ -446,6 +519,13 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams lp2 = new LinearLayout.LayoutParams(dp(240), dp(48));
         lp2.topMargin = dp(10);
         box.addView(browser, lp2);
+
+        Button offline = button("Расписание без интернета", false);
+        offline.setTag("offline");
+        offline.setOnClickListener(v -> showOffline());
+        LinearLayout.LayoutParams lp3 = new LinearLayout.LayoutParams(dp(240), dp(48));
+        lp3.topMargin = dp(10);
+        box.addView(offline, lp3);
         return box;
     }
 
@@ -472,7 +552,102 @@ public class MainActivity extends Activity {
         progress.setVisibility(View.GONE);
         ((TextView) errorView.findViewWithTag("title")).setText(title);
         errorText.setText(text);
+        errorView.findViewWithTag("offline").setVisibility(EtisStore.loadPairs(this).isEmpty() ? View.GONE : View.VISIBLE);
         errorView.setVisibility(View.VISIBLE);
+    }
+
+    // ---------- Расписание без интернета ----------
+
+    private android.widget.ScrollView offlineView;
+
+    /** Сохранённое фоновой синхронизацией расписание — когда ЕТИС не открывается. */
+    private void showOffline() {
+        long now = System.currentTimeMillis();
+        java.util.Calendar today = java.util.Calendar.getInstance();
+        today.set(java.util.Calendar.HOUR_OF_DAY, 0); today.set(java.util.Calendar.MINUTE, 0);
+        today.set(java.util.Calendar.SECOND, 0); today.set(java.util.Calendar.MILLISECOND, 0);
+        long dayStart = today.getTimeInMillis();
+
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(dp(18), dp(28), dp(18), dp(28));
+
+        LinearLayout head = new LinearLayout(this);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout titles = new LinearLayout(this);
+        titles.setOrientation(LinearLayout.VERTICAL);
+        titles.addView(text("Расписание", 26, Color.WHITE, true));
+        long at = EtisStore.pairsAt(this);
+        titles.addView(text("без интернета · сохранено " + (at > 0 ? new java.text.SimpleDateFormat("d MMM, H:mm", new java.util.Locale("ru")).format(at) : "раньше"), 13, Color.parseColor("#A9A9BC"), false));
+        head.addView(titles, new LinearLayout.LayoutParams(0, -2, 1));
+        Button close = button("Назад", false);
+        close.setOnClickListener(v -> hideOffline());
+        head.addView(close, new LinearLayout.LayoutParams(-2, dp(40)));
+        list.addView(head);
+
+        long lastDay = -1;
+        int shown = 0;
+        java.text.SimpleDateFormat dayFmt = new java.text.SimpleDateFormat("EEEE, d MMMM", new java.util.Locale("ru"));
+        java.text.SimpleDateFormat hm = new java.text.SimpleDateFormat("H:mm", java.util.Locale.getDefault());
+        for (EtisClient.Pair p : EtisStore.loadPairs(this)) {
+            if (p.end < dayStart) continue;
+            long d = p.start - ((p.start - dayStart) % 86400000L + 86400000L) % 86400000L;
+            if (d != lastDay) {
+                lastDay = d;
+                String label = d == dayStart ? "Сегодня" : d == dayStart + 86400000L ? "Завтра" : dayFmt.format(p.start);
+                TextView dh = text(label.substring(0, 1).toUpperCase() + label.substring(1), 15, Color.parseColor("#B4A9FF"), true);
+                dh.setPadding(dp(4), dp(22), 0, dp(8));
+                list.addView(dh);
+            }
+            boolean live = p.start <= now && now < p.end;
+            LinearLayout card = new LinearLayout(this);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setPadding(dp(16), dp(12), dp(16), dp(12));
+            GradientDrawable bg = new GradientDrawable();
+            bg.setCornerRadius(dp(16));
+            bg.setColor(Color.parseColor(live ? "#2A2350" : "#17172A"));
+            bg.setStroke(dp(1), Color.parseColor(live ? "#7B6CF6" : "#26263C"));
+            card.setBackground(bg);
+            card.addView(text(p.num + " пара · " + hm.format(p.start) + "–" + hm.format(p.end) + (live ? " · сейчас" : ""), 12, Color.parseColor("#A9A9BC"), true));
+            TextView name = text(p.name, 16, Color.WHITE, true);
+            name.setPadding(0, dp(4), 0, dp(2));
+            card.addView(name);
+            String sub = (p.aud.isEmpty() ? "" : p.aud) + (p.type.isEmpty() ? "" : (p.aud.isEmpty() ? "" : " · ") + p.type);
+            if (!sub.isEmpty()) card.addView(text(sub, 13, Color.parseColor("#C9C6E0"), false));
+            if (!p.teacher.isEmpty()) card.addView(text(p.teacher, 13, Color.parseColor("#8F8BAD"), false));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+            lp.bottomMargin = dp(8);
+            list.addView(card, lp);
+            shown++;
+        }
+        if (shown == 0) {
+            TextView empty = text("На сохранённые недели пар больше нет", 15, Color.parseColor("#A9A9BC"), false);
+            empty.setPadding(dp(4), dp(28), 0, 0);
+            list.addView(empty);
+        }
+
+        if (offlineView == null) {
+            offlineView = new android.widget.ScrollView(this);
+            offlineView.setBackgroundColor(Color.parseColor("#0D0D14"));
+            offlineView.setFillViewport(true);
+            ((FrameLayout) errorView.getParent()).addView(offlineView, new FrameLayout.LayoutParams(-1, -1));
+        }
+        offlineView.removeAllViews();
+        offlineView.addView(list);
+        offlineView.setVisibility(View.VISIBLE);
+    }
+
+    private void hideOffline() {
+        if (offlineView != null) offlineView.setVisibility(View.GONE);
+    }
+
+    private TextView text(String s, int sp, int color, boolean bold) {
+        TextView t = new TextView(this);
+        t.setText(s);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
+        t.setTextColor(color);
+        if (bold) t.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        return t;
     }
 
     private void hideError() {
@@ -597,6 +772,7 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
+        if (offlineView != null && offlineView.getVisibility() == View.VISIBLE) { hideOffline(); return; }
         if (errorView.getVisibility() == View.VISIBLE && web.canGoBack()) { hideError(); web.goBack(); }
         else if (web.canGoBack()) web.goBack();
         else super.onBackPressed();
