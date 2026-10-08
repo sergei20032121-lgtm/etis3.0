@@ -131,6 +131,7 @@ function applySettings() {
 	root.classList.toggle('etis3-no-scoredots', !settings.scoreDots);
 	root.classList.toggle('etis3-modern',       settings.layout === 'modern');
 	root.classList.toggle('etis3-no-aurora',    !settings.aurora);
+	applyWallpaper();
 	applySky();
 	syncThemeSwitcher();
 	document.getElementById('etis3-sp-panel')?.etis3Render?.();
@@ -173,7 +174,7 @@ prefersDark?.addEventListener('change', () => { if (settings.theme === 'auto') a
 
 function applyTheme() {
 	document.documentElement.setAttribute('theme', etis3IsDark(settings.theme) ? 'dark' : 'light');
-	applyAccent(settings.accent);
+	applyAccent();
 	syncAppMeta();
 }
 
@@ -238,10 +239,9 @@ function syncThemeSwitcher() {
 // АКЦЕНТНЫЙ ЦВЕТ
 // ============================================================
 
-function applyAccent(key) {
-	const preset = ETIS3_ACCENTS[key] || ETIS3_ACCENTS.violet;
+function applyAccent() {
 	const isDark = document.documentElement.getAttribute('theme') === 'dark';
-	const hex    = isDark ? preset.dark : preset.light;
+	const hex    = etis3AccentHex(settings, isDark);
 	const rgb    = etis3HexToRgb(hex);
 	const root   = document.documentElement;
 	root.style.setProperty('--color-accent',         hex);
@@ -253,6 +253,80 @@ function applyAccent(key) {
 	root.style.setProperty('--color-text-link',       hex);
 	root.style.setProperty('--color-text-accent',     hex);
 }
+
+// ============================================================
+// ФОН СТРАНИЦ: пресеты и своё фото
+// ============================================================
+
+let wallImg = null;          // data:-URL своего фото (из chrome.storage)
+let wallImgLoaded = false;
+
+function applyWallpaper() {
+	const root = document.documentElement;
+	root.dataset.wall = settings.wallpaper;
+	root.style.setProperty('--wall-dim', settings.wallDim);
+	if (settings.wallpaper === 'custom' && !wallImgLoaded) {
+		wallImgLoaded = true;
+		try {
+			chrome.storage.local.get(ETIS3_WALL_IMG_KEY, res => { wallImg = res?.[ETIS3_WALL_IMG_KEY] || null; paintWall(); });
+		} catch (e) { /* нет хранилища — останется аврора */ }
+	}
+	paintWall();
+}
+
+function paintWall() {
+	const root = document.documentElement;
+	const el = document.getElementById('etis3-wall');
+	const custom = settings.wallpaper === 'custom' && wallImg;
+	root.classList.toggle('etis3-wall-photo', !!custom);
+	if (el) el.style.backgroundImage = custom ? `url("${wallImg}")` : '';
+}
+
+// Слой фона за стеклом — только на страницах кабинета (вход остаётся с авророй)
+function buildWall(parent) {
+	if (document.getElementById('etis3-wall')) return;
+	parent.prepend(createEl('div', { id: 'etis3-wall', 'aria-hidden': 'true' }));
+	paintWall();
+}
+
+// Фото → JPEG до 1920px по длинной стороне, чтобы влезть в хранилище
+function prepareWallImage(file) {
+	return new Promise((resolve, reject) => {
+		const img = new Image();
+		img.onload = () => {
+			const k = Math.min(1, 1920 / Math.max(img.naturalWidth, img.naturalHeight));
+			const c = document.createElement('canvas');
+			c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+			c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+			URL.revokeObjectURL(img.src);
+			let q = 0.82, url = c.toDataURL('image/jpeg', q);
+			while (url.length > 1400000 && q > 0.4) { q -= 0.12; url = c.toDataURL('image/jpeg', q); }
+			resolve(url);
+		};
+		img.onerror = () => reject(new Error('image'));
+		img.src = URL.createObjectURL(file);
+	});
+}
+
+async function setWallImage(file) {
+	const url = await prepareWallImage(file);
+	await new Promise((resolve, reject) => {
+		try {
+			chrome.storage.local.set({ [ETIS3_WALL_IMG_KEY]: url }, () => chrome.runtime.lastError ? reject(chrome.runtime.lastError) : resolve());
+		} catch (e) { reject(e); }
+	});
+	// Userscript-прослойка молча глотает переполнение localStorage — проверяем, что записалось
+	const back = await new Promise(r => { try { chrome.storage.local.get(ETIS3_WALL_IMG_KEY, x => r(x?.[ETIS3_WALL_IMG_KEY])); } catch (e) { r(null); } });
+	if (back !== url) throw new Error('quota');
+	wallImg = url; wallImgLoaded = true;
+	saveSettings({ wallpaper: 'custom' });
+}
+
+try {
+	chrome.storage.onChanged.addListener((changes, area) => {
+		if (area === 'local' && changes[ETIS3_WALL_IMG_KEY]) { wallImg = changes[ETIS3_WALL_IMG_KEY].newValue || null; wallImgLoaded = true; paintWall(); }
+	});
+} catch (e) {}
 
 // ============================================================
 // НЕБО: цвета фона по времени суток
@@ -685,6 +759,7 @@ function stylePages() {
 	if (sidebar) {
 		styleSidebar(sidebar);
 		buildAurora(document.body, 'aurora--page');
+		buildWall(document.body);
 		buildTopbar(sidebar);
 		initCommandPalette(sidebar);
 		greetAfterLogin();
@@ -2150,6 +2225,25 @@ function openSettingsPanel() {
 						<div class="etis3-sp-swatch" data-accent="${key}" title="${x.label}"
 							style="background:${x.light}"></div>
 					`).join('')}
+					<label class="etis3-sp-swatch etis3-sp-swatch--custom" data-accent="custom" title="Свой цвет"><input type="color" aria-label="Свой цвет"></label>
+				</div>
+			</div>
+
+			<div class="etis3-sp-section">
+				<div class="etis3-sp-section-label">ФОН</div>
+				<div class="etis3-sp-walls">
+					${Object.entries(ETIS3_WALLPAPERS).map(([key, label]) => `
+						<div class="etis3-sp-wall wall-prev--${key}" data-wall="${key}" role="button" tabindex="0">
+							${key === 'custom' ? '<span class="material-icons">add_photo_alternate</span>' : ''}<span>${label}</span>
+						</div>`).join('')}
+				</div>
+				<input type="file" accept="image/*" id="etis3-sp-wallfile" hidden>
+				<div class="etis3-sp-wallopts">
+					<a href="#" id="etis3-sp-wallpick"><span class="material-icons">photo_library</span>Другое фото</a>
+					<div class="etis3-sp-font-row">
+						<span class="etis3-sp-dim-label">Затемнение</span>
+						<input type="range" id="etis3-sp-dim" min="0" max="0.85" step="0.05">
+					</div>
 				</div>
 			</div>
 
@@ -2200,6 +2294,15 @@ function openSettingsPanel() {
 	function render() {
 		panel.querySelectorAll('[data-theme]').forEach(b => b.classList.toggle('active', b.dataset.theme === settings.theme));
 		panel.querySelectorAll('[data-accent]').forEach(s => s.classList.toggle('active', s.dataset.accent === settings.accent));
+		const customSw = panel.querySelector('.etis3-sp-swatch--custom');
+		customSw.querySelector('input').value = settings.accentCustom;
+		customSw.style.background = settings.accent === 'custom' ? settings.accentCustom : '';
+		panel.querySelectorAll('[data-wall]').forEach(t => t.classList.toggle('active', t.dataset.wall === settings.wallpaper));
+		const customWall = panel.querySelector('[data-wall="custom"]');
+		customWall.style.backgroundImage = wallImg ? `url("${wallImg}")` : '';
+		customWall.classList.toggle('has-photo', !!wallImg);
+		panel.querySelector('.etis3-sp-wallopts').hidden = settings.wallpaper !== 'custom' || !wallImg;
+		panel.querySelector('#etis3-sp-dim').value = settings.wallDim;
 		panel.querySelectorAll('[data-layout]').forEach(b => b.classList.toggle('active', b.dataset.layout === settings.layout));
 		panel.querySelectorAll('[data-setting]').forEach(el => { el.checked = settings[el.dataset.setting]; });
 		fontRange.value      = settings.fontSize;
@@ -2233,9 +2336,43 @@ function openSettingsPanel() {
 		btn.addEventListener('click', () => { saveSettings({ layout: btn.dataset.layout }); render(); });
 	});
 
-	panel.querySelectorAll('[data-accent]').forEach(sw => {
+	panel.querySelectorAll('.etis3-sp-swatch[data-accent]:not(.etis3-sp-swatch--custom)').forEach(sw => {
 		sw.addEventListener('click', () => { saveSettings({ accent: sw.dataset.accent }); render(); });
 	});
+	const colorInput = panel.querySelector('.etis3-sp-swatch--custom input');
+	colorInput.addEventListener('input', () => {   // живой предпросмотр, сохраняем по отпусканию
+		settings = etis3Normalize({ ...settings, accent: 'custom', accentCustom: colorInput.value });
+		applyAccent();
+		render();
+	});
+	colorInput.addEventListener('change', () => { saveSettings({ accent: 'custom', accentCustom: colorInput.value }); render(); });
+
+	const fileInput = panel.querySelector('#etis3-sp-wallfile');
+	const pickPhoto = () => fileInput.click();
+	panel.querySelectorAll('[data-wall]').forEach(tile => {
+		const pick = () => {
+			if (tile.dataset.wall === 'custom' && !wallImg) { pickPhoto(); return; }
+			if (tile.dataset.wall === 'custom') wallImgLoaded = true;
+			saveSettings({ wallpaper: tile.dataset.wall });
+			render();
+		};
+		tile.addEventListener('click', pick);
+		tile.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
+	});
+	panel.querySelector('#etis3-sp-wallpick').addEventListener('click', e => { e.preventDefault(); pickPhoto(); });
+	fileInput.addEventListener('change', async () => {
+		const file = fileInput.files?.[0];
+		fileInput.value = '';
+		if (!file) return;
+		try { await setWallImage(file); showToast('Фон обновлён'); }
+		catch (err) { showToast(err.message === 'quota' ? 'Фото не влезло в хранилище — попробуйте другое' : 'Не получилось открыть фото'); }
+		render();
+	});
+	const dimRange = panel.querySelector('#etis3-sp-dim');
+	dimRange.addEventListener('input', () => {
+		document.documentElement.style.setProperty('--wall-dim', dimRange.value);
+	});
+	dimRange.addEventListener('change', () => saveSettings({ wallDim: parseFloat(dimRange.value) }));
 
 	fontRange.addEventListener('input', () => {
 		saveSettings({ fontSize: parseFloat(fontRange.value) });
@@ -3267,6 +3404,11 @@ function buildTimetableDays(span9, week) {
 // ============================================================
 
 const CHANGELOG = [
+	['4.10.0', [
+		['wallpaper', 'Свои фоны', 'Закат, океан, лес, космос, сладкая вата, графит — или своё фото с затемнением. Настройки → «Фон»'],
+		['palette', 'Любой цвет акцента', 'Радужный кружок в настройках — выбери свой цвет интерфейса'],
+		['ios_share', 'Неделя картинкой', 'Кнопка «Поделиться» рядом со стрелками недели — расписание красивой картинкой для чата группы'],
+	]],
 	['4.9.0', [
 		['widgets', 'Виджет «Следующая пара»', 'Долгий тап по рабочему столу → Виджеты → ЕТИС 3.0. Текущая или следующая пара, аудитория и обратный отсчёт', 'app'],
 		['notifications_active', 'Уведомления о новых оценках', 'Приложение само проверяет ЕТИС раз в час и присылает пуш, когда появляется оценка', 'app'],
@@ -3517,7 +3659,18 @@ function buildWeekNav(span9, week, todayBtn) {
 			<span>${escapeHtml(range + kind)}</span>
 		</div>
 		${!isCurrentWeek && todayBtn?.href ? `<a class="ttw-today" href="${escapeHtml(todayBtn.href)}">Сегодня</a>` : ''}
+		${week.some(d => d.pairs.length) ? '<a class="ttw-share" href="#" role="button" title="Неделя картинкой — скинуть в чат" aria-label="Поделиться неделей"><span class="material-icons">ios_share</span></a>' : ''}
 		<a class="ttw-arrow${next ? '' : ' ttw-arrow--off'}" ${next ? `href="${escapeHtml(next)}"` : ''} aria-label="Следующая неделя"><span class="material-icons">chevron_right</span></a>`;
+	nav.querySelector('.ttw-share')?.addEventListener('click', async e => {
+		e.preventDefault();
+		const btn = e.currentTarget;
+		if (btn.classList.contains('is-busy')) return;
+		btn.classList.add('is-busy');
+		try {
+			const canvas = renderWeekImage(week, `${cur.textContent.trim()} неделя`, range + kind, isCurrentWeek);
+			await saveCanvasImage(canvas, `etis-nedelya-${cur.textContent.trim()}.png`, 'Моя неделя');
+		} finally { btn.classList.remove('is-busy'); }
+	});
 	return nav;
 }
 
@@ -4019,17 +4172,20 @@ function wrappedImage(data, s, name, facts) {
 }
 
 async function wrappedSave(canvas, label) {
-	const name = `etis-wrapped-${label.replace(/\s+/g, '-')}.png`;
+	return saveCanvasImage(canvas, `etis-wrapped-${label.replace(/\s+/g, '-')}.png`, 'Мой семестр');
+}
+
+// Картинку — в «Поделиться» (телефон), в галерею (Android-приложение) или скачать (ПК)
+async function saveCanvasImage(canvas, name, title) {
 	const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
 	if (!blob) return;
-	// Android-приложение ЕТИС 3.0 сохраняет в «Галерею» само
 	if (window.ETIS3Native?.saveImage) {
 		window.ETIS3Native.saveImage(canvas.toDataURL('image/png').split(',')[1], name);
 		return;
 	}
 	const file = new File([blob], name, { type: 'image/png' });
 	if (navigator.canShare?.({ files: [file] })) {
-		try { await navigator.share({ files: [file], title: 'Мой семестр' }); return; } catch (e) { if (e.name === 'AbortError') return; }
+		try { await navigator.share({ files: [file], title }); return; } catch (e) { if (e.name === 'AbortError') return; }
 	}
 	const a = createEl('a', { href: URL.createObjectURL(blob), download: name });
 	document.body.appendChild(a); a.click(); a.remove();
@@ -4156,3 +4312,114 @@ function initWrapped() {
 	fromHash();
 }
 onReady(initWrapped);
+
+
+// ============================================================
+// НЕДЕЛЯ КАРТИНКОЙ — расписание для чата группы
+// ============================================================
+
+function hexToHue(hex) {
+	const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
+	const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+	if (!d) return 260;
+	const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+	return Math.round((h * 60 + 360) % 360);
+}
+
+function renderWeekImage(week, title, sub, isCurrentWeek) {
+	const W = 1080, P = 72;
+	const accent = getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim() || '#7c6fd4';
+	const hue = /^#[0-9a-f]{6}$/i.test(accent) ? hexToHue(accent) : 260;
+	const font = (w, size) => `${w} ${size}px -apple-system, "SF Pro Display", Inter, "Segoe UI", Roboto, sans-serif`;
+	const fmt = ([h, m]) => `${h}:${String(m).padStart(2, '0')}`;
+	const slot = num => PAIR_SCHEDULE.find(p => p.num === num);
+	const days = week.filter(d => d.pairs.length);
+	const total = days.reduce((s, d) => s + d.pairs.length, 0);
+
+	const measure = document.createElement('canvas').getContext('2d');
+	const wrap = (text, maxW, f, maxLines) => {
+		measure.font = f;
+		const words = text.split(/\s+/), lines = [];
+		let line = '';
+		words.forEach(w => { const t = line ? line + ' ' + w : w; if (measure.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t; });
+		if (line) lines.push(line);
+		if (lines.length > maxLines) { lines.length = maxLines; let l = lines[maxLines - 1]; while (measure.measureText(l + '…').width > maxW && l.length) l = l.slice(0, -1); lines[maxLines - 1] = l.trimEnd() + '…'; }
+		return lines;
+	};
+	const ellipsize = (text, maxW, f) => wrap(text, maxW, f, 1)[0] || '';
+
+	// Раскладка: сначала считаем высоту, потом рисуем
+	const nameW = W - P * 2 - 210, nameFont = font(700, 38), subFont = font(500, 28);
+	const blocks = days.map(d => ({
+		d, rows: d.pairs.map(p => {
+			const lines = wrap(p.name, nameW, nameFont, 2);
+			const subText = [p.type?.label, p.aud].filter(Boolean).join(' · ');
+			return { p, lines, subText, h: 44 + lines.length * 48 + (subText ? 40 : 0) };
+		}),
+	}));
+	let H = 430;
+	blocks.forEach(b => { H += 90 + b.rows.reduce((s, r) => s + r.h + 16, 0); });
+	H = Math.max(1350, H + 130);
+
+	const c = document.createElement('canvas');
+	c.width = W; c.height = H;
+	const x = c.getContext('2d');
+	const rr = (X, Y, w, h, r) => { x.beginPath(); x.moveTo(X + r, Y); x.arcTo(X + w, Y, X + w, Y + h, r); x.arcTo(X + w, Y + h, X, Y + h, r); x.arcTo(X, Y + h, X, Y, r); x.arcTo(X, Y, X + w, Y, r); x.closePath(); };
+
+	const bg = x.createLinearGradient(0, 0, W * 0.4, H);
+	bg.addColorStop(0, `hsl(${hue} 55% 18%)`); bg.addColorStop(0.5, `hsl(${(hue + 30) % 360} 45% 11%)`); bg.addColorStop(1, '#090912');
+	x.fillStyle = bg; x.fillRect(0, 0, W, H);
+	[[W * 0.85, 140, 520, `hsla(${hue},90%,62%,0.35)`], [80, H * 0.55, 600, `hsla(${(hue + 60) % 360},85%,55%,0.18)`], [W * 0.7, H - 120, 520, `hsla(${(hue + 300) % 360},85%,60%,0.2)`]].forEach(([cx, cy, r, col]) => {
+		const g = x.createRadialGradient(cx, cy, 0, cx, cy, r); g.addColorStop(0, col); g.addColorStop(1, 'transparent'); x.fillStyle = g; x.fillRect(0, 0, W, H);
+	});
+
+	// Шапка
+	x.fillStyle = 'rgba(255,255,255,0.65)'; x.font = font(700, 30);
+	x.fillText('МОЯ НЕДЕЛЯ', P, 120);
+	x.fillStyle = '#fff'; x.font = font(800, 104);
+	x.fillText(title, P, 236);
+	x.fillStyle = 'rgba(255,255,255,0.75)'; x.font = font(500, 38);
+	x.fillText(ellipsize(sub, W - P * 2, font(500, 38)), P, 300);
+	let cx = P;
+	[`${total} ${plural(total, 'пара', 'пары', 'пар')}`, `${days.length} ${plural(days.length, 'учебный день', 'учебных дня', 'учебных дней')}`].forEach(t => {
+		x.font = font(700, 28);
+		const w = x.measureText(t).width + 48;
+		x.fillStyle = 'rgba(255,255,255,0.12)'; rr(cx, 340, w, 56, 28); x.fill();
+		x.fillStyle = '#fff'; x.fillText(t, cx + 24, 378);
+		cx += w + 14;
+	});
+
+	let y = 470;
+	blocks.forEach(({ d, rows }) => {
+		const label = d.title.replace(/\s+/g, ' ').trim();
+		x.font = font(800, 40); x.fillStyle = '#fff';
+		x.fillText(label, P, y + 44);
+		if (d.isToday && isCurrentWeek) {
+			const lw = x.measureText(label).width;
+			x.font = font(700, 24);
+			const tw = x.measureText('СЕГОДНЯ').width + 32;
+			x.fillStyle = `hsl(${hue} 85% 66%)`; rr(P + lw + 20, y + 12, tw, 42, 21); x.fill();
+			x.fillStyle = '#120f22'; x.fillText('СЕГОДНЯ', P + lw + 36, y + 42);
+		}
+		y += 74;
+		rows.forEach(({ p, lines, subText, h }) => {
+			const t = slot(p.num);
+			const dh = disciplineHue(p.name);
+			x.fillStyle = 'rgba(255,255,255,0.075)'; rr(P, y, W - P * 2, h, 32); x.fill();
+			x.strokeStyle = 'rgba(255,255,255,0.08)'; x.lineWidth = 2; rr(P, y, W - P * 2, h, 32); x.stroke();
+			x.fillStyle = '#fff'; x.font = font(800, 40);
+			x.fillText(t ? fmt(t.start) : `${p.num} пара`, P + 32, y + 62);
+			if (t) { x.fillStyle = 'rgba(255,255,255,0.55)'; x.font = font(600, 28); x.fillText(fmt(t.end), P + 32, y + 102); }
+			x.fillStyle = `hsl(${dh} 80% 64%)`; rr(P + 170, y + 26, 8, h - 52, 4); x.fill();
+			x.fillStyle = '#fff'; x.font = nameFont;
+			lines.forEach((l, i) => x.fillText(l, P + 200, y + 62 + i * 48));
+			if (subText) { x.fillStyle = 'rgba(255,255,255,0.68)'; x.font = subFont; x.fillText(ellipsize(subText, nameW, subFont), P + 200, y + 62 + lines.length * 48 + 4); }
+			y += h + 16;
+		});
+		y += 16;
+	});
+
+	x.fillStyle = 'rgba(255,255,255,0.5)'; x.font = font(600, 28);
+	x.fillText('ЕТИС 3.0', P, H - 64);
+	return c;
+}

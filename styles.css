@@ -1578,7 +1578,7 @@ table.common td, table.slimtab_nice td { font-variant-numeric: tabular-nums !imp
 
 .etis3-sp-accents {
 	display: grid !important;
-	grid-template-columns: repeat(8, 1fr) !important;
+	grid-template-columns: repeat(9, 1fr) !important;
 	gap: 8px !important;
 }
 
@@ -4831,3 +4831,131 @@ button.hm-wrapped:hover { filter: brightness(1.08) !important; }
 	.wr-blob, .hm-wrapped { animation: none !important; }
 	.wr-slide--on .wr-in { animation-duration: 0.01s; animation-delay: 0s; }
 }
+
+
+/* ============================================================
+   4.10 — СВОЙ ЦВЕТ И ФОНЫ
+   ============================================================ */
+
+/* Свой цвет: радужный кружок поверх системной палитры */
+.etis3-sp-swatch--custom {
+	position: relative !important; overflow: hidden !important; display: block !important;
+	background: conic-gradient(from 0deg, #ff4d4d, #ffb84d, #f5f54d, #4dff88, #4dd2ff, #6b4dff, #ff4dd8, #ff4d4d);
+}
+.etis3-sp-swatch--custom input { position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important; opacity: 0 !important; cursor: pointer !important; border: 0 !important; padding: 0 !important; }
+
+/* Слой фона: за стеклом, как аврора */
+#etis3-wall {
+	position: fixed !important; inset: 0 !important; z-index: -1 !important; pointer-events: none !important;
+	display: none; background-size: cover !important; background-position: center !important;
+	contain: strict; width: 100vw !important; height: 100vh !important; height: 100lvh !important;
+}
+html[data-wall]:not([data-wall="aurora"]):not([data-wall="custom"]) #etis3-wall,
+html.etis3-wall-photo #etis3-wall { display: block; }
+html[data-wall]:not([data-wall="aurora"]):not([data-wall="custom"]) #etis3-aurora.aurora--page,
+html.etis3-wall-photo #etis3-aurora.aurora--page { display: none !important; }
+/* Затемнение своего фото — под цвет темы, чтобы текст читался */
+html.etis3-wall-photo #etis3-wall::after { content: ''; position: absolute; inset: 0; background: rgba(10, 10, 18, var(--wall-dim, 0.35)); }
+html.etis3-wall-photo[theme="light"] #etis3-wall::after { background: rgba(246, 245, 252, var(--wall-dim, 0.35)); }
+
+/* Пресеты — тёмная тема */
+[data-wall="sunset"] #etis3-wall, .wall-prev--sunset {
+	background: radial-gradient(60% 50% at 15% 10%, rgba(255, 122, 89, 0.55), transparent 70%),
+		radial-gradient(55% 45% at 85% 30%, rgba(255, 61, 139, 0.42), transparent 70%),
+		radial-gradient(70% 60% at 50% 105%, rgba(107, 43, 217, 0.6), transparent 70%), #1a0f24;
+}
+[data-wall="ocean"] #etis3-wall, .wall-prev--ocean {
+	background: radial-gradient(60% 50% at 10% 5%, rgba(30, 144, 255, 0.5), transparent 70%),
+		radial-gradient(55% 50% at 95% 95%, rgba(0, 209, 193, 0.4), transparent 70%),
+		radial-gradient(50% 45% at 70% 35%, rgba(59, 43, 217, 0.32), transparent 70%), #07162a;
+}
+[data-wall="forest"] #etis3-wall, .wall-prev--forest {
+	background: radial-gradient(60% 50% at 20% 0%, rgba(43, 217, 124, 0.32), transparent 70%),
+		radial-gradient(60% 55% at 90% 80%, rgba(15, 118, 110, 0.55), transparent 70%),
+		radial-gradient(40% 35% at 40% 70%, rgba(163, 230, 53, 0.16), transparent 70%), #08160f;
+}
+[data-wall="cosmos"] #etis3-wall, .wall-prev--cosmos {
+	background: radial-gradient(1.5px 1.5px at 20px 30px, #fff, transparent), radial-gradient(1px 1px at 120px 80px, rgba(255,255,255,0.8), transparent),
+		radial-gradient(1.5px 1.5px at 60px 150px, rgba(255,255,255,0.9), transparent), radial-gradient(1px 1px at 170px 170px, rgba(255,255,255,0.7), transparent),
+		radial-gradient(1px 1px at 90px 10px, rgba(255,255,255,0.6), transparent), radial-gradient(1.2px 1.2px at 190px 110px, #fff, transparent),
+		radial-gradient(55% 45% at 75% 20%, rgba(124, 58, 237, 0.4), transparent 70%),
+		radial-gradient(50% 40% at 15% 85%, rgba(37, 99, 235, 0.3), transparent 70%), #04050d;
+	background-size: 200px 200px, 200px 200px, 200px 200px, 200px 200px, 200px 200px, 200px 200px, 100% 100%, 100% 100%, auto !important;
+}
+[data-wall="candy"] #etis3-wall, .wall-prev--candy {
+	background: radial-gradient(60% 50% at 15% 15%, rgba(255, 138, 216, 0.45), transparent 70%),
+		radial-gradient(55% 50% at 90% 40%, rgba(122, 240, 255, 0.32), transparent 70%),
+		radial-gradient(60% 50% at 40% 100%, rgba(180, 140, 255, 0.45), transparent 70%), #1b1030;
+}
+[data-wall="mono"] #etis3-wall, .wall-prev--mono {
+	background: radial-gradient(70% 60% at 30% 0%, rgba(255, 255, 255, 0.08), transparent 70%),
+		linear-gradient(160deg, #15151c, #0b0b10 70%);
+}
+
+/* Пресеты — светлая тема: те же краски, но пастелью */
+[theme="light"][data-wall="sunset"] #etis3-wall, [theme="light"] .wall-prev--sunset {
+	background: radial-gradient(60% 50% at 15% 10%, rgba(255, 150, 110, 0.45), transparent 70%),
+		radial-gradient(55% 45% at 85% 30%, rgba(255, 110, 170, 0.32), transparent 70%),
+		radial-gradient(70% 60% at 50% 105%, rgba(160, 120, 255, 0.4), transparent 70%), #fbf1ee;
+}
+[theme="light"][data-wall="ocean"] #etis3-wall, [theme="light"] .wall-prev--ocean {
+	background: radial-gradient(60% 50% at 10% 5%, rgba(80, 160, 255, 0.4), transparent 70%),
+		radial-gradient(55% 50% at 95% 95%, rgba(0, 200, 190, 0.32), transparent 70%), #eef5fb;
+}
+[theme="light"][data-wall="forest"] #etis3-wall, [theme="light"] .wall-prev--forest {
+	background: radial-gradient(60% 50% at 20% 0%, rgba(60, 200, 120, 0.32), transparent 70%),
+		radial-gradient(60% 55% at 90% 80%, rgba(20, 150, 140, 0.3), transparent 70%), #eff7f1;
+}
+[theme="light"][data-wall="cosmos"] #etis3-wall, [theme="light"] .wall-prev--cosmos {
+	background: radial-gradient(55% 45% at 75% 20%, rgba(124, 58, 237, 0.25), transparent 70%),
+		radial-gradient(50% 40% at 15% 85%, rgba(37, 99, 235, 0.22), transparent 70%), #eef0fa;
+}
+[theme="light"][data-wall="candy"] #etis3-wall, [theme="light"] .wall-prev--candy {
+	background: radial-gradient(60% 50% at 15% 15%, rgba(255, 138, 216, 0.4), transparent 70%),
+		radial-gradient(55% 50% at 90% 40%, rgba(122, 220, 255, 0.35), transparent 70%),
+		radial-gradient(60% 50% at 40% 100%, rgba(190, 160, 255, 0.4), transparent 70%), #fbf3fb;
+}
+[theme="light"][data-wall="mono"] #etis3-wall, [theme="light"] .wall-prev--mono {
+	background: radial-gradient(70% 60% at 30% 0%, rgba(255, 255, 255, 0.9), transparent 70%), linear-gradient(160deg, #ecebf0, #dcdbe3);
+}
+
+/* Плитки фонов в настройках */
+.etis3-sp-walls { display: grid !important; grid-template-columns: repeat(4, 1fr) !important; gap: 8px !important; }
+.etis3-sp-wall {
+	position: relative !important; aspect-ratio: 3 / 4 !important; border-radius: 1.2rem !important; cursor: pointer !important; overflow: hidden !important;
+	display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: flex-end !important; gap: 0.2rem !important;
+	padding: 0.6rem 0.4rem !important; box-sizing: border-box !important;
+	border: 2px solid transparent !important; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12) !important;
+	background-size: cover !important; background-position: center !important;
+	font-size: 1.05rem !important; font-weight: 600 !important; color: #fff !important; text-align: center !important; line-height: 1.15 !important;
+	text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6) !important;
+	transition: transform 0.15s ease, border-color 0.15s ease !important;
+}
+[theme="light"] .etis3-sp-wall:not(.wall-prev--aurora):not(.has-photo) { color: #24203a !important; text-shadow: none !important; }
+.etis3-sp-wall:hover { transform: translateY(-2px) !important; }
+.etis3-sp-wall.active { border-color: var(--color-accent) !important; box-shadow: 0 0 0 3px var(--color-accent-glow) !important; }
+.etis3-sp-wall .material-icons { font-size: 2.2rem !important; opacity: 0.9; margin-bottom: auto; margin-top: auto; }
+.etis3-sp-wall.has-photo .material-icons { display: none !important; }
+.wall-prev--aurora {
+	background: radial-gradient(60% 50% at 20% 20%, rgba(var(--color-accent-rgb, 124,111,212), 0.7), transparent 70%),
+		radial-gradient(55% 50% at 85% 75%, rgba(80, 200, 255, 0.5), transparent 70%),
+		radial-gradient(50% 40% at 70% 15%, rgba(255, 120, 200, 0.45), transparent 70%), #141226 !important;
+}
+.wall-prev--custom:not(.has-photo) { background: var(--glass-bg) !important; color: var(--color-text-secondary) !important; text-shadow: none !important; border-style: dashed !important; border-color: var(--color-border, rgba(127,127,127,0.35)) !important; }
+.wall-prev--custom.active:not(.has-photo) { border-color: var(--color-accent) !important; }
+.etis3-sp-wallopts { display: flex !important; flex-direction: column !important; gap: 1rem !important; margin-top: 1.2rem !important; }
+.etis3-sp-wallopts[hidden] { display: none !important; }
+#etis3-sp-wallpick { display: inline-flex !important; align-items: center !important; gap: 0.6rem !important; font-size: 1.3rem !important; font-weight: 600 !important; color: var(--color-accent) !important; text-decoration: none !important; }
+#etis3-sp-wallpick .material-icons { font-size: 1.8rem !important; }
+.etis3-sp-dim-label { font-size: 1.3rem !important; color: var(--color-text-secondary) !important; white-space: nowrap !important; }
+
+/* Неделя картинкой — кнопка в навигации недели */
+.ttw-share {
+	flex: none; width: 4.4rem; height: 4.4rem; display: grid; place-items: center;
+	border-radius: 1.4rem; color: var(--color-accent) !important; text-decoration: none !important;
+	background: rgba(var(--color-accent-rgb, 124,111,212), 0.12); transition: background 0.2s, transform 0.15s, opacity 0.2s;
+}
+.ttw-share:hover { background: rgba(var(--color-accent-rgb, 124,111,212), 0.22); }
+.ttw-share:active { transform: scale(0.94); }
+.ttw-share .material-icons { font-size: 2.2rem; }
+.ttw-share.is-busy { opacity: 0.5; pointer-events: none; }

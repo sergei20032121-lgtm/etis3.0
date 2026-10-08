@@ -19,7 +19,23 @@ const ETIS3_DEFAULTS = {
 	aurora:    true,     // живой фон-аврора на всех страницах
 	sky:       true,     // цвета фона по времени суток
 	notify:    true,     // фоновая проверка новых оценок / сообщений
+	accentCustom: '#7c6fd4', // свой цвет (accent: 'custom')
+	wallpaper: 'aurora', // фон страниц: aurora | пресет | custom (своё фото)
+	wallDim:   0.35,     // затемнение своего фото, 0…0.85
 };
+
+// Фоны страниц кабинета. «Своё фото» хранится отдельно (ETIS3_WALL_IMG_KEY) — оно большое
+const ETIS3_WALLPAPERS = {
+	aurora: 'Аврора',
+	sunset: 'Закат',
+	ocean:  'Океан',
+	forest: 'Лес',
+	cosmos: 'Космос',
+	candy:  'Сладкая вата',
+	mono:   'Графит',
+	custom: 'Своё фото',
+};
+const ETIS3_WALL_IMG_KEY = 'etis3-wallpaper-img';
 
 const ETIS3_ACCENTS = {
 	violet: { light: '#7c6fd4', dark: '#9d8ef0', label: 'Фиолетовый' },
@@ -40,7 +56,11 @@ function etis3Normalize(raw) {
 	const s = { ...ETIS3_DEFAULTS };
 	if (!raw || typeof raw !== 'object') return s;
 	if (['auto', 'light', 'dark'].includes(raw.theme)) s.theme = raw.theme;
-	if (raw.accent in ETIS3_ACCENTS) s.accent = raw.accent;
+	if (raw.accent in ETIS3_ACCENTS || raw.accent === 'custom') s.accent = raw.accent;
+	if (/^#[0-9a-f]{6}$/i.test(raw.accentCustom || '')) s.accentCustom = raw.accentCustom.toLowerCase();
+	if (raw.wallpaper in ETIS3_WALLPAPERS) s.wallpaper = raw.wallpaper;
+	const dim = parseFloat(raw.wallDim);
+	if (!isNaN(dim)) s.wallDim = Math.min(0.85, Math.max(0, dim));
 	const fs = parseFloat(raw.fontSize);
 	if (!isNaN(fs)) s.fontSize = Math.min(ETIS3_FONT_MAX, Math.max(ETIS3_FONT_MIN, fs));
 	if (['modern', 'classic'].includes(raw.layout)) s.layout = raw.layout;
@@ -69,6 +89,19 @@ function etis3FromLegacy(ls) {
 
 function etis3HexToRgb(hex) {
 	return [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)).join(',');
+}
+
+// Цвет акцента для темы: пресет или свой (в тёмной теме чуть светлее, в светлой — не слишком бледный)
+function etis3AccentHex(s, isDark) {
+	if (s.accent !== 'custom') {
+		const preset = ETIS3_ACCENTS[s.accent] || ETIS3_ACCENTS.violet;
+		return isDark ? preset.dark : preset.light;
+	}
+	const rgb = [1, 3, 5].map(i => parseInt(s.accentCustom.slice(i, i + 2), 16));
+	const lum = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
+	const mix = (to, k) => '#' + rgb.map(c => Math.round(c + (to - c) * k).toString(16).padStart(2, '0')).join('');
+	if (isDark) return lum < 0.45 ? mix(255, 0.28) : s.accentCustom;
+	return lum > 0.7 ? mix(0, 0.35) : s.accentCustom;
 }
 
 function etis3IsDark(themeSetting) {
