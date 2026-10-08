@@ -4959,3 +4959,25 @@ html.etis3-wall-photo[theme="light"] #etis3-wall::after { background: rgba(246, 
 .ttw-share:active { transform: scale(0.94); }
 .ttw-share .material-icons { font-size: 2.2rem; }
 .ttw-share.is-busy { opacity: 0.5; pointer-events: none; }
+
+/* Кнопки темы и профиля в шапке: глобальный стиль кнопок (flex, фон и сдвиг при hover/focus) их ломал —
+   иконка уезжала влево, аватар после клика становился белым квадратом */
+#etis3-topbar .tb-icon, #etis3-topbar .tb-avatar {
+	display: grid !important; place-items: center !important; justify-content: center !important;
+	box-sizing: border-box !important; padding: 0 !important; line-height: 1 !important; transform: none !important;
+}
+#etis3-topbar .tb-icon .material-icons { margin: 0 !important; }
+#etis3-topbar .tb-icon:hover, #etis3-topbar .tb-icon:focus { background: var(--glass-bg-hover) !important; box-shadow: none !important; }
+#etis3-topbar .tb-icon:hover .material-icons { transform: rotate(-12deg); transition: transform 0.2s; }
+#etis3-topbar .tb-avatar, #etis3-topbar .tb-avatar:hover, #etis3-topbar .tb-avatar:focus, #etis3-topbar .tb-avatar:active {
+	background: linear-gradient(135deg, rgba(var(--color-accent-rgb, 124,111,212), 1), rgba(var(--orb-c, 34,180,230), 0.9)) !important;
+	border: 2px solid rgba(255,255,255,0.35) !important;
+	box-shadow: 0 2px 12px rgba(var(--color-accent-rgb, 124,111,212), 0.4), inset 0 1px 0 rgba(255,255,255,0.4) !important;
+	color: #fff !important;
+	border-radius: 50% !important;
+}
+#etis3-topbar .tb-icon, #etis3-topbar .tb-icon:hover, #etis3-topbar .tb-icon:focus, #etis3-topbar .tb-icon:active { border-radius: 1.4rem !important; }
+#etis3-topbar .tb-avatar:hover { transform: scale(1.06) !important; }
+#etis3-topbar .tb-icon:focus:not(:focus-visible), #etis3-topbar .tb-avatar:focus:not(:focus-visible) { outline: none !important; }
+#etis3-topbar .tb-icon:focus-visible, #etis3-topbar .tb-avatar:focus-visible { outline: 2px solid var(--color-accent) !important; outline-offset: 2px !important; }
+@media (max-width: 900px) { #etis3-topbar .tb-theme { display: none !important; } }
