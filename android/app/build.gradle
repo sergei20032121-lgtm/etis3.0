@@ -64,4 +64,6 @@ tasks.named('preBuild') { dependsOn copyUserscript }
 
 dependencies {
     implementation 'androidx.webkit:webkit:1.12.1'
+    implementation 'androidx.work:work-runtime:2.9.1'
+    implementation 'org.jsoup:jsoup:1.17.2'
 }

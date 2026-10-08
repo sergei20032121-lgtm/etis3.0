@@ -128,6 +128,9 @@ public class MainActivity extends Activity {
         cookies.setAcceptCookie(true);
         cookies.setAcceptThirdPartyCookies(web, true);
 
+        // Мост для страницы: сохранить картинку «Итогов семестра» в галерею
+        web.addJavascriptInterface(new NativeBridge(), "ETIS3Native");
+
         script = wrap(loadScript());
         documentStartSupported = WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT);
         installScript();
@@ -186,6 +189,8 @@ public class MainActivity extends Activity {
                 // Старые WebView без document-start: подключаем после загрузки (скрипт умеет стартовать поздно)
                 if (!documentStartSupported && isEtis(url)) view.evaluateJavascript(script, null);
                 CookieManager.getInstance().flush();
+                // Зашёл в ЕТИС — обновим виджет и снимок оценок фоном
+                if (isEtis(url) && !url.contains("stu.login")) SyncWorker.syncSoon(MainActivity.this);
             }
         });
 
@@ -223,6 +228,73 @@ public class MainActivity extends Activity {
         else web.loadUrl(data != null && HOST.equalsIgnoreCase(data.getHost()) ? data.toString() : START_URL);
 
         updateScriptInBackground();
+        SyncWorker.schedule(this);
+        askNotificationsOnce();
+    }
+
+    /** Android 13+: разрешение на уведомления о новых оценках — один раз при первом запуске. */
+    private void askNotificationsOnce() {
+        SyncWorker.ensureChannel(this);
+        if (Build.VERSION.SDK_INT < 33 || EtisStore.askedNotifications(this)) return;
+        EtisStore.setAskedNotifications(this);
+        if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 3);
+        }
+    }
+
+    /** Методы, доступные странице ЕТИС как window.ETIS3Native. */
+    final class NativeBridge {
+        @android.webkit.JavascriptInterface
+        public void saveImage(String base64, String name) {
+            ui.post(() -> {
+                String url = web.getUrl();
+                if (url == null || !isEtis(url)) return;
+                new Thread(() -> {
+                    Uri saved = null;
+                    try {
+                        byte[] png = android.util.Base64.decode(base64, android.util.Base64.DEFAULT);
+                        saved = saveToGallery(png, name.replaceAll("[^\\w.\\-]", "_"));
+                    } catch (Exception ignored) { }
+                    Uri result = saved;
+                    ui.post(() -> {
+                        if (result == null) { toast("Не получилось сохранить картинку"); return; }
+                        toast("Картинка сохранена в «Галерею»");
+                        if (!"content".equals(result.getScheme())) return;   // file:// поделиться нельзя (Android 7+)
+                        Intent share = new Intent(Intent.ACTION_SEND).setType("image/png")
+                                .putExtra(Intent.EXTRA_STREAM, result)
+                                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        try { startActivity(Intent.createChooser(share, "Поделиться итогами")); } catch (Exception ignored) { }
+                    });
+                }).start();
+            });
+        }
+    }
+
+    private Uri saveToGallery(byte[] png, String name) throws java.io.IOException {
+        if (Build.VERSION.SDK_INT >= 29) {
+            android.content.ContentValues v = new android.content.ContentValues();
+            v.put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, name);
+            v.put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/png");
+            v.put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/ЕТИС 3.0");
+            Uri uri = getContentResolver().insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v);
+            if (uri == null) throw new java.io.IOException("MediaStore");
+            try (java.io.OutputStream out = getContentResolver().openOutputStream(uri)) {
+                if (out == null) throw new java.io.IOException("MediaStore");
+                out.write(png);
+            }
+            return uri;
+        }
+        if (checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            ui.post(() -> requestPermissions(new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, 2));
+            return null;
+        }
+        File dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "ЕТИС 3.0");
+        //noinspection ResultOfMethodCallIgnored
+        dir.mkdirs();
+        File f = new File(dir, name);
+        try (FileOutputStream out = new FileOutputStream(f)) { out.write(png); }
+        android.media.MediaScannerConnection.scanFile(this, new String[]{f.getAbsolutePath()}, new String[]{"image/png"}, null);
+        return Uri.fromFile(f);
     }
 
     // ---------- Скрипт ----------
