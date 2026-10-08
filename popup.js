@@ -26,10 +26,20 @@ Object.entries(ETIS3_ACCENTS).forEach(([key, preset]) => {
 	accentRow.appendChild(sw);
 });
 
+// Свой цвет: радужный кружок с системной палитрой
+const customSw = document.createElement('label');
+customSw.className = 'accent-swatch accent-swatch--custom';
+customSw.dataset.accent = 'custom';
+customSw.title = 'Свой цвет';
+customSw.innerHTML = '<input type="color" aria-label="Свой цвет">';
+const customInput = customSw.querySelector('input');
+customInput.addEventListener('input', () => { settings = etis3Normalize({ ...settings, accent: 'custom', accentCustom: customInput.value }); render(); });
+customInput.addEventListener('change', () => save({ accent: 'custom', accentCustom: customInput.value }));
+accentRow.appendChild(customSw);
+
 function render() {
 	const isDark = etis3IsDark(settings.theme);
-	const preset = ETIS3_ACCENTS[settings.accent] || ETIS3_ACCENTS.violet;
-	const hex    = isDark ? preset.dark : preset.light;
+	const hex    = etis3AccentHex(settings, isDark);
 	const rgb    = etis3HexToRgb(hex);
 	const root   = document.documentElement;
 	root.setAttribute('data-theme', isDark ? 'dark' : 'light');
@@ -40,6 +50,9 @@ function render() {
 	themeBtns.forEach(b => b.classList.toggle('active', b.dataset.themeVal === settings.theme));
 	layoutBtns.forEach(b => b.classList.toggle('active', b.dataset.layoutVal === settings.layout));
 	accentRow.querySelectorAll('.accent-swatch').forEach(s => s.classList.toggle('active', s.dataset.accent === settings.accent));
+	customInput.value = settings.accentCustom;
+	if (settings.accent === 'custom') customSw.style.background = settings.accentCustom;
+	else customSw.style.background = '';
 	fontRange.value     = settings.fontSize;
 	fontVal.textContent = settings.fontSize + 'px';
 	toggles.forEach(el => { el.checked = settings[el.dataset.setting]; });
