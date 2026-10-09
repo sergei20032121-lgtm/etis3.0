@@ -108,7 +108,7 @@
 .vc-shot img{max-width:min(100%,1100px);max-height:78vh;border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,.4);background:#fff}
 .vc-shot .row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
 .vc-shot p{color:#E8ECE7;font-size:13px;text-align:center;margin:0;max-width:520px}
-.vc-shot .btn{background:#fff;color:#17191B;border:1px solid #fff}
+.vc-shot .btn{background:#fff;color:#17191B;border:1px solid #fff;height:44px;padding:0 18px;border-radius:10px;display:inline-flex;align-items:center;text-decoration:none;font:600 15px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;cursor:pointer}
 .vc-shot .btn.primary{background:#1D6B57;border-color:#1D6B57;color:#fff}
 
 @media (prefers-reduced-motion:reduce){.vc-block,.vc-hbars .tr i,.vc-dist .st i{animation:none}}
