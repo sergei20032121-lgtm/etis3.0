@@ -1,4 +1,5 @@
-<img width="1862" height="894" alt="image" src="https://github.com/user-attachments/assets/ee31bc8c-d5ba-4f69-8526-f5b7a9e78547" />
+<img width="1857" height="924" alt="image" src="https://github.com/user-attachments/assets/27d42fdd-6478-4e2e-b9b1-df55a59304f4" />
+
 
 # ЕТИС 3.0
 
