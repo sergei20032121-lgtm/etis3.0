@@ -6,7 +6,7 @@
 set -euo pipefail
 
 BRANCH="${VOTE_BRANCH:-claude/inspiring-mayer-sgw1ap}"
-BASE="https://raw.githubusercontent.com/sergei20032121-lgtm/etis3.0/refs/heads/${BRANCH}/tools/presentation-vote/server"
+REPO=sergei20032121-lgtm/etis3.0
 APP=/opt/presentation-vote
 DATA=/var/lib/presentation-vote
 ENVF=/etc/presentation-vote.env
@@ -22,7 +22,12 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 command -v curl >/dev/null || { apt-get update -qq && apt-get install -y -qq curl; }
 
-echo "→ Скачиваю файлы"
+# Качаем по номеру коммита: ссылки на ветку GitHub кэширует до 5 минут
+REF="$(curl -fsSL -H "Accept: application/vnd.github.sha" "https://api.github.com/repos/$REPO/commits/$BRANCH" 2>/dev/null || true)"
+if ! echo "$REF" | grep -Eq '^[0-9a-f]{40}$'; then REF="refs/heads/$BRANCH"; fi
+BASE="https://raw.githubusercontent.com/$REPO/$REF/tools/presentation-vote/server"
+
+echo "→ Скачиваю файлы (${REF:0:12})"
 mkdir -p "$APP/static" "$DATA"
 for f in vote.py static/vote.html static/admin.html static/qrcode.js; do
   curl -fsSL "$BASE/$f" -o "$APP/$f.new" && mv "$APP/$f.new" "$APP/$f"
@@ -74,8 +79,12 @@ if command -v firewall-cmd >/dev/null && firewall-cmd --state >/dev/null 2>&1; t
   firewall-cmd -q --permanent --add-port="$VOTE_PORT"/tcp && firewall-cmd -q --reload && echo "→ Открыл порт $VOTE_PORT в firewalld"
 fi
 
-sleep 1
-if ! curl -fsS "http://127.0.0.1:$VOTE_PORT/healthz" >/dev/null; then
+ok=0
+for i in 1 2 3 4 5 6; do
+  sleep 1
+  if curl -fsS "http://127.0.0.1:$VOTE_PORT/healthz" >/dev/null 2>&1; then ok=1; break; fi
+done
+if [ "$ok" != 1 ]; then
   echo "Сервер не запустился. Лог:"; journalctl -u presentation-vote -n 30 --no-pager; exit 1
 fi
 
