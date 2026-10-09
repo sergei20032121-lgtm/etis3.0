@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Оценка презентаций</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one working column, three steps as tabs (форма → QR → итоги); poster preview beside the controls on wide screens */
+:root{
+  --bg:#F3F4EF; --surface:#FFFFFF; --ink:#17191B; --muted:#5D6460; --line:#D9DCD3;
+  --accent:#1D6B57; --accent-ink:#FFFFFF; --mark:#FFD84D; --mark-ink:#17191B;
+  --good:#1D6B57; --soft:#E7EEE9;
+  --f-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --f-body:"Golos Text",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121514; --surface:#1A1E1C; --ink:#ECEFEA; --muted:#9BA39E; --line:#2D3330;
+  --accent:#4FBF9F; --accent-ink:#0D1412; --mark:#F2CC45; --mark-ink:#17191B; --good:#4FBF9F; --soft:#203029;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121514; --surface:#1A1E1C; --ink:#ECEFEA; --muted:#9BA39E; --line:#2D3330;
+  --accent:#4FBF9F; --accent-ink:#0D1412; --mark:#F2CC45; --mark-ink:#17191B; --good:#4FBF9F; --soft:#203029;
+  color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--f-body);padding:28px 16px 64px}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+h1{font:700 clamp(24px,4.4vw,38px)/1.1 var(--f-display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h2{font:600 20px/1.25 var(--f-display);margin:0;text-wrap:balance}
+h3{font:600 15px/1.3 var(--f-body);margin:0}
+p{margin:0}
+.lead{color:var(--muted);max-width:64ch}
+.eyebrow{font:600 11px/1 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+header{display:flex;flex-direction:column;gap:10px}
+
+.tabs{display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+.tab{appearance:none;border:0;background:none;color:var(--muted);font:500 15px var(--f-body);padding:10px 14px 12px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px;display:flex;gap:8px;align-items:center}
+.tab .n{font:600 12px var(--f-mono);width:22px;height:22px;border-radius:50%;display:grid;place-items:center;border:1.5px solid currentColor}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tab[aria-selected="true"] .n{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.tab:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.panel{display:flex;flex-direction:column;gap:20px}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:820px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+
+label{font-weight:600;font-size:14px}
+.hint{color:var(--muted);font-size:13px}
+input[type=text],input[type=url],textarea,select{width:100%;font:15px/1.45 var(--f-body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+textarea{resize:vertical;min-height:120px}
+.field{display:flex;flex-direction:column;gap:6px}
+
+.btn{appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:500 14px var(--f-body);padding:9px 14px;border-radius:8px;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.small{padding:5px 10px;font-size:13px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* Steps in Yandex Forms */
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0}
+.step{display:grid;grid-template-columns:36px minmax(0,1fr);gap:14px;padding:16px 0;border-top:1px solid var(--line)}
+.step:first-child{border-top:0;padding-top:4px}
+.step .num{font:700 15px var(--f-display);width:32px;height:32px;border-radius:50%;background:var(--soft);color:var(--accent);display:grid;place-items:center}
+.step .body{display:flex;flex-direction:column;gap:8px;min-width:0}
+.q{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.q-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap}
+.q-type{font:600 11px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;background:var(--mark);color:var(--mark-ink);padding:3px 7px;border-radius:4px;white-space:nowrap}
+.q-text{font-weight:600;overflow-wrap:anywhere}
+.q-sub{color:var(--muted);font-size:13px;overflow-wrap:anywhere}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:13px;border:1px solid var(--line);border-radius:999px;padding:2px 10px;background:var(--surface)}
+code,.mono{font-family:var(--f-mono);font-size:13px}
+a{color:var(--accent)}
+
+/* Poster */
+.poster-wrap{background:var(--soft);border-radius:12px;padding:16px;display:flex;justify-content:center}
+.poster-wrap img{width:100%;max-width:420px;box-shadow:0 6px 24px rgba(0,0,0,.12);border-radius:4px;background:#fff}
+.qr-only{display:flex;justify-content:center}
+.qr-only img{width:220px;max-width:100%;background:#fff;padding:10px;border-radius:8px;border:1px solid var(--line)}
+
+/* Fullscreen QR */
+.stage{position:fixed;inset:0;background:#FFFFFF;color:#17191B;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vh;padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px))}
+.stage h2{font:700 clamp(24px,5vh,56px)/1.1 var(--f-display);text-align:center;color:#17191B}
+.stage img{height:min(68vh,90vw);width:auto;max-width:100%;image-rendering:pixelated}
+.stage .s-url{font:500 clamp(14px,2.2vh,22px) var(--f-mono);color:#5D6460;text-align:center;overflow-wrap:anywhere;max-width:90vw}
+.stage .close{position:absolute;top:calc(12px + env(safe-area-inset-top,0px));right:12px;background:#17191B;color:#fff;border:0}
+
+/* Results */
+.tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:14px}
+th,td{padding:10px 12px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font:600 12px var(--f-body);color:var(--muted);vertical-align:bottom;white-space:normal;min-width:84px}
+th:nth-child(2),td:nth-child(2){text-align:left;white-space:normal;min-width:160px}
+th:first-child,td:first-child{text-align:center;width:44px;min-width:44px}
+tr:last-child td{border-bottom:0}
+td.total{font-weight:700;font-size:15px}
+.place{font:700 14px var(--f-display);display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--soft);color:var(--accent)}
+tr.top1 .place{background:var(--mark);color:var(--mark-ink)}
+.bar{display:block;height:4px;border-radius:2px;background:var(--soft);margin-top:4px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+.badge-ex{font:600 11px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border:1px dashed var(--muted);padding:2px 8px;border-radius:4px}
+.drop{border:1.5px dashed var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.drop.over{border-color:var(--accent);background:var(--soft)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:14px;z-index:60}
+@media (prefers-reduced-motion:no-preference){.tab,.btn{transition:border-color .15s,background .15s,color .15s}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">Яндекс Формы · 5 критериев · шкала 1–5</span>
+    <h1>Оценка презентаций</h1>
+    <p class="lead">Соберите анкету в Яндекс Формах по готовому тексту, распечатайте или выведите на экран QR-код, а после выступлений загрузите выгрузку ответов и получите рейтинг.</p>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab-form" aria-selected="true" data-tab="form"><span class="n">1</span>Анкета</button>
+    <button class="tab" role="tab" id="tab-qr" aria-selected="false" data-tab="qr"><span class="n">2</span>QR-код</button>
+    <button class="tab" role="tab" id="tab-res" aria-selected="false" data-tab="res"><span class="n">3</span>Итоги</button>
+  </div>
+
+  <!-- 1. FORM -->
+  <section class="panel" id="panel-form">
+    <div class="grid2">
+      <div class="box">
+        <h2>Что оцениваем</h2>
+        <div class="field">
+          <label for="inp-pres">Презентации, по одной в строке</label>
+          <textarea id="inp-pres" rows="6"></textarea>
+          <span class="hint">Название и, если нужно, выступающий. Пример: «Анализ рынка — Иванова А.»</span>
+        </div>
+        <div class="field">
+          <label for="inp-crit">Критерии, по одному в строке</label>
+          <textarea id="inp-crit" rows="5"></textarea>
+          <span class="hint">Формат: «Название — пояснение». Пояснение покажется под вопросом.</span>
+        </div>
+        <div class="row">
+          <button class="btn small" id="btn-reset">Вернуть пример</button>
+          <span class="hint" id="count-hint"></span>
+        </div>
+      </div>
+
+      <div class="box">
+        <h2>Как собрать анкету</h2>
+        <ol class="steps" id="steps"></ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. QR -->
+  <section class="panel" id="panel-qr" hidden>
+    <div class="grid2">
+      <div class="box">
+        <h2>Ссылка на анкету</h2>
+        <div class="field">
+          <label for="inp-url">Ссылка из Яндекс Форм</label>
+          <input type="url" id="inp-url" placeholder="https://forms.yandex.ru/u/…/" inputmode="url" autocomplete="off">
+          <span class="hint">В форме: «Опубликовать» → скопируйте ссылку и вставьте сюда.</span>
+        </div>
+        <div class="field">
+          <label for="inp-title">Заголовок плаката</label>
+          <input type="text" id="inp-title">
+        </div>
+        <div class="field">
+          <label for="inp-sub">Подзаголовок</label>
+          <input type="text" id="inp-sub">
+        </div>
+        <div class="row">
+          <button class="btn primary" id="btn-stage">Показать QR на весь экран</button>
+          <button class="btn" id="btn-copy-url">Скопировать ссылку</button>
+        </div>
+        <p class="hint">Плакат и QR — это картинки: на телефоне удерживайте палец, на компьютере — правая кнопка → «Сохранить изображение». Плакат сделан в формате A4, его можно печатать или вставить последним слайдом.</p>
+        <h3>Только QR</h3>
+        <div class="qr-only"><img id="img-qr" alt="QR-код анкеты"></div>
+      </div>
+      <div class="box">
+        <h2>Плакат A4</h2>
+        <div class="poster-wrap"><img id="img-poster" alt="Плакат с QR-кодом для голосования"></div>
+        <p class="hint" id="url-warn" hidden>Сейчас QR ведёт на пример ссылки. Вставьте свою ссылку слева.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. RESULTS -->
+  <section class="panel" id="panel-res" hidden>
+    <div class="box">
+      <h2>Загрузите ответы</h2>
+      <p class="hint">В Яндекс Формах: вкладка «Ответы» → «Выгрузить» (XLSX или CSV). Перетащите файл сюда или скопируйте таблицу из Excel и вставьте в поле.</p>
+      <div class="drop" id="drop">
+        <div class="row">
+          <label class="btn primary" for="inp-file" style="cursor:pointer">Выбрать файл</label>
+          <input type="file" id="inp-file" accept=".xlsx,.xls,.csv,.tsv,.txt" hidden>
+          <span class="hint" id="file-name">или перетащите .xlsx / .csv</span>
+        </div>
+        <textarea id="inp-paste" rows="3" placeholder="…или вставьте таблицу (Ctrl+V) сюда"></textarea>
+      </div>
+      <div class="row" id="col-row" hidden>
+        <div class="field" style="flex:1;min-width:220px">
+          <label for="sel-col">Колонка с названием презентации</label>
+          <select id="sel-col"></select>
+        </div>
+      </div>
+    </div>
+
+    <div class="row" style="justify-content:space-between">
+      <h2 id="res-title">Рейтинг</h2>
+      <div class="row"><span class="badge-ex" id="ex-badge">Пример данных</span><button class="btn small" id="btn-copy-res">Скопировать таблицу</button></div>
+    </div>
+    <div class="tablebox"><table id="res-table"></table></div>
+    <p class="hint" id="res-note"></p>
+  </section>
+</div>
+
+<div class="stage" id="stage" hidden>
+  <button class="btn close" id="btn-close">Закрыть</button>
+  <h2 id="stage-title"></h2>
+  <img id="stage-qr" alt="QR-код анкеты">
+  <div class="s-url" id="stage-url"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const store = {
+  get(k){ try { return localStorage.getItem('pv_'+k); } catch(e){ return null; } },
+  set(k,v){ try { localStorage.setItem('pv_'+k, v); } catch(e){} }
+};
+const EX_PRES = ['Анализ рынка — Иванова А.','Редизайн сайта — Петров С.','Новая система отчётности — Ким Д.','Автоматизация закупок — Смирнова Е.'];
+const EX_CRIT = [
+  'Содержание — польза, полнота и точность материала',
+  'Структура — логика и последовательность изложения',
+  'Оформление — наглядность и читаемость слайдов',
+  'Выступление — уверенность, речь, контакт с залом',
+  'Ответы на вопросы — понятно и по делу'
+];
+const EX_URL = 'https://forms.yandex.ru/u/primer/';
+
+const pres = $('inp-pres'), crit = $('inp-crit'), url = $('inp-url'), title = $('inp-title'), sub = $('inp-sub');
+pres.value = store.get('pres') ?? EX_PRES.join('\n');
+crit.value = store.get('crit') ?? EX_CRIT.join('\n');
+url.value = store.get('url') ?? '';
+title.value = store.get('title') ?? 'Оцените презентации';
+sub.value = store.get('sub') ?? 'Анонимно · меньше минуты на одну презентацию';
+
+const lines = t => t.split('\n').map(s => s.trim()).filter(Boolean);
+const splitCrit = s => { const m = s.split(/\s+[—–-]\s+/); return { name: m[0], desc: m.slice(1).join(' — ') }; };
+const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function toast(msg){ const t = document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),1800); }
+async function copy(text, btn){
+  try { await navigator.clipboard.writeText(text); toast('Скопировано'); }
+  catch(e){
+    const ta = document.createElement('textarea'); ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    let ok = false; try { ok = document.execCommand('copy'); } catch(_){}
+    ta.remove(); toast(ok ? 'Скопировано' : 'Не удалось скопировать — выделите текст вручную');
+  }
+}
+
+/* ---------- Tabs ---------- */
+document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+function showTab(name){
+  document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === name));
+  ['form','qr','res'].forEach(n => $('panel-'+n).hidden = n !== name);
+  if (name === 'qr') renderQR();
+  store.set('tab', name);
+}
+
+/* ---------- Step 1: instructions ---------- */
+function renderSteps(){
+  const P = lines(pres.value), C = lines(crit.value).map(splitCrit);
+  $('count-hint').textContent = `${P.length} презентаци${P.length%10===1&&P.length%100!==11?'я':(P.length%10>=2&&P.length%10<=4&&(P.length%100<10||P.length%100>=20)?'и':'й')} · ${C.length} критери${C.length===1?'й':(C.length>=2&&C.length<=4?'я':'ев')}`;
+  const qPres = 'Какую презентацию вы оцениваете?';
+  const critQs = C.map((c,i) => `
+    <div class="q">
+      <div class="q-head"><span class="q-text">${esc(c.name)}</span><span class="q-type">Шкала 1–5</span></div>
+      ${c.desc ? `<span class="q-sub">${esc(c.desc)}</span>` : ''}
+      <div class="row"><button class="btn small" data-copy="${esc(c.name)}">Копировать вопрос</button>${c.desc?`<button class="btn small" data-copy="${esc(c.desc)}">Копировать пояснение</button>`:''}</div>
+    </div>`).join('');
+  $('steps').innerHTML = `
+    <li class="step"><span class="num">1</span><div class="body">
+      <h3>Создайте пустую форму</h3>
+      <p>Откройте <a href="https://forms.yandex.ru/admin/" target="_blank" rel="noopener">forms.yandex.ru</a> → «Создать форму». Название, например: «${esc(title.value || 'Оцените презентации')}».</p>
+    </div></li>
+    <li class="step"><span class="num">2</span><div class="body">
+      <h3>Первый вопрос: выбор презентации</h3>
+      <div class="q">
+        <div class="q-head"><span class="q-text">${qPres}</span><span class="q-type">Выпадающий список</span></div>
+        <div class="chips">${P.map(p=>`<span class="chip">${esc(p)}</span>`).join('')}</div>
+        <div class="row"><button class="btn small" data-copy="${esc(qPres)}">Копировать вопрос</button><button class="btn small" data-copy-list="pres">Копировать варианты</button></div>
+      </div>
+      <p class="hint">Отметьте «Обязательный». Варианты можно вставить списком сразу — каждая строка станет отдельным вариантом.</p>
+    </div></li>
+    <li class="step"><span class="num">3</span><div class="body">
+      <h3>Пять вопросов-шкал</h3>
+      <p class="hint">Тип «Шкала», от 1 до 5, подписи краёв: 1 — «Слабо», 5 — «Отлично». Все обязательные.</p>
+      ${critQs}
+    </div></li>
+    <li class="step"><span class="num">4</span><div class="body">
+      <h3>Комментарий (по желанию)</h3>
+      <div class="q">
+        <div class="q-head"><span class="q-text">Что понравилось или что улучшить?</span><span class="q-type">Длинный текст</span></div>
+        <div class="row"><button class="btn small" data-copy="Что понравилось или что улучшить?">Копировать вопрос</button></div>
+      </div>
+      <p class="hint">Сделайте его необязательным, чтобы не тормозить голосование.</p>
+    </div></li>
+    <li class="step"><span class="num">5</span><div class="body">
+      <h3>Настройки и публикация</h3>
+      <p>Не ограничивайте число ответов от одного человека и не требуйте вход в Яндекс ID: каждый проходит анкету по разу на каждую презентацию. В тексте после отправки напишите:</p>
+      <div class="q">
+        <span class="q-text">Спасибо! Чтобы оценить следующую презентацию, отсканируйте QR-код ещё раз или обновите страницу.</span>
+        <div class="row"><button class="btn small" data-copy="Спасибо! Чтобы оценить следующую презентацию, отсканируйте QR-код ещё раз или обновите страницу.">Копировать текст</button></div>
+      </div>
+      <p>Нажмите «Опубликовать», скопируйте ссылку и перейдите к шагу <a href="#qr" data-goto="qr">«QR-код»</a>.</p>
+    </div></li>`;
+}
+$('steps').addEventListener('click', e => {
+  const b = e.target.closest('[data-copy],[data-copy-list],[data-goto]');
+  if (!b) return;
+  if (b.dataset.goto){ e.preventDefault(); showTab(b.dataset.goto); return; }
+  if (b.dataset.copyList) copy(lines(pres.value).join('\n'));
+  else copy(b.dataset.copy);
+});
+[pres, crit].forEach(el => el.addEventListener('input', () => { store.set(el === pres ? 'pres' : 'crit', el.value); renderSteps(); posterDirty = true; }));
+$('btn-reset').addEventListener('click', () => { pres.value = EX_PRES.join('\n'); crit.value = EX_CRIT.join('\n'); store.set('pres',pres.value); store.set('crit',crit.value); renderSteps(); posterDirty = true; });
+
+/* ---------- Step 2: QR ---------- */
+let posterDirty = true;
+const formUrl = () => url.value.trim() || EX_URL;
+function qrMatrix(text){
+  const q = qrcode(0, 'M'); q.addData(text); q.make();
+  const n = q.getModuleCount(); return { n, dark: (r,c) => q.isDark(r,c) };
+}
+function drawQR(ctx, text, x, y, size){
+  const m = qrMatrix(text), quiet = 2, cell = size / (m.n + quiet*2);
+  ctx.fillStyle = '#FFFFFF'; ctx.fillRect(x, y, size, size);
+  ctx.fillStyle = '#111111';
+  for (let r = 0; r < m.n; r++) for (let c = 0; c < m.n; c++)
+    if (m.dark(r,c)) ctx.fillRect(Math.floor(x + (c+quiet)*cell), Math.floor(y + (r+quiet)*cell), Math.ceil(cell), Math.ceil(cell));
+}
+function qrDataURL(text, px){
+  const m = qrMatrix(text), quiet = 3, cell = Math.max(4, Math.floor(px / (m.n + quiet*2))), size = cell*(m.n+quiet*2);
+  const cv = document.createElement('canvas'); cv.width = cv.height = size;
+  const ctx = cv.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0,0,size,size); ctx.fillStyle = '#111';
+  for (let r = 0; r < m.n; r++) for (let c = 0; c < m.n; c++) if (m.dark(r,c)) ctx.fillRect((c+quiet)*cell, (r+quiet)*cell, cell, cell);
+  return cv.toDataURL('image/png');
+}
+function wrapText(ctx, text, maxW){
+  const words = text.split(' '), out = []; let line = '';
+  for (const w of words){ const t = line ? line+' '+w : w; if (ctx.measureText(t).width > maxW && line){ out.push(line); line = w; } else line = t; }
+  if (line) out.push(line); return out;
+}
+function fitFont(ctx, text, weight, family, start, maxW, min){
+  let s = start; ctx.font = `${weight} ${s}px ${family}`;
+  while (ctx.measureText(text).width > maxW && s > min){ s -= 2; ctx.font = `${weight} ${s}px ${family}`; }
+  return s;
+}
+function renderPoster(){
+  const W = 1240, H = 1754, M = 96;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d');
+  const DISP = '"Unbounded","Golos Text",sans-serif', BODY = '"Golos Text",sans-serif', MONO = '"JetBrains Mono",monospace';
+  ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = '#1D6B57'; ctx.fillRect(0,0,W,18);
+  ctx.textBaseline = 'alphabetic';
+
+  // Title
+  ctx.fillStyle = '#17191B';
+  ctx.font = `700 84px ${DISP}`;
+  let tl = wrapText(ctx, title.value || 'Оцените презентации', W - 2*M);
+  if (tl.length > 2){ ctx.font = `700 64px ${DISP}`; tl = wrapText(ctx, title.value, W - 2*M).slice(0,3); }
+  const lh = parseInt(ctx.font.match(/(\d+)px/)[1]) * 1.12;
+  let y = 190;
+  tl.forEach(l => { ctx.fillText(l, M, y); y += lh; });
+  ctx.fillStyle = '#5D6460'; ctx.font = `400 38px ${BODY}`;
+  wrapText(ctx, sub.value, W - 2*M).slice(0,2).forEach(l => { ctx.fillText(l, M, y + 4); y += 50; });
+
+  // QR
+  const qs = 760, qx = (W - qs)/2, qy = y + 40;
+  ctx.fillStyle = '#FFD84D'; roundRect(ctx, qx - 26, qy - 26, qs + 52, qs + 52, 28); ctx.fill();
+  drawQR(ctx, formUrl(), qx, qy, qs);
+  y = qy + qs + 26;
+
+  // Steps
+  const steps = ['Наведите камеру', 'Выберите презентацию', 'Поставьте оценки 1–5'];
+  const colW = (W - 2*M) / 3; y += 90;
+  steps.forEach((s, i) => {
+    const cx = M + i*colW;
+    ctx.fillStyle = '#1D6B57'; ctx.beginPath(); ctx.arc(cx + 28, y - 12, 28, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#FFFFFF'; ctx.font = `700 30px ${DISP}`; ctx.textAlign = 'center'; ctx.fillText(String(i+1), cx + 28, y - 1); ctx.textAlign = 'left';
+    ctx.fillStyle = '#17191B'; ctx.font = `600 30px ${BODY}`;
+    wrapText(ctx, s, colW - 84).forEach((l, j) => ctx.fillText(l, cx + 72, y - 2 + j*36));
+  });
+
+  // Criteria
+  y += 110;
+  ctx.fillStyle = '#5D6460'; ctx.font = `600 22px ${MONO}`; ctx.fillText('КРИТЕРИИ', M, y);
+  y += 22;
+  const C = lines(crit.value).map(splitCrit).map(c => c.name);
+  let cx = M; const ch = 54, gap = 14; y += 10;
+  ctx.font = `500 28px ${BODY}`;
+  C.forEach(name => {
+    const w = ctx.measureText(name).width + 40;
+    if (cx + w > W - M){ cx = M; y += ch + gap; }
+    ctx.strokeStyle = '#C9CDC4'; ctx.lineWidth = 2; roundRect(ctx, cx, y, w, ch, 27); ctx.stroke();
+    ctx.fillStyle = '#17191B'; ctx.fillText(name, cx + 20, y + 37);
+    cx += w + gap;
+  });
+
+  // URL footer
+  ctx.fillStyle = '#5D6460';
+  const u = formUrl().replace(/^https?:\/\//,'');
+  fitFont(ctx, u, 400, MONO, 26, W - 2*M, 14);
+  ctx.fillText(u, M, H - 70);
+  $('img-poster').src = cv.toDataURL('image/png');
+}
+function roundRect(ctx, x, y, w, h, r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+let qrTimer;
+function renderQR(){
+  if (typeof qrcode === 'undefined'){ $('url-warn').hidden = false; $('url-warn').textContent = 'Не загрузилась библиотека QR. Обновите страницу.'; return; }
+  $('url-warn').hidden = !!url.value.trim();
+  $('url-warn').textContent = 'Сейчас QR ведёт на пример ссылки. Вставьте свою ссылку слева.';
+  $('img-qr').src = qrDataURL(formUrl(), 600);
+  const go = () => { renderPoster(); posterDirty = false; };
+  (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(go);
+}
+[url, title, sub].forEach(el => el.addEventListener('input', () => {
+  store.set(el.id === 'inp-url' ? 'url' : el.id === 'inp-title' ? 'title' : 'sub', el.value);
+  clearTimeout(qrTimer); qrTimer = setTimeout(renderQR, 200);
+  if (el === title) renderSteps();
+}));
+$('btn-copy-url').addEventListener('click', () => copy(formUrl()));
+$('btn-stage').addEventListener('click', () => {
+  $('stage-title').textContent = title.value || 'Оцените презентации';
+  $('stage-qr').src = qrDataURL(formUrl(), 1200);
+  $('stage-url').textContent = formUrl().replace(/^https?:\/\//,'');
+  $('stage').hidden = false;
+  const el = document.documentElement;
+  if (el.requestFullscreen) el.requestFullscreen().catch(()=>{});
+  try { navigator.wakeLock && navigator.wakeLock.request('screen').catch(()=>{}); } catch(e){}
+});
+function closeStage(){ $('stage').hidden = true; if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(()=>{}); }
+$('btn-close').addEventListener('click', closeStage);
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('stage').hidden) closeStage(); });
+
+/* ---------- Step 3: results ---------- */
+let table = null, isExample = true;
+function sampleTable(){
+  const C = lines(crit.value).map(splitCrit).map(c => c.name);
+  const P = lines(pres.value);
+  const head = ['ID', 'Время создания', 'Какую презентацию вы оцениваете?', ...C, 'Что понравилось или что улучшить?'];
+  const rows = [head]; let seed = 7;
+  const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  P.forEach((p, pi) => {
+    const base = [4.4, 3.9, 4.1, 3.5, 4.0][pi % 5];
+    for (let v = 0; v < 9 + pi*2; v++){
+      rows.push([String(100230 + rows.length), '09.10.2026 15:' + String(10 + v).padStart(2,'0'), p,
+        ...C.map(() => String(Math.max(1, Math.min(5, Math.round(base + (rnd() - .45) * 2))))), '']);
+    }
+  });
+  return rows;
+}
+const num = v => { if (v === null || v === undefined) return NaN; const s = String(v).trim().replace(',', '.'); if (!/^-?\d+(\.\d+)?$/.test(s)) return NaN; return parseFloat(s); };
+
+function analyse(){
+  if (!table || table.length < 2){ $('res-table').innerHTML = ''; $('res-note').textContent = 'Нет строк с ответами.'; return; }
+  const head = table[0].map(h => String(h ?? '').trim()), rows = table.slice(1).filter(r => r.some(c => String(c ?? '').trim() !== ''));
+  // Numeric 1..10 columns are scores; others are candidates for the presentation column
+  const scoreCols = [], textCols = [];
+  head.forEach((h, i) => {
+    const vals = rows.map(r => r[i]).filter(v => String(v ?? '').trim() !== '');
+    if (!vals.length) return;
+    const nums = vals.map(num).filter(n => !isNaN(n));
+    if (nums.length / vals.length >= .8 && nums.every(n => n >= 0 && n <= 10) && !/^id$/i.test(h)) scoreCols.push(i);
+    else textCols.push(i);
+  });
+  const sel = $('sel-col');
+  if (!sel.options.length || sel.dataset.sig !== head.join('|')){
+    sel.innerHTML = textCols.map(i => `<option value="${i}">${esc(head[i] || 'Колонка ' + (i+1))}</option>`).join('');
+    sel.dataset.sig = head.join('|');
+    const guess = textCols.find(i => /презентац|выступлен|доклад|команд/i.test(head[i]));
+    if (guess !== undefined) sel.value = String(guess);
+    else { // fewest unique values among text columns
+      let best = textCols[0], bu = Infinity;
+      textCols.forEach(i => { const u = new Set(rows.map(r => r[i])).size; if (u > 1 && u < bu){ bu = u; best = i; } });
+      if (best !== undefined) sel.value = String(best);
+    }
+  }
+  $('col-row').hidden = isExample;
+  const pc = parseInt(sel.value, 10);
+  if (isNaN(pc) || !scoreCols.length){ $('res-table').innerHTML = ''; $('res-note').textContent = 'Не нашёл колонки с оценками. Проверьте, что выгрузка содержит ответы-шкалы.'; return; }
+
+  const groups = new Map();
+  rows.forEach(r => {
+    const name = String(r[pc] ?? '').trim(); if (!name) return;
+    if (!groups.has(name)) groups.set(name, { n: 0, sums: scoreCols.map(() => 0), cnt: scoreCols.map(() => 0) });
+    const g = groups.get(name); g.n++;
+    scoreCols.forEach((ci, k) => { const v = num(r[ci]); if (!isNaN(v)){ g.sums[k] += v; g.cnt[k]++; } });
+  });
+  const max = Math.max(...scoreCols.map(ci => Math.max(...rows.map(r => num(r[ci])).filter(n => !isNaN(n)))), 5);
+  const res = [...groups].map(([name, g]) => {
+    const avgs = g.sums.map((s, k) => g.cnt[k] ? s / g.cnt[k] : NaN);
+    const valid = avgs.filter(a => !isNaN(a));
+    return { name, n: g.n, avgs, total: valid.reduce((a,b)=>a+b,0) / (valid.length || 1) };
+  }).sort((a, b) => b.total - a.total || b.n - a.n);
+
+  const f = x => isNaN(x) ? '—' : x.toFixed(2).replace('.', ',');
+  let place = 0, prev = null;
+  const body = res.map((r, i) => {
+    if (prev === null || r.total.toFixed(2) !== prev) place = i + 1; prev = r.total.toFixed(2);
+    return `<tr class="${place === 1 ? 'top1' : ''}"><td><span class="place">${place}</span></td><td>${esc(r.name)}</td><td>${r.n}</td>${r.avgs.map(a => `<td>${f(a)}</td>`).join('')}<td class="total">${f(r.total)}<span class="bar"><i style="width:${Math.max(0, Math.min(100, r.total / max * 100))}%"></i></span></td></tr>`;
+  }).join('');
+  $('res-table').innerHTML = `<thead><tr><th>Место</th><th>Презентация</th><th>Голосов</th>${scoreCols.map(ci => `<th>${esc(head[ci])}</th>`).join('')}<th>Средний балл</th></tr></thead><tbody>${body}</tbody>`;
+  $('res-note').textContent = `Ответов: ${rows.length}. Средний балл — среднее по ${scoreCols.length} критериям; в каждом критерии — среднее по всем голосам за презентацию.`;
+  $('ex-badge').hidden = !isExample;
+  $('res-title').textContent = isExample ? 'Рейтинг' : 'Рейтинг по вашим ответам';
+  lastResult = { head: ['Место','Презентация','Голосов', ...scoreCols.map(ci => head[ci]), 'Средний балл'], rows: res.map((r,i)=>[String(i+1), r.name, String(r.n), ...r.avgs.map(f), f(r.total)]) };
+}
+let lastResult = null;
+$('btn-copy-res').addEventListener('click', () => { if (lastResult) copy([lastResult.head, ...lastResult.rows].map(r => r.join('\t')).join('\n')); });
+$('sel-col').addEventListener('change', analyse);
+
+function parseDelimited(text){
+  const first = text.split(/\r?\n/)[0] || '';
+  const d = first.includes('\t') ? '\t' : (first.split(';').length > first.split(',').length ? ';' : ',');
+  const out = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++){
+    const ch = text[i];
+    if (q){ if (ch === '"'){ if (text[i+1] === '"'){ cell += '"'; i++; } else q = false; } else cell += ch; }
+    else if (ch === '"' && cell === '') q = true;
+    else if (ch === d){ row.push(cell); cell = ''; }
+    else if (ch === '\n'){ row.push(cell.replace(/\r$/,'')); out.push(row); row = []; cell = ''; }
+    else cell += ch;
+  }
+  if (cell || row.length){ row.push(cell); out.push(row); }
+  return out;
+}
+function loadTable(t, label){
+  table = t; isExample = false; $('sel-col').innerHTML = ''; $('file-name').textContent = label; analyse();
+}
+let xlsxLoading = null;
+function loadXLSX(){
+  if (window.XLSX) return Promise.resolve();
+  return xlsxLoading ||= new Promise((ok, fail) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload = ok; s.onerror = fail; document.head.appendChild(s); });
+}
+async function handleFile(file){
+  if (!file) return;
+  $('file-name').textContent = 'Читаю ' + file.name + '…';
+  try {
+    if (/\.(xlsx|xls)$/i.test(file.name)){
+      await loadXLSX();
+      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+      const sh = wb.Sheets[wb.SheetNames[0]];
+      loadTable(XLSX.utils.sheet_to_json(sh, { header: 1, raw: false, defval: '' }), file.name);
+    } else loadTable(parseDelimited(await file.text()), file.name);
+  } catch(e){ $('file-name').textContent = 'Не удалось прочитать файл. Попробуйте выгрузку в CSV или вставьте таблицу из Excel.'; }
+}
+$('inp-file').addEventListener('change', e => handleFile(e.target.files[0]));
+const drop = $('drop');
+['dragenter','dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave','drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => handleFile(e.dataTransfer.files[0]));
+$('inp-paste').addEventListener('input', e => { const v = e.target.value.trim(); if (v.includes('\n')) loadTable(parseDelimited(v), 'Вставленная таблица'); });
+
+/* ---------- Boot ---------- */
+renderSteps();
+table = sampleTable(); analyse();
+[pres, crit].forEach(el => el.addEventListener('input', () => { if (isExample){ table = sampleTable(); $('sel-col').innerHTML=''; analyse(); } }));
+const saved = store.get('tab'); const hash = (location.hash || '').slice(1);
+showTab(['form','qr','res'].includes(hash) ? hash : (['form','qr','res'].includes(saved) ? saved : 'form'));
+})();
+</script>
+</body>
+</html>
