@@ -15,19 +15,6 @@
 @media (max-width:900px){.vc-grid2{grid-template-columns:minmax(0,1fr)}}
 .vc-empty{color:var(--muted);font-size:14px;padding:12px 0}
 
-/* Пьедестал */
-.vc-podium{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;align-items:end;max-width:640px;margin:0 auto;width:100%}
-.vc-pcol{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0}
-.vc-pname{font-weight:600;text-align:center;font-size:14px;line-height:1.25;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.vc-pscore{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
-.vc-pvotes{font-size:12px;color:var(--muted);margin-top:-4px}
-.vc-block{width:100%;border-radius:10px 10px 0 0;display:flex;justify-content:center;padding-top:10px;color:var(--medal-ink);font-weight:800;font-size:28px;transform-origin:bottom;animation:vc-rise .7s cubic-bezier(.2,.7,.2,1) both}
-.vc-pcol.p1 .vc-block{height:150px;background:var(--gold);animation-delay:.5s}
-.vc-pcol.p2 .vc-block{height:110px;background:var(--silver);animation-delay:.25s}
-.vc-pcol.p3 .vc-block{height:80px;background:var(--bronze)}
-.vc-pcol.p1 .vc-pscore{font-size:34px}
-@keyframes vc-rise{from{transform:scaleY(0)}to{transform:scaleY(1)}}
-
 /* Турнирная таблица */
 .vc-tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
 .vc-table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:14px}
@@ -111,4 +98,4 @@
 .vc-shot .btn{background:#fff;color:#17191B;border:1px solid #fff;height:44px;padding:0 18px;border-radius:10px;display:inline-flex;align-items:center;text-decoration:none;font:600 15px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;cursor:pointer}
 .vc-shot .btn.primary{background:#1D6B57;border-color:#1D6B57;color:#fff}
 
-@media (prefers-reduced-motion:reduce){.vc-block,.vc-hbars .tr i,.vc-dist .st i{animation:none}}
+@media (prefers-reduced-motion:reduce){.vc-hbars .tr i,.vc-dist .st i{animation:none}}

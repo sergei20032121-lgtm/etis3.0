@@ -15,20 +15,6 @@ window.VoteCharts = (() => {
   }
   const medal = p => p <= 3 ? ' m' + p : '';
 
-  function podium(rows){
-    if (!rows.length) return '';
-    const order = [rows[1], rows[0], rows[2]];
-    return `<div class="vc-podium">${order.map((r, i) => {
-      if (!r) return '<div></div>';
-      const cls = ['p2', 'p1', 'p3'][i];
-      return `<div class="vc-pcol ${cls}">
-        <span class="vc-pname">${esc(r.name)}</span>
-        <span class="vc-pscore">${fmt(r.total)}</span>
-        <span class="vc-pvotes">${r.votes} ${plural(r.votes, 'голос', 'голоса', 'голосов')}</span>
-        <div class="vc-block">${r.place}</div></div>`;
-    }).join('')}</div>`;
-  }
-
   function table(rows, criteria, S){
     const best = criteria.map((_, k) => Math.max(...rows.map(r => r.avgs[k] == null ? -1 : r.avgs[k])));
     return `<div class="vc-tablebox"><table class="vc-table"><thead><tr>
@@ -136,7 +122,6 @@ window.VoteCharts = (() => {
     if (!rows.length) return '<p class="vc-empty">Графики появятся после первых оценок.</p>';
     const sec = (title, sub, body) => `<section class="vc-section"><h3>${title}</h3>${sub ? `<p class="vc-sub">${sub}</p>` : ''}${body}</section>`;
     return [
-      sec('Пьедестал', '', podium(rows)),
       sec('Турнирная таблица', `Средний балл — среднее по ${res.criteria.length} ${plural(res.criteria.length, 'критерию', 'критериям', 'критериям')}. Выделена лучшая оценка в каждом критерии.`, table(rows, res.criteria, S)),
       sec('Профиль каждой презентации', 'Чем дальше точка от центра, тем выше оценка по критерию', radars(rows, res.criteria, S)),
       `<div class="vc-grid2">${sec('Средний балл', `Шкала 0–${S}`, bars(rows, S))}${sec('Сильные и слабые стороны', 'Чем ярче цвет клетки, тем выше оценка', heat(rows, res.criteria, S))}</div>`,
@@ -189,53 +174,37 @@ window.VoteCharts = (() => {
     x.fillText(`${d} · ${res.total_votes} ${plural(res.total_votes, 'оценка', 'оценки', 'оценок')} от ${res.voters} ${plural(res.voters, 'человека', 'человек', 'человек')}`, M, y);
     const headBottom = y + 30;
 
-    // Пьедестал
-    const podX = M, podW = land ? W * 0.44 - M : W - 2 * M;
-    const podBottom = land ? H - M : headBottom + 400;
-    const top3 = [rows[1], rows[0], rows[2]], hs = [0.62, 1, 0.44], colW = podW / 3, gap = 14;
-    const maxH = land ? Math.min(330, (podBottom - headBottom) - 230) : 190;
-    top3.forEach((r, i) => {
-      if (!r) return;
-      const bx = podX + i * colW + gap / 2, bw = colW - gap, bh = Math.max(60, maxH * hs[i]), by = podBottom - bh;
-      rr(x, medalColor(r.place), bx, by, bw, bh, [14, 14, 0, 0]);
-      x.fillStyle = C.ink; x.textAlign = 'center';
-      x.font = `800 ${i === 1 ? 64 : 48}px ${FONT}`; x.fillText(String(r.place), bx + bw / 2, by + (i === 1 ? 74 : 58));
-      x.font = `800 ${i === 1 ? 50 : 40}px ${FONT}`; x.fillText(fmt(r.total), bx + bw / 2, by - 22);
-      x.font = `600 ${i === 1 ? 26 : 23}px ${FONT}`;
-      const nl = wrap(x, r.name, bw, 3);
-      nl.forEach((l, j) => x.fillText(l, bx + bw / 2, by - (i === 1 ? 82 : 72) - (nl.length - 1 - j) * 30));
-      x.textAlign = 'left';
-    });
-
-    // Таблица мест с полосами + лучшие по критериям
+    // Таблица мест с полосами + лучшие по критериям.
+    // 16:9: слева шапка и лучшие по критериям, справа таблица. Вертикально: всё друг под другом.
     const lx = land ? W * 0.5 : M, lw = land ? W * 0.5 - M : W - 2 * M;
-    let ly = land ? M + 20 : podBottom + 60;
+    let ly = land ? M + 20 : headBottom + 50;
     const lb = H - M;
     const crit = res.criteria.map((name, k) => {
       let bestR = null;
       rows.forEach(r => { if (r.avgs[k] != null && (!bestR || r.avgs[k] > bestR.avgs[k])) bestR = r; });
       return bestR ? {name, r: bestR, v: bestR.avgs[k]} : null;
     }).filter(Boolean);
-    const critLineH = 46, critH = crit.length ? 34 + crit.length * critLineH + 36 : 0;
+    const critLineH = land ? 64 : 46, critFs = land ? 24 : 21;
+    const critH = crit.length ? 34 + crit.length * critLineH + (land ? 0 : 36) : 0;
+    const critX = land ? M : M, critW = land ? W * 0.44 - M : W - 2 * M;
     x.fillStyle = C.muted; x.font = `700 22px ${FONT}`; x.fillText('ТУРНИРНАЯ ТАБЛИЦА', lx, ly); ly += 24;
-    let avail = lb - ly - critH;
-    const minRow = 62;
-    let showCrit = crit.length && avail / Math.max(rows.length, 1) >= minRow;
+    let avail = lb - ly - (land ? 0 : critH);
+    const showCrit = crit.length && (land ? lb - critH > headBottom + 30 : avail / Math.max(rows.length, 1) >= 62);
     if (!showCrit) avail = lb - ly;
-    const rowH = Math.max(52, Math.min(92, avail / Math.max(rows.length, 1)));
+    const rowH = Math.max(52, Math.min(land ? 140 : 92, avail / Math.max(rows.length, 1)));
     const fit = Math.min(rows.length, Math.floor(avail / rowH));
     const shown = fit < rows.length ? fit - 1 : fit;
     for (let i = 0; i < shown; i++){
       const r = rows[i], cy = ly + i * rowH + rowH / 2;
       if (i) { x.fillStyle = C.line; x.fillRect(lx, ly + i * rowH, lw, 1); }
-      const rad = Math.min(22, rowH * 0.3);
+      const rad = Math.min(24, rowH * 0.3);
       x.beginPath(); x.arc(lx + rad, cy, rad, 0, Math.PI * 2); x.fillStyle = medalColor(r.place); x.fill();
       x.fillStyle = r.place <= 3 ? C.ink : C.accent; x.font = `800 ${Math.round(rad * 0.95)}px ${FONT}`; x.textAlign = 'center';
       x.fillText(String(r.place), lx + rad, cy + rad * 0.34); x.textAlign = 'left';
       const nameX = lx + rad * 2 + 18, valW = 90, barW = Math.max(120, lw * 0.3), nameW = lw - (nameX - lx) - barW - valW - 24;
-      const fs = Math.round(Math.min(26, rowH * 0.32));
+      const fs = Math.round(Math.min(28, rowH * 0.32));
       x.font = `600 ${fs}px ${FONT}`;
-      const fs2 = Math.round(Math.min(19, rowH * 0.24)), lh = Math.round(fs * 1.18);
+      const fs2 = Math.round(Math.min(20, rowH * 0.24)), lh = Math.round(fs * 1.18);
       const nl = wrap(x, r.name, nameW, rowH >= fs * 2 + fs2 + 16 ? 2 : 1);
       const top = cy - (nl.length * lh + 4 + fs2) / 2;
       x.fillStyle = C.ink; nl.forEach((l, j) => x.fillText(l, nameX, top + j * lh + fs * 0.9));
@@ -244,7 +213,7 @@ window.VoteCharts = (() => {
       const bX = lx + lw - valW - barW, bH = Math.min(18, rowH * 0.24);
       rr(x, C.track, bX, cy - bH / 2, barW, bH, bH / 2);
       rr(x, r.place === 1 ? C.gold : C.accent, bX, cy - bH / 2, Math.max(bH, barW * r.total / S), bH, bH / 2);
-      x.fillStyle = C.ink; x.font = `800 ${Math.round(Math.min(32, rowH * 0.42))}px ${FONT}`; x.textAlign = 'right';
+      x.fillStyle = C.ink; x.font = `800 ${Math.round(Math.min(34, rowH * 0.42))}px ${FONT}`; x.textAlign = 'right';
       x.fillText(fmt(r.total), lx + lw, cy + 10); x.textAlign = 'left';
     }
     if (shown < rows.length){
@@ -253,20 +222,29 @@ window.VoteCharts = (() => {
     }
     if (!rows.length){ x.fillStyle = C.muted; x.font = `400 28px ${FONT}`; x.fillText('Оценок пока нет', lx, ly + 40); }
 
+    let bottom = ly + Math.max(shown, rows.length ? 0 : 1) * rowH + (shown < rows.length ? rowH : 0);
     if (showCrit){
-      let cy = lb - crit.length * critLineH - 34 + 22;
-      x.fillStyle = C.muted; x.font = `700 22px ${FONT}`; x.fillText('ЛУЧШИЕ ПО КРИТЕРИЯМ', lx, cy - 14);
-      cy += 18;
+      // 16:9 — под шапкой слева; вертикально — сразу под таблицей
+      let cy = land ? headBottom + 90 : bottom + 70;
+      x.fillStyle = C.muted; x.font = `700 22px ${FONT}`; x.fillText('ЛУЧШИЕ ПО КРИТЕРИЯМ', critX, cy - 18);
+      const ty = (critLineH - 8) / 2 + critFs * 0.36;
       crit.forEach((c, i) => {
         const yy = cy + i * critLineH;
-        rr(x, C.soft, lx, yy, lw, critLineH - 8, 8);
-        x.fillStyle = C.accent; x.font = `700 21px ${FONT}`;
-        const cw = Math.min(lw * 0.36, 300);
-        x.fillText(ellipsis(x, c.name, cw - 16), lx + 14, yy + 26);
-        x.fillStyle = C.ink; x.font = `500 21px ${FONT}`;
-        x.fillText(ellipsis(x, c.r.name, lw - cw - 90), lx + cw, yy + 26);
-        x.font = `800 21px ${FONT}`; x.textAlign = 'right'; x.fillText(fmt(c.v), lx + lw - 14, yy + 26); x.textAlign = 'left';
+        rr(x, C.soft, critX, yy, critW, critLineH - 8, 10);
+        x.fillStyle = C.accent; x.font = `700 ${critFs}px ${FONT}`;
+        const cw = Math.min(critW * 0.38, 300);
+        x.fillText(ellipsis(x, c.name, cw - 20), critX + 16, yy + ty);
+        x.fillStyle = C.ink; x.font = `500 ${critFs}px ${FONT}`;
+        x.fillText(ellipsis(x, c.r.name, critW - cw - 100), critX + cw, yy + ty);
+        x.font = `800 ${critFs}px ${FONT}`; x.textAlign = 'right'; x.fillText(fmt(c.v), critX + critW - 16, yy + ty); x.textAlign = 'left';
       });
+      if (!land) bottom = cy + crit.length * critLineH;
+    }
+    // Вертикальную картинку обрезаем по содержимому, чтобы снизу не было пустоты
+    if (!land && bottom + M < H){
+      const out = document.createElement('canvas'); out.width = W; out.height = Math.round(bottom + M);
+      out.getContext('2d').drawImage(cv, 0, 0);
+      return out;
     }
     return cv;
   }
