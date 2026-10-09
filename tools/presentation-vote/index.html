@@ -279,7 +279,7 @@ function renderSteps(){
   const qPres = 'Какую презентацию вы оцениваете?';
   const critQs = C.map((c,i) => `
     <div class="q">
-      <div class="q-head"><span class="q-text">${esc(c.name)}</span><span class="q-type">Шкала 1–5</span></div>
+      <div class="q-head"><span class="q-text">${esc(c.name)}</span><span class="q-type">Оценка по шкале</span></div>
       ${c.desc ? `<span class="q-sub">${esc(c.desc)}</span>` : ''}
       <div class="row"><button class="btn small" data-copy="${esc(c.name)}">Копировать вопрос</button>${c.desc?`<button class="btn small" data-copy="${esc(c.desc)}">Копировать пояснение</button>`:''}</div>
     </div>`).join('');
@@ -291,7 +291,7 @@ function renderSteps(){
     <li class="step"><span class="num">2</span><div class="body">
       <h3>Первый вопрос: выбор презентации</h3>
       <div class="q">
-        <div class="q-head"><span class="q-text">${qPres}</span><span class="q-type">Выпадающий список</span></div>
+        <div class="q-head"><span class="q-text">${qPres}</span><span class="q-type">Список</span></div>
         <div class="chips">${P.map(p=>`<span class="chip">${esc(p)}</span>`).join('')}</div>
         <div class="row"><button class="btn small" data-copy="${esc(qPres)}">Копировать вопрос</button><button class="btn small" data-copy-list="pres">Копировать варианты</button></div>
       </div>
@@ -299,13 +299,13 @@ function renderSteps(){
     </div></li>
     <li class="step"><span class="num">3</span><div class="body">
       <h3>Пять вопросов-шкал</h3>
-      <p class="hint">Тип «Шкала», от 1 до 5, подписи краёв: 1 — «Слабо», 5 — «Отлично». Все обязательные.</p>
+      <p class="hint">Тип «Оценка по шкале», от 1 до 5, подписи краёв: 1 — «Слабо», 5 — «Отлично». Все обязательные.</p>
       ${critQs}
     </div></li>
     <li class="step"><span class="num">4</span><div class="body">
       <h3>Комментарий (по желанию)</h3>
       <div class="q">
-        <div class="q-head"><span class="q-text">Что понравилось или что улучшить?</span><span class="q-type">Длинный текст</span></div>
+        <div class="q-head"><span class="q-text">Что понравилось или что улучшить?</span><span class="q-type">Текст</span></div>
         <div class="row"><button class="btn small" data-copy="Что понравилось или что улучшить?">Копировать вопрос</button></div>
       </div>
       <p class="hint">Сделайте его необязательным, чтобы не тормозить голосование.</p>
