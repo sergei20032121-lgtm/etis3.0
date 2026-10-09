@@ -298,6 +298,6 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     if not ADMIN_KEY:
-        raise SystemExit("Задайте VOTE_ADMIN_KEY")
-    print("Голосование запущено на порту %d" % PORT, flush=True)
+        raise SystemExit("VOTE_ADMIN_KEY is not set")
+    print("Vote server started on port %d" % PORT, flush=True)
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()

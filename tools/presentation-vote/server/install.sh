@@ -55,11 +55,12 @@ fi
 
 cat > /etc/systemd/system/presentation-vote.service <<EOF
 [Unit]
-Description=Голосование за презентации
+Description=Presentation vote
 After=network.target
 
 [Service]
 EnvironmentFile=$ENVF
+Environment=PYTHONIOENCODING=utf-8
 ExecStart=/usr/bin/env python3 $APP/vote.py
 Restart=always
 RestartSec=2
