@@ -11,12 +11,21 @@ import hmac
 import io
 import json
 import os
-import secrets
 import sqlite3
 import threading
 import time
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from socketserver import ThreadingMixIn
 from urllib.parse import parse_qs, urlparse
+
+
+class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
+    # Свой вариант вместо http.server.ThreadingHTTPServer: его нет в Python до 3.7
+    daemon_threads = True
+
+
+def token_hex(n):
+    return os.urandom(n).hex()
 
 PORT = int(os.environ.get("VOTE_PORT", "80"))
 ADMIN_KEY = os.environ.get("VOTE_ADMIN_KEY", "")
@@ -122,7 +131,7 @@ class Handler(BaseHTTPRequestHandler):
             k, _, v = part.strip().partition("=")
             if k == "vid" and 16 <= len(v) <= 64 and v.isalnum():
                 return v, False
-        return secrets.token_hex(16), True
+        return token_hex(16), True
 
     def send(self, code, body, ctype="application/json; charset=utf-8", extra=None):
         if isinstance(body, (dict, list)):
