@@ -190,6 +190,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_static("vote.html", "text/html; charset=utf-8", self.cookie(vid) if fresh else None)
         if u.path == "/admin":
             return self.send_static("admin.html", "text/html; charset=utf-8")
+        if u.path == "/screen":
+            return self.send_static("screen.html", "text/html; charset=utf-8")
         if u.path == "/results":
             return self.send_static("vote.html", "text/html; charset=utf-8", self.cookie(vid) if fresh else None)
         if u.path in ("/qrcode.js", "/charts.js"):

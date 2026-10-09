@@ -69,21 +69,6 @@ textarea{resize:vertical}
 .stage img{height:min(64vh,90vw);max-width:100%;image-rendering:pixelated}
 .stage .u{font:clamp(14px,2.4vh,24px) ui-monospace,Menlo,monospace;color:#5D6460}
 .stage .close{position:absolute;top:12px;right:12px}
-.podium{position:fixed;inset:0;z-index:55;background:#fff;color:#17191B;display:flex;flex-direction:column;gap:3vh;padding:5vh 6vw}
-.podium h2{font-size:clamp(26px,5vh,56px);line-height:1.1}
-.podium .pl{display:flex;flex-direction:column;gap:2vh;flex:1;justify-content:center}
-.podium .pr{display:grid;grid-template-columns:clamp(40px,7vh,80px) minmax(0,30%) minmax(0,1fr) auto;gap:2vw;align-items:center;font-size:clamp(16px,3vh,34px)}
-.podium .pr.hid{visibility:hidden}
-.podium .pn{display:grid;place-items:center;aspect-ratio:1;border-radius:50%;background:#E7EEE9;color:#1D6B57;font-weight:800}
-.podium .pr.first .pn{background:#FFD84D;color:#17191B}
-.podium .nm{font-weight:600;overflow-wrap:anywhere;line-height:1.15}
-.podium .tr{height:clamp(14px,3vh,34px);background:#EEF0EA;border-radius:0 6px 6px 0;overflow:hidden}
-.podium .tr i{display:block;height:100%;background:#1D6B57;border-radius:0 6px 6px 0;width:0;transition:width .9s cubic-bezier(.2,.7,.2,1)}
-.podium .vl{font-weight:800;font-variant-numeric:tabular-nums}
-.podium .bt{display:flex;gap:10px;justify-content:center}
-.podium .btn{background:#fff;color:#17191B;border-color:#C9CDC4;font-size:16px;padding:10px 18px}
-.podium .btn.primary{background:#1D6B57;border-color:#1D6B57;color:#fff}
-@media (prefers-reduced-motion:reduce){.podium .tr i{transition:none}}
 .charts{display:flex;flex-direction:column;gap:28px}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;z-index:60}
 button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -91,11 +76,6 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 </head>
 <body>
 <div class="wrap" id="app"><p class="muted">Загрузка…</p></div>
-<div class="podium" id="podium" hidden>
-  <h2 id="pd-title">Итоги голосования</h2>
-  <div class="pl" id="pd-list"></div>
-  <div class="bt"><button class="btn" id="pd-close">Закрыть</button><button class="btn" id="pd-all">Показать все</button><button class="btn primary" id="pd-next">Следующее место</button></div>
-</div>
 <div class="stage" id="stage" hidden>
   <button class="btn close" id="stage-close">Закрыть</button>
   <h2 id="stage-title"></h2>
@@ -171,7 +151,7 @@ function render(){
             <div class="row" style="justify-content:space-between"><h2>Рейтинг</h2><span class="small muted" id="stats"></span></div>
             <div class="tablebox"><table id="tbl"></table></div>
             <div id="comments"></div>
-            <div class="row"><a class="btn" id="csv">Скачать все ответы (CSV для Excel)</a><button class="btn primary" id="shot-btn">Картинка итогов</button><button class="btn" id="podium-btn">Итоги на экран</button></div>
+            <div class="row"><a class="btn" id="csv">Скачать все ответы (CSV для Excel)</a><button class="btn primary" id="shot-btn">Картинка итогов</button><a class="btn" id="screen-btn" target="_blank" rel="noopener">Экран итогов (для монитора)</a></div>
           </div>
         </div>
       </div>
@@ -202,16 +182,12 @@ function render(){
     $('csv').href = '/api/export.csv?key=' + encodeURIComponent(key);
     $('copy').addEventListener('click', async () => { try { await navigator.clipboard.writeText(voteUrl); toast('Ссылка скопирована'); } catch(e){ toast(voteUrl); } });
     $('full').addEventListener('click', showStage);
-    $('podium-btn').addEventListener('click', openPodium);
+    $('screen-btn').href = '/screen?key=' + encodeURIComponent(key);
     $('shot-btn').addEventListener('click', () => VoteCharts.showShot(data.results, data.config));
     $('show-res').addEventListener('change', e => save({show_results: e.target.checked}));
-    $('pd-next').addEventListener('click', revealNext);
-    $('pd-all').addEventListener('click', () => { while (revealNext()); });
-    $('pd-close').addEventListener('click', closePodium);
     $('stage-close').addEventListener('click', closeStage);
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape'){ closeStage(); closePodium(); }
-      if (!$('podium').hidden && (e.key === ' ' || e.key === 'ArrowRight' || e.key === 'Enter')){ e.preventDefault(); revealNext(); }
+      if (e.key === 'Escape') closeStage();
     });
     $('toggle').addEventListener('click', async () => { await save({open: !data.config.open}); });
     $('settings').addEventListener('input', () => editing = true);
@@ -264,32 +240,6 @@ function render(){
 const fmt = VoteCharts.fmt;
 VoteCharts.tooltips();
 
-/* ---------- Итоги на экран ---------- */
-let podiumRows = [], shown = 0;
-function openPodium(){
-  const r = data.results, S = data.config.scale;
-  podiumRows = r.rows.filter(x => x.votes > 0);
-  shown = 0;
-  $('pd-title').textContent = 'Итоги голосования';
-  let place = 0, prev = null;
-  $('pd-list').innerHTML = podiumRows.slice(0, 10).map((x, i) => {
-    if (fmt(x.total) !== prev){ place = i + 1; prev = fmt(x.total); }
-    return `<div class="pr hid ${place === 1 ? 'first' : ''}" data-w="${x.total / S * 100}"><span class="pn">${place}</span><span class="nm">${esc(x.name)}</span><span class="tr"><i></i></span><span class="vl">${fmt(x.total)}</span></div>`;
-  }).join('') || '<p>Пока нет оценок.</p>';
-  $('podium').hidden = false;
-  document.documentElement.requestFullscreen?.().catch(() => {});
-  $('pd-next').hidden = $('pd-all').hidden = !podiumRows.length;
-}
-function revealNext(){
-  const items = [...$('pd-list').querySelectorAll('.pr')];
-  if (shown >= items.length) return false;
-  const el = items[items.length - 1 - shown]; shown++;
-  el.classList.remove('hid');
-  requestAnimationFrame(() => requestAnimationFrame(() => { el.querySelector('i').style.width = el.dataset.w + '%'; }));
-  if (shown >= items.length) $('pd-next').hidden = $('pd-all').hidden = true;
-  return shown < items.length;
-}
-function closePodium(){ $('podium').hidden = true; if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); }
 
 function fillSettings(){
   const c = data.config;

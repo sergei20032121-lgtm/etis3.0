@@ -274,5 +274,5 @@ window.VoteCharts = (() => {
     document.addEventListener('mousemove', e => { if (tip.hidden) return; tip.style.left = Math.min(innerWidth - tip.offsetWidth - 8, e.clientX + 12) + 'px'; tip.style.top = (e.clientY + 16) + 'px'; });
   }
 
-  return {full, image, showShot, tooltips, ranked, fmt};
+  return {full, image, showShot, tooltips, ranked, fmt, radarSvg, plural};
 })();

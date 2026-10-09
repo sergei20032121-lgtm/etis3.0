@@ -103,7 +103,7 @@ function showResults(){
   app.classList.add('wide');
   app.innerHTML = `<div class="res-head"><span class="eyebrow">Итоги голосования</span><h1>${esc(cfg.title)}</h1>
     <p class="muted">${n} ${VC_pl(n, 'оценка', 'оценки', 'оценок')} от ${r.voters} ${VC_pl(r.voters, 'человека', 'человек', 'человек')} · спасибо всем, кто голосовал!</p>
-    <div><button class="btn" id="shot" style="height:44px">Сохранить картинку итогов</button></div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="shot" style="height:44px">Сохранить картинку итогов</button><a class="btn" href="/screen" style="height:44px;display:inline-flex;align-items:center;text-decoration:none">Открыть на весь экран</a></div></div>
     ${window.VoteCharts ? VoteCharts.full(r, cfg) : '<p class="muted">Не загрузились графики. Обновите страницу.</p>'}`;
   const b = document.getElementById('shot');
   if (b) b.addEventListener('click', () => VoteCharts.showShot(r, cfg));
