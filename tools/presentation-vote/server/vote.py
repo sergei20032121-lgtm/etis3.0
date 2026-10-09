@@ -47,6 +47,7 @@ DEFAULT_CONFIG = {
     "open": True,
     "current": "",
     "comments": True,
+    "show_results": True,
 }
 
 lock = threading.Lock()
@@ -189,16 +190,27 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_static("vote.html", "text/html; charset=utf-8", self.cookie(vid) if fresh else None)
         if u.path == "/admin":
             return self.send_static("admin.html", "text/html; charset=utf-8")
-        if u.path == "/qrcode.js":
-            return self.send_static("qrcode.js", "application/javascript; charset=utf-8")
+        if u.path == "/results":
+            return self.send_static("vote.html", "text/html; charset=utf-8", self.cookie(vid) if fresh else None)
+        if u.path in ("/qrcode.js", "/charts.js"):
+            return self.send_static(u.path[1:], "application/javascript; charset=utf-8")
+        if u.path == "/charts.css":
+            return self.send_static("charts.css", "text/css; charset=utf-8")
         if u.path == "/api/config":
             cfg = get_config()
             mine = {}
             for pres, scores, comment in query(
                     "SELECT presentation, scores, comment FROM votes WHERE voter=?", (vid,)):
                 mine[pres] = {"scores": json.loads(scores), "comment": comment}
-            pub = {k: cfg[k] for k in ("title", "presentations", "criteria", "scale", "open", "current", "comments")}
+            pub = {k: cfg[k] for k in ("title", "presentations", "criteria", "scale", "open", "current", "comments",
+                                       "show_results")}
             pub["mine"] = mine
+            if not cfg["open"] and cfg["show_results"]:
+                res = results(cfg)
+                for row in res["rows"]:
+                    row.pop("comments", None)
+                res["rows"] = [r for r in res["rows"] if r["votes"] and not r["removed"]]
+                pub["results"] = res
             return self.send(200, pub, extra={"Set-Cookie": self.cookie(vid)} if fresh else None)
         if u.path == "/api/admin":
             if not self.is_admin(q):
@@ -283,6 +295,8 @@ class Handler(BaseHTTPRequestHandler):
                 cfg["open"] = bool(data["open"])
             if "comments" in data:
                 cfg["comments"] = bool(data["comments"])
+            if "show_results" in data:
+                cfg["show_results"] = bool(data["show_results"])
             if "current" in data:
                 cur = clean_text(data["current"], 200)
                 cfg["current"] = cur if cur in cfg["presentations"] else ""

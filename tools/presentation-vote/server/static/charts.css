@@ -1,0 +1,114 @@
+/* Графики итогов: общие для админки и публичной страницы. Цвета — из токенов страницы. */
+:root{
+  --d1:#B5452A; --d2:#E8A68D; --d3:#CBCEC7; --d4:#86C4AE; --d5:#1D6B57; --grid:#E6E8E1;
+  --gold:#E9B949; --silver:#C3C9CF; --bronze:#D29468; --medal-ink:#17191B;
+}
+@media (prefers-color-scheme: dark){:root{
+  --d1:#E5795A; --d2:#8E4C3A; --d3:#4B514D; --d4:#2E7C66; --d5:#6AD1B0; --grid:#262B28;
+  --gold:#E2B33F; --silver:#AEB6BD; --bronze:#C9875A;
+}}
+
+.vc-section{display:flex;flex-direction:column;gap:10px;min-width:0}
+.vc-section h3{font-size:16px;margin:0}
+.vc-sub{font-size:13px;color:var(--muted);margin:-6px 0 0}
+.vc-grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px}
+@media (max-width:900px){.vc-grid2{grid-template-columns:minmax(0,1fr)}}
+.vc-empty{color:var(--muted);font-size:14px;padding:12px 0}
+
+/* Пьедестал */
+.vc-podium{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;align-items:end;max-width:640px;margin:0 auto;width:100%}
+.vc-pcol{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0}
+.vc-pname{font-weight:600;text-align:center;font-size:14px;line-height:1.25;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.vc-pscore{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+.vc-pvotes{font-size:12px;color:var(--muted);margin-top:-4px}
+.vc-block{width:100%;border-radius:10px 10px 0 0;display:flex;justify-content:center;padding-top:10px;color:var(--medal-ink);font-weight:800;font-size:28px;transform-origin:bottom;animation:vc-rise .7s cubic-bezier(.2,.7,.2,1) both}
+.vc-pcol.p1 .vc-block{height:150px;background:var(--gold);animation-delay:.5s}
+.vc-pcol.p2 .vc-block{height:110px;background:var(--silver);animation-delay:.25s}
+.vc-pcol.p3 .vc-block{height:80px;background:var(--bronze)}
+.vc-pcol.p1 .vc-pscore{font-size:34px}
+@keyframes vc-rise{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+
+/* Турнирная таблица */
+.vc-tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.vc-table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:14px}
+.vc-table th,.vc-table td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+.vc-table th{font-size:12px;font-weight:600;color:var(--muted);white-space:normal;vertical-align:bottom;min-width:64px}
+.vc-table tr:last-child td{border-bottom:0}
+.vc-table td.c-place,.vc-table th.c-place{text-align:center;width:52px;min-width:52px}
+.vc-table td.c-name,.vc-table th.c-name{text-align:left;white-space:normal;min-width:170px}
+.vc-table td.c-total{min-width:130px}
+.vc-total{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.vc-total b{font-size:16px}
+.vc-mini{flex:0 0 64px;height:6px;border-radius:3px;background:var(--grid);overflow:hidden}
+.vc-mini i{display:block;height:100%;background:var(--accent);border-radius:3px}
+.vc-place{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--soft);color:var(--accent);font-weight:800}
+.vc-place.m1{background:var(--gold);color:var(--medal-ink)}
+.vc-place.m2{background:var(--silver);color:var(--medal-ink)}
+.vc-place.m3{background:var(--bronze);color:var(--medal-ink)}
+.vc-cell-best{font-weight:700;color:var(--accent)}
+
+/* Радары */
+.vc-radars{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.vc-radar{border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:4px;background:var(--surface);min-width:0}
+.vc-radar-h{display:flex;gap:8px;align-items:center}
+.vc-radar-h .vc-place{width:26px;height:26px;font-size:13px;flex:none}
+.vc-radar-h span.n{font-weight:600;font-size:14px;line-height:1.25;overflow-wrap:anywhere;flex:1;min-width:0}
+.vc-radar-h b{font-variant-numeric:tabular-nums}
+.vc-radar svg{width:100%;height:auto;display:block;overflow:visible}
+.vc-legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted);align-items:center}
+.vc-legend span{display:inline-flex;align-items:center;gap:6px}
+.vc-legend b{width:12px;height:12px;border-radius:3px;display:inline-block}
+.vc-legend i.line{width:18px;height:0;border-top:2px solid var(--accent);display:inline-block}
+.vc-legend i.dash{width:18px;height:0;border-top:2px dashed var(--muted);display:inline-block}
+
+/* Средний балл */
+.vc-hbars{display:grid;grid-template-columns:minmax(90px,36%) minmax(0,1fr) 46px;column-gap:10px;row-gap:9px;align-items:center}
+.vc-hbars .nm{font-size:14px;overflow-wrap:anywhere;line-height:1.25}
+.vc-hbars .tr{position:relative;height:18px}
+.vc-hbars .tr::before{content:"";position:absolute;inset:-4px 0;background:linear-gradient(90deg,var(--grid) 1px,transparent 1px) 0 0/calc(100% / var(--ticks)) 100%;border-right:1px solid var(--grid)}
+.vc-hbars .tr i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);border-radius:0 4px 4px 0;animation:vc-grow .8s cubic-bezier(.2,.7,.2,1) both}
+.vc-hbars .tr i.top{background:var(--gold)}
+.vc-hbars .vl{font-weight:700;font-variant-numeric:tabular-nums;text-align:right;font-size:14px}
+.vc-hbars .ax{grid-column:2;position:relative;height:14px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.vc-hbars .ax span{position:absolute;transform:translateX(-50%)}
+@keyframes vc-grow{from{width:0!important}}
+
+/* Тепловая карта */
+.vc-heat{overflow-x:auto}
+.vc-heat table{border-collapse:separate;border-spacing:3px;width:100%}
+.vc-heat th{font-size:11px;color:var(--muted);font-weight:600;text-align:center;padding:2px 4px;vertical-align:bottom}
+.vc-heat th:first-child{text-align:left}
+.vc-heat td{padding:9px 6px;text-align:center;font-variant-numeric:tabular-nums;font-size:13px;border-radius:5px;min-width:46px;white-space:nowrap}
+.vc-heat td:first-child{text-align:left;white-space:normal;min-width:110px;padding-left:0;overflow-wrap:anywhere}
+.vc-heat td.best{box-shadow:inset 0 0 0 2px var(--gold)}
+.vc-ramp{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.vc-ramp span.g{flex:0 0 120px;height:10px;border-radius:3px;background:linear-gradient(90deg,color-mix(in oklab,var(--accent) 8%,var(--surface)),var(--accent))}
+
+/* Распределение */
+.vc-dist{display:grid;grid-template-columns:minmax(90px,36%) minmax(0,1fr);column-gap:10px;row-gap:9px;align-items:center}
+.vc-dist .nm{font-size:14px;overflow-wrap:anywhere;line-height:1.25}
+.vc-dist .st{display:flex;gap:2px;height:18px}
+.vc-dist .st i{display:block;height:100%;min-width:3px;animation:vc-fade .6s both}
+.vc-dist .st i:first-child{border-radius:4px 0 0 4px}
+.vc-dist .st i:last-child{border-radius:0 4px 4px 0}
+@keyframes vc-fade{from{opacity:0}}
+
+/* Активность */
+.vc-cols{display:flex;align-items:flex-end;gap:2px;height:120px;border-bottom:1px solid var(--line);background:linear-gradient(var(--grid) 1px,transparent 1px) 0 0/100% 25%}
+.vc-cols i{flex:1;background:var(--accent);border-radius:3px 3px 0 0}
+.vc-cols i.z{background:transparent}
+.vc-cols-ax{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* Подсказка */
+[data-tip]{cursor:default}
+.vc-tip{position:fixed;z-index:70;pointer-events:none;background:var(--ink);color:var(--bg);font-size:13px;padding:6px 9px;border-radius:6px;max-width:260px;line-height:1.35}
+
+/* Картинка итогов */
+.vc-shot{position:fixed;inset:0;z-index:80;background:rgba(10,12,11,.82);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px}
+.vc-shot img{max-width:min(100%,1100px);max-height:78vh;border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,.4);background:#fff}
+.vc-shot .row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.vc-shot p{color:#E8ECE7;font-size:13px;text-align:center;margin:0;max-width:520px}
+.vc-shot .btn{background:#fff;color:#17191B;border:1px solid #fff}
+.vc-shot .btn.primary{background:#1D6B57;border-color:#1D6B57;color:#fff}
+
+@media (prefers-reduced-motion:reduce){.vc-block,.vc-hbars .tr i,.vc-dist .st i{animation:none}}

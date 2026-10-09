@@ -29,7 +29,7 @@ BASE="https://raw.githubusercontent.com/$REPO/$REF/tools/presentation-vote/serve
 
 echo "→ Скачиваю файлы (${REF:0:12})"
 mkdir -p "$APP/static" "$DATA"
-for f in vote.py static/vote.html static/admin.html static/qrcode.js; do
+for f in vote.py static/vote.html static/admin.html static/qrcode.js static/charts.js static/charts.css; do
   curl -fsSL "$BASE/$f" -o "$APP/$f.new" && mv "$APP/$f.new" "$APP/$f"
 done
 

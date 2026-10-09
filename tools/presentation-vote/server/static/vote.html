@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Оценка презентаций</title>
+<link rel="stylesheet" href="/charts.css">
 <style>
 :root{
   --bg:#F3F4EF; --surface:#FFFFFF; --ink:#17191B; --muted:#5D6460; --line:#D9DCD3;
@@ -20,6 +21,9 @@ html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(110px + env(safe-area-inset-bottom,0px));-webkit-tap-highlight-color:transparent}
 .wrap{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.wrap.wide{max-width:1100px;gap:28px}
+.res-head{display:flex;flex-direction:column;gap:8px}
+.eyebrow{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
 h1{font-size:24px;line-height:1.2;margin:4px 0 0;text-wrap:balance}
 h2{font-size:19px;line-height:1.25;margin:0;text-wrap:balance}
 p{margin:0}
@@ -57,6 +61,7 @@ button:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outl
 </head>
 <body>
 <div class="wrap" id="app"><p class="muted">Загрузка…</p></div>
+<script src="/charts.js"></script>
 <div class="bar" id="bar" hidden><div class="in" id="bar-in"></div></div>
 <script>
 (() => {
@@ -70,12 +75,13 @@ async function load(){
     cfg = await r.json();
   } catch(e){ app.innerHTML = '<div class="center"><h2>Нет связи с сервером</h2><p class="muted">Проверьте интернет и обновите страницу.</p></div>'; return; }
   document.title = cfg.title;
-  if (cfg.current && !cfg.mine[cfg.current] && cfg.open) open(cfg.current); else list();
+  if (cfg.open && cfg.current && !cfg.mine[cfg.current] && location.pathname !== '/results') open(cfg.current); else list();
 }
 
 function list(){
   sel = null; window.scrollTo(0,0);
-  if (!cfg.open){ bar.hidden = true; app.innerHTML = `<div class="center"><h2>Голосование закрыто</h2><p class="muted">Спасибо за участие!</p></div>`; return; }
+  if (!cfg.open){ bar.hidden = true; if (cfg.results) return showResults(); app.classList.remove('wide'); app.innerHTML = `<div class="center"><h2>Голосование закрыто</h2><p class="muted">Спасибо за участие! Итоги объявят организаторы.</p></div>`; return; }
+  app.classList.remove('wide');
   if (!cfg.presentations.length){ bar.hidden = true; app.innerHTML = `<h1>${esc(cfg.title)}</h1><p class="muted">Презентации ещё не добавлены. Обновите страницу чуть позже.</p>`; return; }
   const done = Object.keys(cfg.mine).filter(p => cfg.presentations.includes(p)).length;
   app.innerHTML = `
@@ -90,6 +96,20 @@ function list(){
   app.querySelectorAll('.pres').forEach(b => b.addEventListener('click', () => open(cfg.presentations[+b.dataset.i])));
   bar.hidden = true;
 }
+
+function showResults(){
+  const r = cfg.results, n = r.total_votes;
+  document.title = 'Итоги: ' + cfg.title;
+  app.classList.add('wide');
+  app.innerHTML = `<div class="res-head"><span class="eyebrow">Итоги голосования</span><h1>${esc(cfg.title)}</h1>
+    <p class="muted">${n} ${VC_pl(n, 'оценка', 'оценки', 'оценок')} от ${r.voters} ${VC_pl(r.voters, 'человека', 'человек', 'человек')} · спасибо всем, кто голосовал!</p>
+    <div><button class="btn" id="shot" style="height:44px">Сохранить картинку итогов</button></div></div>
+    ${window.VoteCharts ? VoteCharts.full(r, cfg) : '<p class="muted">Не загрузились графики. Обновите страницу.</p>'}`;
+  const b = document.getElementById('shot');
+  if (b) b.addEventListener('click', () => VoteCharts.showShot(r, cfg));
+  if (window.VoteCharts) VoteCharts.tooltips();
+}
+const VC_pl = (n, one, few, many) => n % 10 === 1 && n % 100 !== 11 ? one : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)) ? few : many;
 
 function open(p){
   sel = p; error = '';

@@ -5,17 +5,16 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title>Голосование — управление</title>
+<link rel="stylesheet" href="/charts.css">
 <style>
 :root{
   --bg:#F3F4EF; --surface:#FFFFFF; --ink:#17191B; --muted:#5D6460; --line:#D9DCD3;
   --accent:#1D6B57; --accent-ink:#FFFFFF; --soft:#E7EEE9; --mark:#FFD84D; --mark-ink:#17191B; --bad:#B3261E;
-  --d1:#B5452A; --d2:#E8A68D; --d3:#CBCEC7; --d4:#86C4AE; --d5:#1D6B57; --grid:#E6E8E1;
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){:root{
   --bg:#121514; --surface:#1A1E1C; --ink:#ECEFEA; --muted:#9BA39E; --line:#2D3330;
   --accent:#4FBF9F; --accent-ink:#0D1412; --soft:#203029; --mark:#F2CC45; --mark-ink:#17191B; --bad:#FF8A80;
-  --d1:#E5795A; --d2:#8E4C3A; --d3:#4B514D; --d4:#2E7C66; --d5:#6AD1B0; --grid:#262B28;
   color-scheme:dark}}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -45,12 +44,12 @@ p{margin:0}
 .status.on .dot{background:#2EA36B}
 .status.off .dot{background:var(--bad)}
 .tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
-table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
-th,td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
-th{font-size:12px;font-weight:600;color:var(--muted);white-space:normal;vertical-align:bottom;min-width:70px}
-th:nth-child(2),td:nth-child(2){text-align:left;white-space:normal;min-width:170px}
-th:first-child,td:first-child{text-align:center;width:48px;min-width:48px}
-tr:last-child td{border-bottom:0}
+#tbl{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+#tbl th,#tbl td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+#tbl th{font-size:12px;font-weight:600;color:var(--muted);white-space:normal;vertical-align:bottom;min-width:70px}
+#tbl th:nth-child(2),#tbl td:nth-child(2){text-align:left;white-space:normal;min-width:170px}
+#tbl th:first-child,#tbl td:first-child{text-align:center;width:48px;min-width:48px}
+#tbl tr:last-child td{border-bottom:0}
 .place{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--soft);color:var(--accent);font-weight:700}
 tr.top1 .place{background:var(--mark);color:var(--mark-ink)}
 td.total{font-weight:700;font-size:16px}
@@ -70,43 +69,6 @@ textarea{resize:vertical}
 .stage img{height:min(64vh,90vw);max-width:100%;image-rendering:pixelated}
 .stage .u{font:clamp(14px,2.4vh,24px) ui-monospace,Menlo,monospace;color:#5D6460}
 .stage .close{position:absolute;top:12px;right:12px}
-.charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
-@media (max-width:900px){.charts{grid-template-columns:minmax(0,1fr)}}
-.chart{display:flex;flex-direction:column;gap:10px;min-width:0}
-.chart h3{font-size:15px;margin:0}
-.chart .sub{font-size:13px;color:var(--muted);margin-top:-6px}
-.hbars{display:grid;grid-template-columns:minmax(90px,38%) minmax(0,1fr) 44px;column-gap:10px;row-gap:8px;align-items:center}
-.hbars .nm{font-size:14px;overflow-wrap:anywhere;line-height:1.25}
-.hbars .tr{position:relative;height:16px}
-.hbars .tr::before{content:"";position:absolute;inset:-4px 0;background:linear-gradient(90deg,var(--grid) 1px,transparent 1px) 0 0/calc(100% / var(--ticks)) 100%;border-right:1px solid var(--grid)}
-.hbars .ax span{position:absolute;transform:translateX(-50%)}
-.hbars .tr i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);border-radius:0 4px 4px 0;transition:width .5s}
-.hbars .vl{font-weight:700;font-variant-numeric:tabular-nums;text-align:right;font-size:14px}
-.hbars .ax{grid-column:2;position:relative;height:14px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
-.heat{overflow-x:auto}
-.heat table{border-collapse:separate;border-spacing:2px;width:100%}
-.heat th{font-size:11px;color:var(--muted);font-weight:600;text-align:center;padding:2px 4px;border:0;white-space:normal;min-width:0;vertical-align:bottom}
-.heat th:first-child{text-align:left}
-.heat td{border:0;padding:8px 6px;text-align:center;font-variant-numeric:tabular-nums;font-size:13px;border-radius:4px;min-width:44px;white-space:nowrap}
-.heat td:first-child{text-align:left;font-size:13px;white-space:normal;min-width:110px;padding-left:0;overflow-wrap:anywhere}
-.heat td.best{box-shadow:inset 0 0 0 2px var(--mark)}
-.ramp{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted)}
-.ramp span.g{flex:0 0 120px;height:10px;border-radius:3px;background:linear-gradient(90deg,color-mix(in oklab,var(--accent) 8%,var(--surface)),var(--accent))}
-.dist{display:grid;grid-template-columns:minmax(90px,38%) minmax(0,1fr);column-gap:10px;row-gap:8px;align-items:center}
-.dist .nm{font-size:14px;overflow-wrap:anywhere;line-height:1.25}
-.dist .st{display:flex;gap:2px;height:16px}
-.dist .st i{display:block;height:100%;min-width:2px}
-.dist .st i:first-child{border-radius:4px 0 0 4px}.dist .st i:last-child{border-radius:0 4px 4px 0}
-.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--muted)}
-.legend span{display:inline-flex;align-items:center;gap:5px}
-.legend b{width:12px;height:12px;border-radius:3px;display:inline-block}
-.cols{display:flex;align-items:flex-end;gap:2px;height:120px;border-bottom:1px solid var(--line);background:linear-gradient(var(--grid) 1px,transparent 1px) 0 0/100% 25%}
-.cols i{flex:1;background:var(--accent);border-radius:3px 3px 0 0;min-height:0}
-.cols i.z{background:transparent}
-.cols-ax{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
-[data-tip]{cursor:default}
-.tip{position:fixed;z-index:70;pointer-events:none;background:var(--ink);color:var(--bg);font-size:13px;padding:6px 9px;border-radius:6px;max-width:260px;line-height:1.35}
-.empty{color:var(--muted);font-size:14px;padding:12px 0}
 .podium{position:fixed;inset:0;z-index:55;background:#fff;color:#17191B;display:flex;flex-direction:column;gap:3vh;padding:5vh 6vw}
 .podium h2{font-size:clamp(26px,5vh,56px);line-height:1.1}
 .podium .pl{display:flex;flex-direction:column;gap:2vh;flex:1;justify-content:center}
@@ -121,14 +83,14 @@ textarea{resize:vertical}
 .podium .bt{display:flex;gap:10px;justify-content:center}
 .podium .btn{background:#fff;color:#17191B;border-color:#C9CDC4;font-size:16px;padding:10px 18px}
 .podium .btn.primary{background:#1D6B57;border-color:#1D6B57;color:#fff}
-@media (prefers-reduced-motion:reduce){.podium .tr i,.hbars .tr i{transition:none}}
+@media (prefers-reduced-motion:reduce){.podium .tr i{transition:none}}
+.charts{display:flex;flex-direction:column;gap:28px}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;z-index:60}
 button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 </style>
 </head>
 <body>
 <div class="wrap" id="app"><p class="muted">Загрузка…</p></div>
-<div class="tip" id="tip" hidden></div>
 <div class="podium" id="podium" hidden>
   <h2 id="pd-title">Итоги голосования</h2>
   <div class="pl" id="pd-list"></div>
@@ -142,6 +104,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
   <div class="u" id="stage-url"></div>
 </div>
 <script src="/qrcode.js"></script>
+<script src="/charts.js"></script>
 <script>
 (() => {
 const $ = id => document.getElementById(id);
@@ -150,7 +113,7 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;
 const voteUrl = location.origin + '/';
 let key = new URLSearchParams(location.search).get('key') || '';
 try { if (key) localStorage.setItem('pv_admin_key', key); else key = localStorage.getItem('pv_admin_key') || ''; } catch(e){}
-let data = null, editing = false, timer = null;
+let data = null, editing = false, timer = null, chartSig = '';
 
 function toast(m){ const t = document.createElement('div'); t.className='toast'; t.textContent=m; document.body.appendChild(t); setTimeout(()=>t.remove(),1800); }
 function qrSrc(text, px){
@@ -202,17 +165,18 @@ function render(){
             <div class="row" style="justify-content:space-between"><h2>Сейчас выступает</h2><button class="btn" id="toggle"></button></div>
             <p class="small muted">Тем, кто отсканирует QR, сразу откроется оценка этой презентации.</p>
             <div class="chips" id="cur"></div>
+            <label class="row small" style="font-weight:500"><input type="checkbox" id="show-res"> После закрытия приёма показывать всем итоги по той же ссылке и QR</label>
           </div>
           <div class="box">
             <div class="row" style="justify-content:space-between"><h2>Рейтинг</h2><span class="small muted" id="stats"></span></div>
             <div class="tablebox"><table id="tbl"></table></div>
             <div id="comments"></div>
-            <div class="row"><a class="btn" id="csv">Скачать все ответы (CSV для Excel)</a><button class="btn primary" id="podium-btn">Итоги на экран</button></div>
+            <div class="row"><a class="btn" id="csv">Скачать все ответы (CSV для Excel)</a><button class="btn primary" id="shot-btn">Картинка итогов</button><button class="btn" id="podium-btn">Итоги на экран</button></div>
           </div>
         </div>
       </div>
       <div class="box">
-        <h2>Графики</h2>
+        <div class="row" style="justify-content:space-between"><h2>Графики</h2><span class="small muted">Это же увидят все после закрытия приёма</span></div>
         <div class="charts" id="charts"></div>
       </div>
       <form class="box" id="settings">
@@ -239,6 +203,8 @@ function render(){
     $('copy').addEventListener('click', async () => { try { await navigator.clipboard.writeText(voteUrl); toast('Ссылка скопирована'); } catch(e){ toast(voteUrl); } });
     $('full').addEventListener('click', showStage);
     $('podium-btn').addEventListener('click', openPodium);
+    $('shot-btn').addEventListener('click', () => VoteCharts.showShot(data.results, data.config));
+    $('show-res').addEventListener('change', e => save({show_results: e.target.checked}));
     $('pd-next').addEventListener('click', revealNext);
     $('pd-all').addEventListener('click', () => { while (revealNext()); });
     $('pd-close').addEventListener('click', closePodium);
@@ -284,78 +250,19 @@ function render(){
   const openNow = [...document.querySelectorAll('#comments details[open]')].map(d => d.dataset.n);
   $('comments').innerHTML = withC.map(x => `<details data-n="${esc(x.name)}" ${openNow.includes(x.name) ? 'open' : ''}><summary>Комментарии: ${esc(x.name)} (${x.comments.length})</summary>${x.comments.map(cm => `<div class="cm">${esc(cm.text)}</div>`).join('')}</details>`).join('');
   if (!$('stage').hidden) $('stage-now').textContent = c.current ? 'Сейчас: ' + c.current : '';
-  renderCharts(c, r);
-}
-
-/* ---------- Графики ---------- */
-const fmt = x => x == null ? '—' : x.toFixed(2).replace('.', ',');
-const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
-function bins(dist, scale){
-  if (scale <= 5) return dist.map((n, i) => ({label: String(i + 1), n}));
-  const out = [];
-  for (let i = 0; i < dist.length; i += 2) out.push({label: (i + 1) + '–' + (i + 2), n: dist[i] + (dist[i + 1] || 0)});
-  return out;
-}
-function renderCharts(c, r){
-  const box = $('charts');
-  const rows = r.rows.filter(x => x.votes > 0);
-  if (!rows.length){ box.innerHTML = '<p class="empty">Графики появятся после первых оценок.</p>'; return; }
-  const S = c.scale;
-
-  // 1. Средний балл
-  const bars = `<div class="chart"><h3>Средний балл</h3><p class="sub">По всем критериям, шкала 0–${S}</p>
-    <div class="hbars" style="--ticks:${S}">${rows.map(x => `
-      <span class="nm">${esc(x.name)}</span>
-      <span class="tr" data-tip="${esc(x.name)}: ${fmt(x.total)} из ${S} · голосов: ${x.votes}"><i style="width:${x.total / S * 100}%"></i></span>
-      <span class="vl">${fmt(x.total)}</span>`).join('')}
-      <span class="ax">${Array.from({length: S + 1}, (_, k) => k).filter(k => S <= 5 || k % 2 === 0).map(k => `<span style="left:${k / S * 100}%">${k}</span>`).join('')}</span></div></div>`;
-
-  // 2. Тепловая карта критериев
-  const best = r.criteria.map((_, k) => Math.max(...rows.map(x => x.avgs[k] ?? -1)));
-  const all = rows.flatMap(x => x.avgs).filter(a => a != null);
-  let lo = Math.min(...all), hi = Math.max(...all);
-  if (hi - lo < 0.5){ const m = (hi + lo) / 2; lo = Math.max(1, m - 0.25); hi = Math.min(S, m + 0.25); if (hi - lo < 0.01){ lo = 1; hi = S; } }
-  const heat = `<div class="chart"><h3>Сильные и слабые стороны</h3><p class="sub">Средняя оценка по критериям: чем темнее, тем выше. Рамкой — лучшая в критерии.</p>
-    <div class="heat"><table><thead><tr><th>Презентация</th>${r.criteria.map(n => `<th>${esc(n)}</th>`).join('')}</tr></thead><tbody>
-    ${rows.map(x => `<tr><td>${esc(x.name)}</td>${x.avgs.map((a, k) => {
-      if (a == null) return '<td>—</td>';
-      const p = Math.round(8 + Math.min(1, Math.max(0, (a - lo) / (hi - lo))) * 87);
-      const ink = p > 55 ? 'var(--accent-ink)' : 'var(--ink)';
-      return `<td class="${a === best[k] ? 'best' : ''}" style="background:color-mix(in oklab,var(--accent) ${p}%,var(--surface));color:${ink}" data-tip="${esc(x.name)} · ${esc(r.criteria[k])}: ${fmt(a)}">${fmt(a)}</td>`;
-    }).join('')}</tr>`).join('')}</tbody></table></div>
-    <div class="ramp"><span>${fmt(lo)}</span><span class="g"></span><span>${fmt(hi)}</span></div></div>`;
-
-  // 3. Распределение оценок
-  const cols = ['--d1','--d2','--d3','--d4','--d5'];
-  const dist = `<div class="chart"><h3>Как распределились оценки</h3><p class="sub">Доля каждой оценки среди всех оценок презентации</p>
-    <div class="dist">${rows.map(x => {
-      const b = bins(x.dist, S), tot = b.reduce((a, y) => a + y.n, 0);
-      return `<span class="nm">${esc(x.name)}</span><span class="st">${b.map((y, i) => y.n ? `<i style="flex:${y.n};background:var(${cols[i]})" data-tip="${esc(x.name)} · оценка ${y.label}: ${y.n} (${pct(y.n, tot)}%)"></i>` : '').join('')}</span>`;
-    }).join('')}</div>
-    <div class="legend">${bins(Array(S).fill(0), S).map((y, i) => `<span><b style="background:var(${cols[i]})"></b>${y.label}</span>`).join('')}</div></div>`;
-
-  // 4. Активность
-  const t = r.times;
-  let act = '<div class="chart"><h3>Активность</h3><p class="empty">Нет данных</p></div>';
-  if (t.length){
-    const start = Math.floor(t[0] / 60) * 60, end = Math.max(r.now, t[t.length - 1]);
-    const span = Math.max(1, Math.ceil((end - start + 1) / 60));
-    const step = Math.max(1, Math.ceil(span / 40));
-    const n = Math.ceil(span / step), buckets = Array(n).fill(0);
-    t.forEach(x => { const i = Math.min(n - 1, Math.floor((x - start) / 60 / step)); buckets[i]++; });
-    const mx = Math.max(...buckets);
-    const hm = s => new Date(s * 1000).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
-    act = `<div class="chart"><h3>Активность</h3><p class="sub">Оценок за ${step === 1 ? 'минуту' : step + ' мин'} · максимум ${mx}</p>
-      <div class="cols">${buckets.map((v, i) => `<i class="${v ? '' : 'z'}" style="height:${v / mx * 100}%" data-tip="${hm(start + i * step * 60)}: ${v} оцен${v % 10 === 1 && v % 100 !== 11 ? 'ка' : (v % 10 >= 2 && v % 10 <= 4 && (v % 100 < 10 || v % 100 >= 20)) ? 'ки' : 'ок'}"></i>`).join('')}</div>
-      <div class="cols-ax"><span>${hm(start)}</span><span>${hm(end)}</span></div></div>`;
+  $('show-res').checked = c.show_results;
+  // Перерисовываем графики только при новых данных, иначе анимации перезапускались бы каждые 4 секунды
+  const sig = JSON.stringify([r.rows, r.criteria, c.scale, r.total_votes, Math.floor(r.now / 60)]);
+  if (sig !== chartSig){
+    chartSig = sig;
+    const scrollY = window.scrollY;
+    $('charts').innerHTML = VoteCharts.full(r, c, {activity: true});
+    if (Math.abs(window.scrollY - scrollY) > 2) window.scrollTo(0, scrollY);
   }
-  box.innerHTML = bars + heat + dist + act;
 }
 
-// Подсказки при наведении
-const tip = $('tip');
-document.addEventListener('mouseover', e => { const el = e.target.closest('[data-tip]'); if (!el){ tip.hidden = true; return; } tip.textContent = el.dataset.tip; tip.hidden = false; });
-document.addEventListener('mousemove', e => { if (tip.hidden) return; const w = tip.offsetWidth; tip.style.left = Math.min(innerWidth - w - 8, e.clientX + 12) + 'px'; tip.style.top = (e.clientY + 16) + 'px'; });
+const fmt = VoteCharts.fmt;
+VoteCharts.tooltips();
 
 /* ---------- Итоги на экран ---------- */
 let podiumRows = [], shown = 0;
@@ -406,7 +313,7 @@ function showStage(){
 }
 function closeStage(){ $('stage').hidden = true; if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); }
 
-function start(){ app.innerHTML = '<p class="muted">Загрузка…</p>'; refresh(); clearInterval(timer); timer = setInterval(refresh, 4000); }
+function start(){ chartSig = ''; app.innerHTML = '<p class="muted">Загрузка…</p>'; refresh(); clearInterval(timer); timer = setInterval(refresh, 4000); }
 if (key) start(); else gate('');
 })();
 </script>
