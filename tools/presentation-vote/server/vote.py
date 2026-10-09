@@ -90,9 +90,12 @@ def clean_text(v, limit):
 def results(cfg):
     names = [c["name"] for c in cfg["criteria"]]
     rows = query("SELECT presentation, scores, comment, ts FROM votes")
+    scale = cfg["scale"]
+    empty = lambda: {"n": 0, "sums": [0.0] * len(names), "cnt": [0] * len(names), "comments": [],
+                     "dist": [0] * scale}
     groups = {}
     for pres, scores, comment, ts in rows:
-        g = groups.setdefault(pres, {"n": 0, "sums": [0.0] * len(names), "cnt": [0] * len(names), "comments": []})
+        g = groups.setdefault(pres, empty())
         g["n"] += 1
         s = json.loads(scores)
         for i, name in enumerate(names):
@@ -100,23 +103,26 @@ def results(cfg):
             if isinstance(v, (int, float)):
                 g["sums"][i] += v
                 g["cnt"][i] += 1
+                if 1 <= v <= scale:
+                    g["dist"][int(v) - 1] += 1
         if comment:
             g["comments"].append({"text": comment, "ts": ts})
     out = []
     order = cfg["presentations"] + [p for p in groups if p not in cfg["presentations"]]
     for p in order:
-        g = groups.get(p, {"n": 0, "sums": [0.0] * len(names), "cnt": [0] * len(names), "comments": []})
+        g = groups.get(p) or empty()
         avgs = [round(g["sums"][i] / g["cnt"][i], 2) if g["cnt"][i] else None for i in range(len(names))]
         valid = [a for a in avgs if a is not None]
         out.append({
             "name": p, "votes": g["n"], "avgs": avgs,
             "total": round(sum(valid) / len(valid), 2) if valid else None,
             "removed": p not in cfg["presentations"],
+            "dist": g["dist"],
             "comments": sorted(g["comments"], key=lambda c: -c["ts"]),
         })
     out.sort(key=lambda r: (r["total"] is None, -(r["total"] or 0), -r["votes"]))
     return {"criteria": names, "rows": out, "voters": query("SELECT COUNT(DISTINCT voter) FROM votes")[0][0],
-            "total_votes": len(rows)}
+            "total_votes": len(rows), "times": sorted(r[3] for r in rows), "now": int(time.time())}
 
 
 class Handler(BaseHTTPRequestHandler):
