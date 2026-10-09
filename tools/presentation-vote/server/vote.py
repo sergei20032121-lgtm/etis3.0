@@ -205,6 +205,8 @@ class Handler(BaseHTTPRequestHandler):
                            + [s.get(n, "") for n in names] + [comment])
             return self.send(200, "﻿" + buf.getvalue(), "text/csv; charset=utf-8",
                              {"Content-Disposition": 'attachment; filename="golosovanie.csv"'})
+        if u.path == "/favicon.ico":
+            return self.send(204, b"", "image/x-icon")
         if u.path == "/healthz":
             return self.send(200, {"ok": True})
         return self.send(404, {"error": "not_found"})
