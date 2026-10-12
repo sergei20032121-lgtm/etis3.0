@@ -85,6 +85,8 @@ public class MainActivity extends Activity {
     private WebView web;
     private String script = "";
     private boolean documentStartSupported;
+    private String[] pendingLogin;          // логин/пароль, только что введённые на странице входа
+    private boolean bioPrompted;            // отпечаток уже спрашивали на этой странице входа
     private ScriptHandler scriptHandler;
     private ValueCallback<Uri[]> fileCallback;
     private ProgressBar progress;
@@ -146,6 +148,7 @@ public class MainActivity extends Activity {
 
             @Override
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                bioPrompted = false;
                 progress.setVisibility(View.VISIBLE);
                 ui.removeCallbacks(loadTimeout);
                 ui.postDelayed(loadTimeout, LOAD_TIMEOUT_MS);
@@ -191,6 +194,7 @@ public class MainActivity extends Activity {
                 CookieManager.getInstance().flush();
                 // Зашёл в ЕТИС — обновим виджет и снимок оценок фоном
                 if (isEtis(url) && !url.contains("stu.login")) SyncWorker.syncSoon(MainActivity.this);
+                afterPage(url);
             }
         });
 
@@ -242,8 +246,126 @@ public class MainActivity extends Activity {
         }
     }
 
+    // ---------- Вход по отпечатку ----------
+
+    /** После загрузки страницы: предложить сохранить вход или сразу спросить отпечаток. */
+    private void afterPage(String url) {
+        if (!isEtis(url)) return;
+        // Страница входа без поля пароля — значит, мы уже внутри
+        web.evaluateJavascript("(document.querySelector('input[type=password]') && !document.querySelector('div.span3'))"
+                + " ? (document.querySelector('.error_message') ? 'error' : 'login') : 'in'", state -> {
+            if ("\"error\"".equals(state)) {
+                // Сохранённый пароль не подошёл (сменили на сайте) — не спрашиваем по кругу; после ручного входа обновим
+                pendingLogin = null;
+                return;
+            }
+            if ("\"login\"".equals(state)) {
+                if (LoginVault.has(this) && !bioPrompted) { bioPrompted = true; ui.postDelayed(this::biometricLogin, 400); }
+                return;
+            }
+            String[] cred = pendingLogin;
+            pendingLogin = null;
+            if (cred == null) return;
+            String[] saved = LoginVault.load(this);
+            if (saved != null) {
+                // Пароль поменялся — тихо обновляем сохранённый
+                if (!saved[0].equals(cred[0]) || !saved[1].equals(cred[1])) LoginVault.save(this, cred[0], cred[1]);
+                return;
+            }
+            if (LoginVault.declined(this) || !canAuthenticate()) return;
+            new android.app.AlertDialog.Builder(this)
+                    .setTitle("Входить по отпечатку?")
+                    .setMessage("ЕТИС 3.0 запомнит логин и пароль в зашифрованном хранилище телефона. "
+                            + "Входить можно будет по отпечатку или коду, а уведомления об оценках не будут пропадать, "
+                            + "когда сессия ЕТИС закончится.")
+                    .setPositiveButton("Да", (d, w) -> authenticate("Подтвердите, что это вы", () -> {
+                        toast(LoginVault.save(this, cred[0], cred[1]) ? "Готово — дальше по отпечатку" : "Не получилось сохранить");
+                    }))
+                    .setNegativeButton("Не надо", (d, w) -> LoginVault.setDeclined(this, true))
+                    .show();
+        });
+    }
+
+    private boolean canAuthenticate() {
+        android.app.KeyguardManager km = (android.app.KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
+        return km != null && km.isDeviceSecure();
+    }
+
+    private Runnable authSuccess;
+    private static final int CONFIRM_CREDENTIAL = 4;
+
+    /** Отпечаток / лицо / PIN телефона; на Android < 9 — экран блокировки. */
+    private void authenticate(String title, Runnable onSuccess) {
+        if (!canAuthenticate()) { onSuccess.run(); return; }
+        if (Build.VERSION.SDK_INT >= 28) {
+            android.hardware.biometrics.BiometricPrompt.Builder b = new android.hardware.biometrics.BiometricPrompt.Builder(this)
+                    .setTitle(title).setSubtitle("ЕТИС 3.0");
+            if (Build.VERSION.SDK_INT >= 30) {
+                b.setAllowedAuthenticators(android.hardware.biometrics.BiometricManager.Authenticators.BIOMETRIC_WEAK
+                        | android.hardware.biometrics.BiometricManager.Authenticators.DEVICE_CREDENTIAL);
+            } else if (Build.VERSION.SDK_INT == 29) {
+                b.setDeviceCredentialAllowed(true);
+            } else {
+                b.setNegativeButton("Отмена", getMainExecutor(), (d, w) -> { });
+            }
+            b.build().authenticate(new android.os.CancellationSignal(), getMainExecutor(),
+                    new android.hardware.biometrics.BiometricPrompt.AuthenticationCallback() {
+                        @Override
+                        public void onAuthenticationSucceeded(android.hardware.biometrics.BiometricPrompt.AuthenticationResult r) {
+                            onSuccess.run();
+                        }
+                    });
+        } else {
+            android.app.KeyguardManager km = (android.app.KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
+            Intent i = km.createConfirmDeviceCredentialIntent(title, "ЕТИС 3.0");
+            if (i == null) { onSuccess.run(); return; }
+            authSuccess = onSuccess;
+            startActivityForResult(i, CONFIRM_CREDENTIAL);
+        }
+    }
+
+    private void biometricLogin() {
+        if (!LoginVault.has(this)) return;
+        authenticate("Вход в ЕТИС", () -> {
+            String[] cred = LoginVault.load(this);
+            if (cred == null) { toast("Сохранённый вход недоступен — войдите паролем"); LoginVault.clear(this); return; }
+            String js = "(function(u,p){var l=document.querySelector('#login,input[name=p_username]'),w=document.querySelector('input[type=password]'),"
+                    + "f=(w&&w.form)||document.getElementById('form');if(!l||!w||!f)return;l.value=u;w.value=p;"
+                    + "var b=document.getElementById('sbmt');if(b)b.classList.add('is-loading');f.submit();})("
+                    + org.json.JSONObject.quote(cred[0]) + "," + org.json.JSONObject.quote(cred[1]) + ")";
+            web.evaluateJavascript(js, null);
+        });
+    }
+
     /** Методы, доступные странице ЕТИС как window.ETIS3Native. */
     final class NativeBridge {
+        @android.webkit.JavascriptInterface
+        public void loginSubmitted(String user, String pass) {
+            ui.post(() -> {
+                String url = web.getUrl();
+                if (url != null && isEtis(url) && user != null && pass != null && !user.isEmpty() && !pass.isEmpty()) {
+                    pendingLogin = new String[]{user, pass};
+                }
+            });
+        }
+
+        @android.webkit.JavascriptInterface
+        public boolean hasSavedLogin() {
+            return LoginVault.has(MainActivity.this);
+        }
+
+        @android.webkit.JavascriptInterface
+        public void biometricLogin() {
+            ui.post(() -> { String url = web.getUrl(); if (url != null && isEtis(url)) MainActivity.this.biometricLogin(); });
+        }
+
+        @android.webkit.JavascriptInterface
+        public void forgetLogin() {
+            LoginVault.clear(MainActivity.this);
+            LoginVault.setDeclined(MainActivity.this, false);
+            ui.post(() -> toast("Сохранённый вход удалён"));
+        }
+
         @android.webkit.JavascriptInterface
         public void saveImage(String base64, String name) {
             ui.post(() -> {
@@ -764,6 +886,12 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == CONFIRM_CREDENTIAL) {
+            Runnable r = authSuccess;
+            authSuccess = null;
+            if (resultCode == RESULT_OK && r != null) r.run();
+            return;
+        }
         if (requestCode == FILE_CHOOSER && fileCallback != null) {
             fileCallback.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data));
             fileCallback = null;
