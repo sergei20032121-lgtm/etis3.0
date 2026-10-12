@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Быстрые действия по долгому нажатию на иконку ЕТИС 3.0 -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="timetable" android:enabled="true" android:icon="@drawable/sc_timetable"
+        android:shortcutShortLabel="@string/sc_timetable">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="ru.komar.etis3"
+            android:targetClass="ru.komar.etis3.MainActivity" android:data="https://student.psu.ru/pls/stu_cus_et/stu.timetable" />
+    </shortcut>
+    <shortcut android:shortcutId="grades" android:enabled="true" android:icon="@drawable/sc_grades"
+        android:shortcutShortLabel="@string/sc_grades">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="ru.komar.etis3"
+            android:targetClass="ru.komar.etis3.MainActivity" android:data="https://student.psu.ru/pls/stu_cus_et/stu.signs?p_mode=current" />
+    </shortcut>
+    <shortcut android:shortcutId="messages" android:enabled="true" android:icon="@drawable/sc_messages"
+        android:shortcutShortLabel="@string/sc_messages">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="ru.komar.etis3"
+            android:targetClass="ru.komar.etis3.MainActivity" android:data="https://student.psu.ru/pls/stu_cus_et/stu.teacher_notes" />
+    </shortcut>
+    <shortcut android:shortcutId="session" android:enabled="true" android:icon="@drawable/sc_session"
+        android:shortcutShortLabel="@string/sc_session">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="ru.komar.etis3"
+            android:targetClass="ru.komar.etis3.MainActivity" android:data="https://student.psu.ru/pls/stu_cus_et/stu.timetable#session" />
+    </shortcut>
+</shortcuts>

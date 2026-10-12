@@ -156,3 +156,26 @@ document.addEventListener('keydown', e => {
 });
 
 
+
+// ---------- Напоминания о ДЗ (Android-приложение) ----------
+// Вечером накануне (19:00), а если уже поздно — за час до пары. Только невыполненные заметки с текстом.
+function syncAppReminders() {
+	if (!window.ETIS3Native?.setReminders) return;
+	const now = Date.now();
+	const list = [];
+	Object.entries(pairNotes).forEach(([key, n]) => {
+		if (n.done || !n.text?.trim() || !n.pair?.date) return;
+		const day = dateFromYmd(n.pair.date);
+		const slot = PAIR_SCHEDULE.find(p => p.num === +n.pair.num);
+		if (!day || !slot) return;
+		const start = new Date(day); start.setHours(slot.start[0], slot.start[1], 0, 0);
+		if (start.getTime() <= now) return;
+		const eve = new Date(day); eve.setDate(eve.getDate() - 1); eve.setHours(19, 0, 0, 0);
+		const at = eve.getTime() > now ? eve.getTime() : start.getTime() - 3600e3;
+		if (at <= now) return;
+		const when = eve.getTime() > now ? 'Завтра' : 'Через час';
+		list.push({ id: key, at, title: `${when}: ${n.pair.name}${n.pair.num ? ` · ${n.pair.num} пара` : ''}`, text: n.text.trim().slice(0, 300) });
+	});
+	try { window.ETIS3Native.setReminders(JSON.stringify(list)); } catch (e) {}
+}
+document.addEventListener('etis3-notes-changed', syncAppReminders);

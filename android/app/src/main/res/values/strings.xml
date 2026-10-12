@@ -2,4 +2,8 @@
 <resources>
     <string name="widget_desc">Текущая и следующая пара с обратным отсчётом</string>
     <string name="widget_name">Следующая пара</string>
+    <string name="sc_timetable">Расписание</string>
+    <string name="sc_grades">Оценки</string>
+    <string name="sc_messages">Сообщения</string>
+    <string name="sc_session">Сессия</string>
 </resources>

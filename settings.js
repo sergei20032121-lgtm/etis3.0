@@ -18,6 +18,7 @@ const ETIS3_DEFAULTS = {
 	layout:    'modern', // modern — рельс + верхняя панель, classic — сайдбар
 	aurora:    true,     // живой фон-аврора на всех страницах
 	sky:       true,     // цвета фона по времени суток
+	season:    true,     // праздничное оформление (Хэллоуин, Новый год)
 	notify:    true,     // фоновая проверка новых оценок / сообщений
 	accentCustom: '#7c6fd4', // свой цвет (accent: 'custom')
 	wallpaper: 'aurora', // фон страниц: aurora | пресет | custom (своё фото)
@@ -64,7 +65,7 @@ function etis3Normalize(raw) {
 	const fs = parseFloat(raw.fontSize);
 	if (!isNaN(fs)) s.fontSize = Math.min(ETIS3_FONT_MAX, Math.max(ETIS3_FONT_MIN, fs));
 	if (['modern', 'classic'].includes(raw.layout)) s.layout = raw.layout;
-	['highlight', 'widget', 'pairTypes', 'scoreDots', 'compact', 'aurora', 'sky', 'notify'].forEach(k => {
+	['highlight', 'widget', 'pairTypes', 'scoreDots', 'compact', 'aurora', 'sky', 'notify', 'season'].forEach(k => {
 		if (typeof raw[k] === 'boolean') s[k] = raw[k];
 	});
 	return s;

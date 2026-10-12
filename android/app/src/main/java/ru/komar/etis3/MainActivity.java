@@ -243,6 +243,7 @@ public class MainActivity extends Activity {
     /** Android 13+: разрешение на уведомления о новых оценках — один раз при первом запуске. */
     private void askNotificationsOnce() {
         SyncWorker.ensureChannel(this);
+        ReminderReceiver.ensureChannel(this);
         if (Build.VERSION.SDK_INT < 33 || EtisStore.askedNotifications(this)) return;
         EtisStore.setAskedNotifications(this);
         if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
@@ -392,6 +393,14 @@ public class MainActivity extends Activity {
                 if (url != null && isEtis(url) && user != null && pass != null && !user.isEmpty() && !pass.isEmpty()) {
                     pendingLogin = new String[]{user, pass};
                 }
+            });
+        }
+
+        @android.webkit.JavascriptInterface
+        public void setReminders(String json) {
+            ui.post(() -> {
+                String url = web.getUrl();
+                if (url != null && isEtis(url)) new Thread(() -> ReminderReceiver.replace(MainActivity.this, json)).start();
             });
         }
 

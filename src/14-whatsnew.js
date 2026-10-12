@@ -3,6 +3,12 @@
 // ============================================================
 
 const CHANGELOG = [
+	['4.13.0', [
+		['notifications_active', 'Расписание звонков', 'Кнопка-колокольчик у недели в расписании (и в Ctrl+K): какая пара идёт, сколько до звонка, все перемены'],
+		['celebration', 'Праздничное оформление', 'К Хэллоуину — летучие мыши, к Новому году — снег. Выключается в настройках'],
+		['alarm', 'Напоминания о ДЗ', 'Заметка к паре напомнит о себе вечером накануне или за час до пары', 'app'],
+		['touch_app', 'Быстрые действия', 'Долгое нажатие на иконку приложения — сразу в расписание, оценки, сообщения или подготовку к сессии', 'app'],
+	]],
 	['4.12.1', [
 		['bug_report', 'Сообщить о проблеме', 'В меню профиля и в настройках: опиши, что не так, — откроется готовое обращение на GitHub или текст для Telegram с версией и страницей (без личных данных)'],
 	]],
@@ -268,6 +274,7 @@ function buildWeekNav(span9, week, todayBtn) {
 			<span>${escapeHtml(range + kind)}</span>
 		</div>
 		${!isCurrentWeek && todayBtn?.href ? `<a class="ttw-today" href="${escapeHtml(todayBtn.href)}">Сегодня</a>` : ''}
+		<a class="ttw-bells" href="#" data-bells role="button" title="Расписание звонков" aria-label="Расписание звонков"><span class="material-icons">notifications_active</span></a>
 		${week.some(d => d.pairs.length) ? '<a class="ttw-share" href="#" role="button" title="Неделя картинкой — скинуть в чат" aria-label="Поделиться неделей"><span class="material-icons">ios_share</span></a>' : ''}
 		<a class="ttw-arrow${next ? '' : ' ttw-arrow--off'}" ${next ? `href="${escapeHtml(next)}"` : ''} aria-label="Следующая неделя"><span class="material-icons">chevron_right</span></a>`;
 	nav.querySelector('.ttw-share')?.addEventListener('click', async e => {

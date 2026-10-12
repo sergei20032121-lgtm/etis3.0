@@ -162,6 +162,7 @@ function applySettings() {
 	root.classList.toggle('etis3-no-aurora',    !settings.aurora);
 	applyWallpaper();
 	applySky();
+	if (typeof applySeason === 'function') applySeason();
 	syncThemeSwitcher();
 	document.getElementById('etis3-sp-panel')?.etis3Render?.();
 }
