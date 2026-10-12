@@ -22,21 +22,24 @@ android {
         versionName appVersion
     }
 
-    // Подпись: ключ из секретов CI, если задан, иначе публичный ключ проекта (android/etis3-public.keystore).
-    // Один и тот же ключ нужен, чтобы новые версии ставились поверх старых.
+    // Подпись релиза — только ключом из секретов CI (ETIS3_KEYSTORE и пароли).
+    // Публичного «запасного» ключа больше нет: без секретов релиз не подписывается вовсе.
+    def releaseKeystore = System.getenv('ETIS3_KEYSTORE')
     signingConfigs {
-        release {
-            storeFile file(System.getenv('ETIS3_KEYSTORE') ?: '../etis3-public.keystore')
-            storePassword System.getenv('ETIS3_KEYSTORE_PASSWORD') ?: 'etis3public'
-            keyAlias System.getenv('ETIS3_KEY_ALIAS') ?: 'etis3'
-            keyPassword System.getenv('ETIS3_KEY_PASSWORD') ?: 'etis3public'
+        if (releaseKeystore) {
+            release {
+                storeFile file(releaseKeystore)
+                storePassword System.getenv('ETIS3_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ETIS3_KEY_ALIAS') ?: 'etis3'
+                keyPassword System.getenv('ETIS3_KEY_PASSWORD') ?: System.getenv('ETIS3_KEYSTORE_PASSWORD')
+            }
         }
     }
 
     buildTypes {
         release {
             minifyEnabled false
-            signingConfig signingConfigs.release
+            if (releaseKeystore) signingConfig signingConfigs.release
         }
     }
 
@@ -47,6 +50,10 @@ android {
 
     sourceSets {
         main.assets.srcDirs += [file('build/generated/etis3-assets')]
+    }
+
+    testOptions {
+        unitTests.returnDefaultValues = true
     }
 
     lint {
@@ -66,4 +73,5 @@ dependencies {
     implementation 'androidx.webkit:webkit:1.12.1'
     implementation 'androidx.work:work-runtime:2.9.1'
     implementation 'org.jsoup:jsoup:1.17.2'
+    testImplementation 'junit:junit:4.13.2'
 }

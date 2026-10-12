@@ -1,6 +1,7 @@
 # Сборка Android-приложения ЕТИС 3.0 (WebView + встроенный userscript).
 # Запускается при изменениях в android/, dist/ или manifest.json на main,
-# публикует APK в релиз vX.Y.Z (и как артефакт сборки).
+# публикует APK, etis3.user.js и его подпись (.sig) в релиз vX.Y.Z.
+# Подпись — только ключами из секретов репозитория; в PR собирается отладочная версия.
 name: Android APK
 
 on:
@@ -14,6 +15,7 @@ on:
   pull_request:
     paths:
       - 'android/**'
+      - 'tests/fixtures/**'
       - '.github/workflows/android.yml'
   workflow_dispatch:
 
@@ -35,15 +37,26 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # Свой ключ подписи можно задать секретами репозитория; без них — публичный ключ из android/
-      - name: Ключ подписи из секретов (если задан)
+      # Релиз подписывается только ключом из секретов. В PR — отладочная сборка (для проверки, не для установки).
+      - name: Ключ подписи из секретов
+        if: github.event_name != 'pull_request'
         env:
           KEYSTORE_B64: ${{ secrets.ETIS3_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ETIS3_KEYSTORE_PASSWORD }}
+          SCRIPT_KEY: ${{ secrets.ETIS3_SCRIPT_SIGNING_KEY }}
         run: |
-          if [ -n "$KEYSTORE_B64" ]; then
-            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
-            echo "ETIS3_KEYSTORE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$SCRIPT_KEY" ]; then
+            echo "::error::Нет секретов ETIS3_KEYSTORE_BASE64 / ETIS3_KEYSTORE_PASSWORD / ETIS3_SCRIPT_SIGNING_KEY — релиз не собирается (см. README, раздел «Подпись»)"
+            exit 1
           fi
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          echo "ETIS3_KEYSTORE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+
+      - name: Тесты парсеров
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew testDebugUnitTest --no-daemon
 
       - name: Сборка APK
         working-directory: android
@@ -53,7 +66,27 @@ jobs:
           ETIS3_KEY_PASSWORD: ${{ secrets.ETIS3_KEY_PASSWORD }}
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            ./gradlew assembleDebug --no-daemon --stacktrace
+            mkdir -p app/build/outputs/apk/release
+            cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/release/app-release.apk
+          else
+            ./gradlew assembleRelease --no-daemon --stacktrace
+          fi
+
+      # Подпись userscript-а: приложение принимает обновление скрипта только с верной подписью
+      - name: Подпись userscript
+        if: github.event_name != 'pull_request'
+        env:
+          SCRIPT_KEY: ${{ secrets.ETIS3_SCRIPT_SIGNING_KEY }}
+        run: |
+          mkdir -p out
+          printf '%s\n' "$SCRIPT_KEY" > "$RUNNER_TEMP/script.pem"
+          cp dist/etis3.user.js out/etis3.user.js
+          openssl dgst -sha256 -sign "$RUNNER_TEMP/script.pem" -out out/etis3.user.js.sig out/etis3.user.js
+          openssl dgst -sha256 -verify android/app/src/main/res/raw/script_pub.pem -signature out/etis3.user.js.sig out/etis3.user.js
+          sha256sum out/etis3.user.js
+          rm -f "$RUNNER_TEMP/script.pem"
 
       - name: Версия
         id: v
@@ -77,7 +110,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: etis3-apk-${{ steps.v.outputs.version }}
+          name: etis3-apk-${{ steps.v.outputs.version }}${{ github.event_name == 'pull_request' && '-debug' || '' }}
           path: out/*.apk
 
       - name: Релиз на GitHub
@@ -88,7 +121,7 @@ jobs:
           TAG="v${{ steps.v.outputs.version }}"
           NOTES="ЕТИС 3.0 для Android. Скачайте etis3.apk и установите (разрешите установку из этого источника). Скрипт внутри приложения обновляется сам."
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" out/*.apk --clobber
+            gh release upload "$TAG" out/*.apk out/etis3.user.js out/etis3.user.js.sig --clobber
           else
-            gh release create "$TAG" out/*.apk --title "ЕТИС 3.0 $TAG" --notes "$NOTES" --latest
+            gh release create "$TAG" out/*.apk out/etis3.user.js out/etis3.user.js.sig --title "ЕТИС 3.0 $TAG" --notes "$NOTES" --latest
           fi

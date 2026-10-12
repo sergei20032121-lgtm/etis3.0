@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html><head><meta content="text/html; charset=utf-8" http-equiv="Content-Type"/>
+<title>ПГНИУ - для студентов</title>
+<meta content="IE=edge" http-equiv="X-UA-Compatible"/>
+<meta content="Данный ресурс беспечивает обратную связь между потребителем образовательных услуг и вузом, который эти образовательные услуги предоставляет." name="description"/>
+</head>
+<body><div class="header_message"><body>Студенты 1-го курса для входа используют email и пароль личного кабинета абитуриента</body></div>
+<script>
+    document.title="ПГНИУ - для студентов";
+    function doSbmt(){
+        $("#sbmt").prop("disabled",true);
+        $("#form").submit();
+    }
+</script>
+<script>$("body").css("background","#D8EBFF").css("font-size","14px");</script>
+<center><div> </div></center>
+<div class="login" style="margin-top:80px;">
+<form action="https://student.psu.ru/pls/stu_cus_et/stu.login" id="form" method="post">
+<input name="p_redirect" type="hidden" value=""/>
+<div class="items">
+<div class="item">
+<label for="login">Фамилия / email</label><input id="login" name="p_username" type="text" value=""/>
+</div>
+<div class="item">
+<label for="password">Пароль</label><input id="password" name="p_password" type="password"/>
+</div>
+<br/>
+<br/>
+<br/>По всем вопросам звоните по тел. 0000000. Специалист службы технической поддержки находится в 214 кабинете 2 корпуса.
+<a href="https://student.psu.ru/pls/stu_cus_et/stu_email_pkg.send_r_email">Забыли пароль?</a><button class="button medium blue" id="sbmt" onclick="doSbmt()"><span>Войти</span></button></div>
+</form>
+</div>
+</body></html>

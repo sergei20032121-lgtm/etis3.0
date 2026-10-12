@@ -61,64 +61,6 @@ final class EtisClient {
         }
     }
 
-    // ---------- Повторный вход ----------
-
-    /**
-     * Вход формой ЕТИС (POST stu.login) с сохранёнными логином и паролем.
-     * Новые cookie кладём в CookieManager — их же использует WebView приложения.
-     */
-    static boolean relogin(String user, String pass) {
-        try {
-            String url = BASE + "stu.login";
-            CookieManager cm = CookieManager.getInstance();
-            // Кодировка формы — как у страницы входа
-            HttpURLConnection g = (HttpURLConnection) new URL(url).openConnection();
-            g.setConnectTimeout(15000);
-            g.setReadTimeout(30000);
-            String had = cm.getCookie(url);
-            if (had != null) g.setRequestProperty("Cookie", had);
-            String charset = "windows-1251";
-            String type = g.getContentType();
-            if (type != null) {
-                Matcher m = Pattern.compile("charset=([\\w-]+)", Pattern.CASE_INSENSITIVE).matcher(type);
-                if (m.find()) charset = m.group(1);
-            }
-            storeCookies(g, url);
-            g.getInputStream().close();
-
-            String body = "p_redirect=&p_username=" + java.net.URLEncoder.encode(user, charset)
-                    + "&p_password=" + java.net.URLEncoder.encode(pass, charset);
-            HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-            c.setConnectTimeout(15000);
-            c.setReadTimeout(30000);
-            c.setInstanceFollowRedirects(false);
-            c.setDoOutput(true);
-            c.setRequestMethod("POST");
-            c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=" + charset);
-            String cookie = cm.getCookie(url);
-            if (cookie != null) c.setRequestProperty("Cookie", cookie);
-            try (java.io.OutputStream out = c.getOutputStream()) { out.write(body.getBytes(charset)); }
-            c.getResponseCode();
-            storeCookies(c, url);
-            try { c.getInputStream().close(); } catch (IOException ignored) { }
-            cm.flush();
-            // Проверяем, что вход удался
-            fetch("stu.timetable");
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private static void storeCookies(HttpURLConnection c, String url) {
-        Map<String, List<String>> headers = c.getHeaderFields();
-        if (headers == null) return;
-        for (Map.Entry<String, List<String>> h : headers.entrySet()) {
-            if (h.getKey() == null || !h.getKey().equalsIgnoreCase("Set-Cookie")) continue;
-            for (String v : h.getValue()) CookieManager.getInstance().setCookie(url, v);
-        }
-    }
-
     // ---------- Расписание ----------
 
     private static final String[] MONTHS = {"январ", "феврал", "март", "апрел", "ма", "июн", "июл", "август", "сентябр", "октябр", "ноябр", "декабр"};

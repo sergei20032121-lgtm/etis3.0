@@ -1,0 +1,5 @@
+# Ключи подписи — только в секретах GitHub, никогда в репозитории
+*.jks
+*.keystore
+*-private.pem
+node_modules/

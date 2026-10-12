@@ -1,0 +1,14 @@
+{
+  "name": "etis3",
+  "private": true,
+  "description": "ЕТИС 3.0 — расширение, userscript и Android-приложение для student.psu.ru",
+  "type": "module",
+  "scripts": {
+    "build": "node tools/build-scripts.mjs && node tools/build-userscript.mjs",
+    "check": "node --check settings.js && node --check scripts.js && node --check popup.js && node --check background.js && node --check dist/etis3.user.js",
+    "test": "npm run build && node --test --test-force-exit tests/*.test.js"
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.1"
+  }
+}

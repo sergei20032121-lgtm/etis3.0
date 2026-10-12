@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html><head><meta content="text/html; charset=utf-8" http-equiv="Content-Type"/>
+<title>ПГНИУ - для студентов</title>
+<meta content="IE=edge" http-equiv="X-UA-Compatible"/>
+<meta content="Данный ресурс беспечивает обратную связь между потребителем образовательных услуг и вузом, который эти образовательные услуги предоставляет." name="description"/>
+</head>
+<body><div class="header_message"><body>Студенты 1-го курса для входа используют email и пароль личного кабинета абитуриента</body></div>
+<script>
+    document.title="ПГНИУ - для студентов";
+    function doSbmt(){
+        $("#sbmt").prop("disabled",true);
+        $("#form").submit();
+    }
+</script>
+<script>$("body").css("background","#D8EBFF").css("font-size","14px");</script>
+<center><div> </div></center>
+<div class="login"><form action="https://student.psu.ru/pls/stu_cus_et/stu.login" id="form" method="post">
+<h3>Вход</h3>
+<input name="p_redirect" type="hidden" value=""/>
+<input id="login" name="p_username" type="text" placeholder="Фамилия / email" value=""/>
+<input id="password" name="p_password" type="password" placeholder="Пароль"/>
+<button class="button medium blue" id="sbmt" onclick="return false"><span>Войти</span></button>
+<a href="https://student.psu.ru/pls/stu_cus_et/stu_email_pkg.send_r_email">Забыли пароль?</a>
+</form>
+</div>
+</body></html>
