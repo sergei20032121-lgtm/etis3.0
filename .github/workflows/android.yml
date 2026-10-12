@@ -81,7 +81,12 @@ jobs:
           SCRIPT_KEY: ${{ secrets.ETIS3_SCRIPT_SIGNING_KEY }}
         run: |
           mkdir -p out
-          printf '%s\n' "$SCRIPT_KEY" > "$RUNNER_TEMP/script.pem"
+          # Ключ мог вставиться в секрет в одну строку, с \r или лишними пробелами — собираем PEM заново
+          BODY=$(printf '%s' "$SCRIPT_KEY" | tr -d '\r' | sed -e 's/-----BEGIN [A-Z ]*-----//' -e 's/-----END [A-Z ]*-----//' | tr -d ' \n\t')
+          KIND=$(printf '%s' "$SCRIPT_KEY" | grep -o 'BEGIN [A-Z ]*PRIVATE KEY' | head -1 | sed 's/BEGIN //')
+          [ -n "$KIND" ] || KIND="EC PRIVATE KEY"
+          { echo "-----BEGIN $KIND-----"; printf '%s\n' "$BODY" | fold -w 64; echo "-----END $KIND-----"; } > "$RUNNER_TEMP/script.pem"
+          openssl pkey -in "$RUNNER_TEMP/script.pem" -noout 2>/dev/null || { echo "::error::ETIS3_SCRIPT_SIGNING_KEY не читается как закрытый ключ (тип: $KIND, длина тела: ${#BODY})"; exit 1; }
           cp dist/etis3.user.js out/etis3.user.js
           openssl dgst -sha256 -sign "$RUNNER_TEMP/script.pem" -out out/etis3.user.js.sig out/etis3.user.js
           openssl dgst -sha256 -verify android/app/src/main/res/raw/script_pub.pem -signature out/etis3.user.js.sig out/etis3.user.js
