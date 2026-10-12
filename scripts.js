@@ -4460,7 +4460,8 @@ function renderWeekImage(week, title, sub, isCurrentWeek) {
 // ============================================================
 
 const SCALE_KEY = 'etis3-grade-scale';
-const SCALE_DEFAULT = { 5: 86, 4: 71, 3: 51 };
+// Шкала ПГНИУ: 5 — от 81, 4 — от 61, 3 и зачёт — от 41 балла из 100
+const SCALE_DEFAULT = { 5: 81, 4: 61, 3: 41 };
 
 function readScale() {
 	try {
