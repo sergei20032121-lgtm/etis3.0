@@ -1,0 +1,37 @@
+# Проверки расширения и userscript: синтаксис, актуальность собранных файлов, тесты.
+name: JS
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Сборка
+        run: npm run build
+
+      - name: Собранные файлы совпадают с исходниками
+        run: |
+          if ! git diff --quiet -- scripts.js dist/; then
+            echo "::error::scripts.js или dist/ не пересобраны — выполните npm run build и закоммитьте"
+            git diff --stat -- scripts.js dist/
+            exit 1
+          fi
+
+      - name: Синтаксис
+        run: npm run check
+
+      - name: Тесты
+        run: node --test --test-force-exit tests/*.test.js

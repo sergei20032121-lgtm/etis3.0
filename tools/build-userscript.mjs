@@ -12,6 +12,9 @@ const REPO = 'https://github.com/sergei20032121-lgtm/etis3.0';
 const RAW  = 'https://raw.githubusercontent.com/sergei20032121-lgtm/etis3.0/main/dist/etis3.user.js';
 
 const css  = read('styles.css');
+// Шрифты встраиваем как data:-URL — никаких внешних запросов
+const fonts = Object.fromEntries(fs.readdirSync(path.join(root, 'fonts')).filter(f => f.endsWith('.woff2'))
+	.map(f => ['fonts/' + f, 'data:font/woff2;base64,' + fs.readFileSync(path.join(root, 'fonts', f)).toString('base64')]));
 const icon = 'data:image/svg+xml;base64,' + Buffer.from(read('icon.svg')).toString('base64');
 
 const shim = `
@@ -53,7 +56,7 @@ const shim = `
 			runtime: {
 				lastError: undefined,
 				getManifest: () => ({ version: ${JSON.stringify(manifest.version)} }),
-				getURL: p => p === 'icon.svg' ? ${JSON.stringify(icon)} : p,
+				getURL: p => p === 'icon.svg' ? ${JSON.stringify(icon)} : (${JSON.stringify(fonts)})[p] || p,
 				sendMessage: () => Promise.resolve(),
 			},
 		};

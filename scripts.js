@@ -1,8 +1,27 @@
+/* Файл собран из src/*.js командой `npm run build` — правьте модули в src/ */
 /* ============================================================
    ЕТИС 3.0 by Комар
    ============================================================ */
 
 'use strict';
+
+// ============================================================
+// ШРИФТЫ — из самого расширения (в userscript — встроены), без Google Fonts
+// ============================================================
+
+(function injectFonts() {
+	const url = f => { try { return chrome.runtime.getURL('fonts/' + f); } catch (e) { return ''; } };
+	const face = (family, file, extra = '') => url(file)
+		? `@font-face{font-family:'${family}';font-style:normal;font-display:swap;src:url("${url(file)}") format('woff2');${extra}}` : '';
+	const style = document.createElement('style');
+	style.id = 'etis3-fonts';
+	style.textContent = [
+		face('Inter', 'inter-cyrillic.woff2', 'font-weight:100 900;unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116;'),
+		face('Inter', 'inter-latin.woff2', 'font-weight:100 900;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;'),
+		face('Material Icons Outlined', 'material-icons-outlined.woff2', 'font-weight:400;'),
+	].join('\n');
+	(document.head || document.documentElement).appendChild(style);
+})();
 
 // ============================================================
 // РАСПИСАНИЕ ПАР (время начала и конца)
@@ -807,8 +826,13 @@ function stylePages() {
 function initAppLogin(form) {
 	const user = form.querySelector('#login, input[name="p_username"]');
 	const pass = form.querySelector('input[type="password"]');
+	let last = '';
 	const report = () => {
-		if (user?.value.trim() && pass?.value) { try { window.ETIS3Native.loginSubmitted(user.value.trim(), pass.value); } catch (e) {} }
+		if (!user?.value.trim() || !pass?.value) return;
+		const key = user.value.trim() + '\n' + pass.value;
+		if (key === last) return;   // клик по кнопке и submit формы — одно и то же
+		last = key;
+		try { window.ETIS3Native.loginSubmitted(user.value.trim(), pass.value); } catch (e) {}
 	};
 	form.querySelector('#sbmt')?.addEventListener('click', report, true);
 	form.addEventListener('keydown', e => { if (e.key === 'Enter') report(); }, true);
@@ -1012,9 +1036,9 @@ function initLoginParticles(container) {
 	if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
 
 	const canvas = createEl('canvas', { id: 'etis3-particles' });
-	container.insertBefore(canvas, container.firstChild);
-
 	const ctx = canvas.getContext('2d');
+	if (!ctx) return;   // canvas недоступен (отключено ускорение и т.п.) — вход работает и без частиц
+	container.insertBefore(canvas, container.firstChild);
 	let W, H, particles, mouse = { x: -999, y: -999 };
 
 	const isDark = () => document.documentElement.getAttribute('theme') === 'dark';

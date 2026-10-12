@@ -2,3 +2,4 @@
 *.jks
 *.keystore
 *-private.pem
+node_modules/

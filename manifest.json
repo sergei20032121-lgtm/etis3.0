@@ -46,7 +46,8 @@
 	"web_accessible_resources": [
 		{
 			"resources": [
-				"icon.svg"
+				"icon.svg",
+				"fonts/*.woff2"
 			],
 			"matches": [
 				"https://student.psu.ru/*"
