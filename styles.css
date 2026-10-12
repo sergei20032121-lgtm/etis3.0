@@ -4942,15 +4942,15 @@ html.etis3-wall-photo[theme="light"] #etis3-wall::after { background: rgba(246, 
 #etis3-sp-wallpick .material-icons { font-size: 1.8rem !important; }
 .etis3-sp-dim-label { font-size: 1.3rem !important; color: var(--color-text-secondary) !important; white-space: nowrap !important; }
 
-/* Неделя картинкой — кнопка в навигации недели */
-.ttw-share {
+/* Неделя картинкой и звонки — кнопки в навигации недели */
+.ttw-share, .ttw-bells {
 	flex: none; width: 4.4rem; height: 4.4rem; display: grid; place-items: center;
 	border-radius: 1.4rem; color: var(--color-accent) !important; text-decoration: none !important;
 	background: rgba(var(--color-accent-rgb, 124,111,212), 0.12); transition: background 0.2s, transform 0.15s, opacity 0.2s;
 }
-.ttw-share:hover { background: rgba(var(--color-accent-rgb, 124,111,212), 0.22); }
-.ttw-share:active { transform: scale(0.94); }
-.ttw-share .material-icons { font-size: 2.2rem; }
+.ttw-share:hover, .ttw-bells:hover { background: rgba(var(--color-accent-rgb, 124,111,212), 0.22); }
+.ttw-share:active, .ttw-bells:active { transform: scale(0.94); }
+.ttw-share .material-icons, .ttw-bells .material-icons { font-size: 2.2rem; }
 .ttw-share.is-busy { opacity: 0.5; pointer-events: none; }
 
 /* Кнопки темы и профиля в шапке: глобальный стиль кнопок (flex, фон и сдвиг при hover/focus) их ломал —
@@ -5126,3 +5126,42 @@ button.sp-close, button.sp-close:hover, button.sp-close:focus {
 .rp-btn .material-icons { font-size: 1.9rem; }
 .etis3-sp-report { display: flex !important; align-items: center !important; gap: 0.8rem !important; margin-bottom: 1rem !important; padding: 1rem 1.2rem !important; border-radius: 1.2rem !important;
 	font-size: 1.35rem !important; font-weight: 600 !important; color: var(--color-accent) !important; background: rgba(var(--color-accent-rgb, 124,111,212), 0.1) !important; text-decoration: none !important; }
+
+/* ============================================================
+   ЗВОНКИ
+   ============================================================ */
+.bl-card { width: min(40rem, 100%) !important; }
+.bl-now { display: flex; flex-direction: column; gap: 0.3rem; padding: 1.4rem 1.6rem; border-radius: 1.6rem; color: #fff;
+	background: linear-gradient(135deg, var(--color-accent), rgba(var(--color-accent-rgb, 124,111,212), 0.6)); }
+.bl-now b { font-size: 1.9rem; font-weight: 800; }
+.bl-now span { font-size: 1.3rem; opacity: 0.9; }
+.bl-list { display: flex; flex-direction: column; gap: 0.4rem; }
+.bl-row { display: grid; grid-template-columns: 3.2rem 11rem 1fr; align-items: center; gap: 1rem; padding: 0.8rem 1rem; border-radius: 1.2rem; font-size: 1.45rem; }
+.bl-row--on { background: rgba(var(--color-accent-rgb, 124,111,212), 0.14); }
+.bl-row--past { opacity: 0.5; }
+.bl-num { width: 3.2rem; height: 3.2rem; border-radius: 1rem; display: grid; place-items: center; font-weight: 800; background: rgba(127,127,127,0.14); }
+.bl-row--on .bl-num { background: var(--color-accent); color: #fff; }
+.bl-time { font-weight: 700; font-variant-numeric: tabular-nums; }
+.bl-bar { height: 0.6rem; border-radius: 1rem; background: rgba(127,127,127,0.16); overflow: hidden; }
+.bl-bar i { display: block; height: 100%; background: var(--color-accent); border-radius: inherit; }
+.bl-break { padding: 0 1rem 0 5.2rem; font-size: 1.15rem; color: var(--color-text-secondary); }
+.bl-break--on { color: var(--color-accent); font-weight: 700; }
+
+/* ============================================================
+   ПРАЗДНИЧНОЕ ОФОРМЛЕНИЕ
+   ============================================================ */
+#etis3-season { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; contain: strict; width: 100vw; height: 100vh; }
+.ss-snow { width: 100%; height: 100%; display: block; }
+/* Хэллоуин: тыквенно-фиолетовое небо и летучие мыши */
+html.etis3-season-halloween { --orb-b: 255,120,30; --orb-c: 130,60,220; --orb-d: 255,170,40; }
+.ss-bat { position: absolute; left: -10vw; width: 8.4rem; color: rgba(20, 12, 30, 0.8); animation: ssBat 26s linear infinite; }
+[theme="dark"] .ss-bat { color: rgba(255, 150, 60, 0.75); }
+.ss-bat svg { width: 100%; fill: currentColor; animation: ssFlap 0.5s ease-in-out infinite alternate; transform-origin: 50% 40%; }
+.ss-bat--1 { top: 14vh; animation-delay: 0s; }
+.ss-bat--2 { top: 32vh; width: 5.6rem; animation-delay: -7s; animation-duration: 31s; }
+.ss-bat--3 { top: 58vh; width: 6.8rem; animation-delay: -15s; animation-duration: 23s; }
+.ss-bat--4 { top: 76vh; width: 5rem; animation-delay: -20s; animation-duration: 35s; }
+.ss-bat--5 { top: 22vh; width: 5.2rem; animation-delay: -11s; animation-duration: 29s; }
+@keyframes ssBat { 0% { transform: translate(0, 0); } 25% { transform: translate(30vw, -6vh); } 50% { transform: translate(60vw, 4vh); } 75% { transform: translate(90vw, -3vh); } 100% { transform: translate(120vw, 2vh); } }
+@keyframes ssFlap { from { transform: scaleY(1); } to { transform: scaleY(0.55); } }
+@media (prefers-reduced-motion: reduce) { .ss-bat, .ss-bat svg { animation: none !important; } .ss-bat { left: auto; right: 6vw; } }

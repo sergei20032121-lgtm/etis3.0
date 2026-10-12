@@ -163,6 +163,7 @@ function applySettings() {
 	root.classList.toggle('etis3-no-aurora',    !settings.aurora);
 	applyWallpaper();
 	applySky();
+	if (typeof applySeason === 'function') applySeason();
 	syncThemeSwitcher();
 	document.getElementById('etis3-sp-panel')?.etis3Render?.();
 }
@@ -2234,6 +2235,7 @@ const SETTINGS_TOGGLES = {
 	'ИНТЕРФЕЙС': [
 		['aurora',    'blur_on',       'Живой фон',              'Аврора за стеклом на всех страницах'],
 		['sky',       'wb_twilight',   'Небо по времени суток',  'Утро, день, вечер и ночь — свои цвета'],
+		['season',    'celebration',   'Праздничное оформление', 'Хэллоуин и Новый год — летучие мыши и снег'],
 		['notify',    'notifications_active', 'Уведомления о новом', 'Оценки, сообщения и объявления — даже когда ЕТИС закрыт'],
 		['compact',   'compress',      'Компактный режим',       'Меньше отступов, больше контента'],
 		['scoreDots', 'grade',         'Цветные точки у оценок', 'Индикаторы рядом с баллом'],
@@ -3470,6 +3472,12 @@ function buildTimetableDays(span9, week) {
 // ============================================================
 
 const CHANGELOG = [
+	['4.13.0', [
+		['notifications_active', 'Расписание звонков', 'Кнопка-колокольчик у недели в расписании (и в Ctrl+K): какая пара идёт, сколько до звонка, все перемены'],
+		['celebration', 'Праздничное оформление', 'К Хэллоуину — летучие мыши, к Новому году — снег. Выключается в настройках'],
+		['alarm', 'Напоминания о ДЗ', 'Заметка к паре напомнит о себе вечером накануне или за час до пары', 'app'],
+		['touch_app', 'Быстрые действия', 'Долгое нажатие на иконку приложения — сразу в расписание, оценки, сообщения или подготовку к сессии', 'app'],
+	]],
 	['4.12.1', [
 		['bug_report', 'Сообщить о проблеме', 'В меню профиля и в настройках: опиши, что не так, — откроется готовое обращение на GitHub или текст для Telegram с версией и страницей (без личных данных)'],
 	]],
@@ -3735,6 +3743,7 @@ function buildWeekNav(span9, week, todayBtn) {
 			<span>${escapeHtml(range + kind)}</span>
 		</div>
 		${!isCurrentWeek && todayBtn?.href ? `<a class="ttw-today" href="${escapeHtml(todayBtn.href)}">Сегодня</a>` : ''}
+		<a class="ttw-bells" href="#" data-bells role="button" title="Расписание звонков" aria-label="Расписание звонков"><span class="material-icons">notifications_active</span></a>
 		${week.some(d => d.pairs.length) ? '<a class="ttw-share" href="#" role="button" title="Неделя картинкой — скинуть в чат" aria-label="Поделиться неделей"><span class="material-icons">ios_share</span></a>' : ''}
 		<a class="ttw-arrow${next ? '' : ' ttw-arrow--off'}" ${next ? `href="${escapeHtml(next)}"` : ''} aria-label="Следующая неделя"><span class="material-icons">chevron_right</span></a>`;
 	nav.querySelector('.ttw-share')?.addEventListener('click', async e => {
@@ -3948,6 +3957,29 @@ document.addEventListener('keydown', e => {
 });
 
 
+
+// ---------- Напоминания о ДЗ (Android-приложение) ----------
+// Вечером накануне (19:00), а если уже поздно — за час до пары. Только невыполненные заметки с текстом.
+function syncAppReminders() {
+	if (!window.ETIS3Native?.setReminders) return;
+	const now = Date.now();
+	const list = [];
+	Object.entries(pairNotes).forEach(([key, n]) => {
+		if (n.done || !n.text?.trim() || !n.pair?.date) return;
+		const day = dateFromYmd(n.pair.date);
+		const slot = PAIR_SCHEDULE.find(p => p.num === +n.pair.num);
+		if (!day || !slot) return;
+		const start = new Date(day); start.setHours(slot.start[0], slot.start[1], 0, 0);
+		if (start.getTime() <= now) return;
+		const eve = new Date(day); eve.setDate(eve.getDate() - 1); eve.setHours(19, 0, 0, 0);
+		const at = eve.getTime() > now ? eve.getTime() : start.getTime() - 3600e3;
+		if (at <= now) return;
+		const when = eve.getTime() > now ? 'Завтра' : 'Через час';
+		list.push({ id: key, at, title: `${when}: ${n.pair.name}${n.pair.num ? ` · ${n.pair.num} пара` : ''}`, text: n.text.trim().slice(0, 300) });
+	});
+	try { window.ETIS3Native.setReminders(JSON.stringify(list)); } catch (e) {}
+}
+document.addEventListener('etis3-notes-changed', syncAppReminders);
 // ============================================================
 // СЕМЕСТР WRAPPED — итоги семестра сторис-слайдами
 // ============================================================
@@ -4913,3 +4945,152 @@ function initReport() {
 	paletteItems.push({ label: 'Сообщить о проблеме', icon: 'bug_report', hint: 'Действие', run: () => openReportDialog() });
 }
 onReady(initReport);
+
+// ============================================================
+// РАСПИСАНИЕ ЗВОНКОВ — пары и перемены, где мы сейчас
+// ============================================================
+// Время берётся из PAIR_SCHEDULE (уточняется по таблице расписания ЕТИС).
+
+function bellsState(now = nowMinutes()) {
+	const rows = [];
+	PAIR_SCHEDULE.forEach((p, i) => {
+		const s = p.start[0] * 60 + p.start[1], e = p.end[0] * 60 + p.end[1];
+		rows.push({ kind: 'pair', num: p.num, s, e });
+		const next = PAIR_SCHEDULE[i + 1];
+		if (next) {
+			const ns = next.start[0] * 60 + next.start[1];
+			if (ns > e) rows.push({ kind: 'break', s: e, e: ns });
+		}
+	});
+	const cur = rows.find(r => now >= r.s && now < r.e) || null;
+	return { rows, cur };
+}
+
+const fmtMin = m => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+
+function openBells() {
+	document.getElementById('etis3-bells')?.remove();
+	const root = createEl('div', { id: 'etis3-bells', className: 'rp bl', role: 'dialog', 'aria-label': 'Расписание звонков' });
+	root.innerHTML = `<div class="rp-card bl-card">
+		<div class="rp-head"><span class="material-icons">notifications_active</span><h2>Звонки</h2>
+			<a href="#" class="rp-close" aria-label="Закрыть"><span class="material-icons">close</span></a></div>
+		<div class="bl-now"></div>
+		<div class="bl-list"></div>
+	</div>`;
+	document.body.appendChild(root);
+	requestAnimationFrame(() => root.classList.add('rp--in'));
+
+	const render = () => {
+		const now = nowMinutes();
+		const { rows, cur } = bellsState(now);
+		const first = rows[0], last = rows[rows.length - 1];
+		let head;
+		if (cur?.kind === 'pair') head = `<b>Идёт ${cur.num} пара</b><span>до конца ${cur.e - now} мин · звонок в ${fmtMin(cur.e)}</span>`;
+		else if (cur?.kind === 'break') head = `<b>Перемена</b><span>${cur.e - now} мин до начала пары · в ${fmtMin(cur.e)}</span>`;
+		else if (now < first.s) head = `<b>Пары ещё не начались</b><span>первая в ${fmtMin(first.s)}</span>`;
+		else head = `<b>Пары закончились</b><span>последний звонок был в ${fmtMin(last.e)}</span>`;
+		root.querySelector('.bl-now').innerHTML = head;
+		root.querySelector('.bl-list').innerHTML = rows.map(r => {
+			const on = r === cur;
+			const pct = on ? Math.round((now - r.s) / (r.e - r.s) * 100) : now >= r.e ? 100 : 0;
+			return r.kind === 'pair'
+				? `<div class="bl-row${on ? ' bl-row--on' : ''}${now >= r.e ? ' bl-row--past' : ''}">
+					<span class="bl-num">${r.num}</span>
+					<span class="bl-time">${fmtMin(r.s)} – ${fmtMin(r.e)}</span>
+					<span class="bl-bar"><i style="width:${pct}%"></i></span></div>`
+				: `<div class="bl-break${on ? ' bl-break--on' : ''}">перемена ${r.e - r.s} мин</div>`;
+		}).join('');
+	};
+	render();
+	const timer = setInterval(render, 20000);
+
+	const close = () => { clearInterval(timer); root.classList.remove('rp--in'); setTimeout(() => root.remove(), 200); document.removeEventListener('keydown', onKey, true); };
+	const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+	document.addEventListener('keydown', onKey, true);
+	root.addEventListener('click', e => { if (e.target === root) close(); });
+	root.querySelector('.rp-close').addEventListener('click', e => { e.preventDefault(); close(); });
+}
+
+function initBells() {
+	if (!document.querySelector('div.span3')) return;
+	paletteItems.push({ label: 'Расписание звонков', icon: 'notifications_active', hint: 'Действие', run: () => openBells() });
+	document.addEventListener('click', e => {
+		const b = e.target.closest('[data-bells]');
+		if (!b) return;
+		e.preventDefault();
+		openBells();
+	});
+	const fromHash = () => { if (location.hash === '#bells') openBells(); };
+	window.addEventListener('hashchange', fromHash);
+	fromHash();
+}
+onReady(initBells);
+
+// ============================================================
+// ПРАЗДНИЧНОЕ ОФОРМЛЕНИЕ — Хэллоуин и Новый год
+// ============================================================
+// Только страницы кабинета, за стеклом (как аврора). Выключается в настройках,
+// при «уменьшении движения» — без анимации. Для проверки: ?etis3-season=halloween|newyear
+
+function currentSeason(d = new Date()) {
+	const forced = new URLSearchParams(location.search).get('etis3-season');
+	if (forced === 'halloween' || forced === 'newyear') return forced;
+	const m = d.getMonth() + 1, day = d.getDate();
+	if ((m === 10 && day >= 24) || (m === 11 && day <= 2)) return 'halloween';
+	if ((m === 12 && day >= 15) || (m === 1 && day <= 10)) return 'newyear';
+	return null;
+}
+
+// var, а не let: applySettings() зовёт applySeason() при старте, раньше этой строки
+var seasonLayer = null, snowStop = null;
+
+function applySeason() {
+	const root = document.documentElement;
+	const s = settings.season && document.querySelector('div.span3') ? currentSeason() : null;
+	['halloween', 'newyear'].forEach(k => root.classList.toggle('etis3-season-' + k, s === k));
+	if (!s) { seasonLayer?.remove(); seasonLayer = null; snowStop?.(); snowStop = null; return; }
+	if (seasonLayer?.dataset.season === s) return;
+	seasonLayer?.remove(); snowStop?.(); snowStop = null;
+	seasonLayer = createEl('div', { id: 'etis3-season', 'aria-hidden': 'true' });
+	seasonLayer.dataset.season = s;
+	if (s === 'halloween') {
+		const bat = '<svg viewBox="0 0 64 32"><path d="M32 10c2-4 6-6 6-6s-1 4 0 6c4-6 14-8 26-4-6 2-9 6-9 11-4-3-8-3-11 1-2-2-5-3-7-1-2-3-3-5-5-7-2 2-3 4-5 7-2-2-5-1-7 1-3-4-7-4-11-1 0-5-3-9-9-11 12-4 22-2 26 4 1-2 0-6 0-6s4 2 6 6z"/></svg>';
+		seasonLayer.innerHTML = [1, 2, 3, 4, 5].map(i => `<i class="ss-bat ss-bat--${i}">${bat}</i>`).join('');
+	} else {
+		const c = createEl('canvas', { className: 'ss-snow' });
+		seasonLayer.appendChild(c);
+		snowStop = startSnow(c);
+	}
+	document.body.prepend(seasonLayer);
+}
+
+function startSnow(canvas) {
+	const ctx = canvas.getContext('2d');
+	if (!ctx) return null;
+	const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+	let W = 0, H = 0, flakes = [], raf = 0, stopped = false;
+	const resize = () => {
+		const dpr = Math.min(2, devicePixelRatio || 1);
+		W = innerWidth; H = innerHeight;
+		canvas.width = W * dpr; canvas.height = H * dpr;
+		ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+		const n = Math.round(Math.min(90, W * H / 14000));
+		flakes = Array.from({ length: n }, () => ({ x: Math.random() * W, y: Math.random() * H, r: 0.8 + Math.random() * 2.4, v: 0.25 + Math.random() * 0.7, d: Math.random() * Math.PI * 2 }));
+	};
+	const draw = () => {
+		ctx.clearRect(0, 0, W, H);
+		ctx.fillStyle = document.documentElement.getAttribute('theme') === 'dark' ? 'rgba(255,255,255,0.75)' : 'rgba(150,170,210,0.75)';
+		flakes.forEach(f => {
+			if (!reduce) { f.y += f.v; f.d += 0.01; f.x += Math.sin(f.d) * 0.35; if (f.y > H + 4) { f.y = -4; f.x = Math.random() * W; } }
+			ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2); ctx.fill();
+		});
+		if (!reduce && !stopped && !document.hidden) raf = requestAnimationFrame(draw);
+	};
+	const onVis = () => { if (!document.hidden && !stopped && !reduce) { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); } };
+	resize(); draw();
+	window.addEventListener('resize', resize);
+	document.addEventListener('visibilitychange', onVis);
+	return () => { stopped = true; cancelAnimationFrame(raf); window.removeEventListener('resize', resize); document.removeEventListener('visibilitychange', onVis); };
+}
+
+onReady(applySeason);

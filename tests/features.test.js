@@ -71,3 +71,45 @@ test('Сообщить о проблеме: техническая информ�
 	assert.equal(u.searchParams.get('title'), 'Не видно колонки');
 	assert.match(u.searchParams.get('body'), /Техническая информация/);
 });
+
+test('Звонки: восемь пар и перемены', async () => {
+	const { window, document, errors } = await open('stu.timetable', { url: BASE + 'stu.timetable#bells', routes });
+	await settle(window, 100);
+	assert.deepEqual(errors, []);
+	assert.equal(document.querySelectorAll('#etis3-bells .bl-row').length, 8);
+	assert.ok(document.querySelectorAll('#etis3-bells .bl-break').length >= 7);
+	assert.ok(document.querySelector('.ttw-bells'), 'кнопка звонков в навигации недели');
+});
+
+test('Праздничное оформление: включается по дате, выключается настройкой', async () => {
+	const on = await open('stu.timetable', { url: BASE + 'stu.timetable?etis3-season=newyear', routes });
+	assert.ok(on.document.documentElement.classList.contains('etis3-season-newyear'));
+	assert.ok(on.document.getElementById('etis3-season'));
+	const off = await open('stu.timetable', {
+		url: BASE + 'stu.timetable?etis3-season=halloween', routes,
+		storage: { 'etis3-us:etis3-settings': JSON.stringify({ season: false }), 'etis3-settings': JSON.stringify({ season: false }) },
+	});
+	assert.equal(off.document.getElementById('etis3-season'), null);
+});
+
+test('Напоминания о ДЗ уходят в приложение', async () => {
+	const sent = [];
+	const d = new Date(Date.now() + 3 * 864e5);
+	const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+	const notes = {
+		[`${ymd}|2|физика`]: { text: 'Решить задачи 1–5', pair: { name: 'Физика', num: 2, date: ymd } },
+		[`${ymd}|3|история`]: { text: 'Уже сделано', done: true, pair: { name: 'История', num: 3, date: ymd } },
+	};
+	const { window, errors } = await open('stu.timetable', {
+		routes,
+		storage: { 'etis3-us:etis3-notes': JSON.stringify(notes) },
+		before: w => { w.ETIS3Native = { setReminders: j => sent.push(JSON.parse(j)) }; },
+	});
+	await settle(window, 100);
+	assert.deepEqual(errors, []);
+	const last = sent.at(-1);
+	assert.equal(last.length, 1, 'только невыполненное');
+	assert.match(last[0].title, /^Завтра: Физика · 2 пара$/);
+	const at = new Date(last[0].at);
+	assert.equal(at.getHours(), 19, 'вечером накануне');
+});
