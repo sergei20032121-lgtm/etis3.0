@@ -64,7 +64,14 @@ public class SyncWorker extends Worker {
         Context c = getApplicationContext();
         EtisStore.markSync(c);
         try {
-            syncTimetable(c);
+            try {
+                syncTimetable(c);
+            } catch (EtisClient.LoginRequired e) {
+                // Сессия ЕТИС истекла — входим сохранёнными данными (если пользователь их сохранил)
+                String[] cred = LoginVault.load(c);
+                if (cred == null || !EtisClient.relogin(cred[0], cred[1])) throw e;
+                syncTimetable(c);
+            }
             syncGrades(c);
             EtisStore.setLoggedOut(c, false);
         } catch (EtisClient.LoginRequired e) {
