@@ -23,6 +23,17 @@
 	(document.head || document.documentElement).appendChild(style);
 })();
 
+// Последние ошибки скрипта — для «Сообщить о проблеме» (только текст и место, без данных страницы)
+const recentErrors = [];
+(function captureErrors() {
+	const push = (msg, where) => {
+		recentErrors.push({ msg: String(msg || '').slice(0, 200), where: String(where || '').slice(0, 80), at: new Date().toTimeString().slice(0, 8) });
+		if (recentErrors.length > 5) recentErrors.shift();
+	};
+	window.addEventListener('error', e => push(e.message, e.filename ? `${e.filename.split('/').pop()}:${e.lineno}` : ''));
+	window.addEventListener('unhandledrejection', e => push(e.reason?.message || e.reason, 'promise'));
+})();
+
 // ============================================================
 // РАСПИСАНИЕ ПАР (время начала и конца)
 // ============================================================
@@ -2323,6 +2334,7 @@ function openSettingsPanel() {
 			`).join('')}
 
 			<div class="etis3-sp-section etis3-sp-section-last">
+				<a href="#" class="etis3-sp-report" id="etis3-sp-report"><span class="material-icons">bug_report</span>Сообщить о проблеме</a>
 				<button class="etis3-sp-danger" id="etis3-sp-reset">
 					<span class="material-icons">restart_alt</span>
 					Сбросить все настройки
@@ -2429,6 +2441,8 @@ function openSettingsPanel() {
 	panel.querySelectorAll('[data-setting]').forEach(el => {
 		el.addEventListener('change', () => saveSettings({ [el.dataset.setting]: el.checked }));
 	});
+
+	panel.querySelector('#etis3-sp-report').addEventListener('click', e => { e.preventDefault(); close(); openReportDialog(); });
 
 	panel.querySelector('#etis3-sp-reset').addEventListener('click', () => {
 		saveSettings({ ...ETIS3_DEFAULTS });
@@ -2706,12 +2720,14 @@ function buildTopbar(sidebar) {
 			${quick.map(a => `<a href="${escapeHtml(a.href)}" class="${/logout/.test(a.href) ? 'tbm-danger' : ''}${a.classList.contains('need_redirect') ? ' need_redirect' : ''}"><span class="material-icons">${a.querySelector('.material-icons')?.textContent || 'chevron_right'}</span>${escapeHtml(a.title || navLabel(a))}</a>`).join('')}
 			<a href="#" class="tbm-theme"><span class="material-icons">contrast</span>Тема: <span class="tbm-theme-name">${THEME_LABELS[settings.theme]}</span></a>
 			<a href="#" class="tbm-settings"><span class="material-icons">tune</span>Настройки ЕТИС 3.0</a>
+			<a href="#" class="tbm-report"><span class="material-icons">bug_report</span>Сообщить о проблеме</a>
 		</div>
 	`;
 	// Выход — последним
 	const logout = menu.querySelector('.tbm-danger');
 	if (logout) menu.querySelector('.tbm-links').appendChild(logout);
 	menu.querySelector('.tbm-settings').addEventListener('click', e => { e.preventDefault(); menu.hidden = true; openSettingsPanel(); });
+	menu.querySelector('.tbm-report').addEventListener('click', e => { e.preventDefault(); menu.hidden = true; openReportDialog(); });
 	menu.querySelector('.tbm-theme').addEventListener('click', e => {
 		e.preventDefault(); switchTheme(); syncTheme();
 		menu.querySelector('.tbm-theme-name').textContent = THEME_LABELS[settings.theme];
@@ -3454,6 +3470,9 @@ function buildTimetableDays(span9, week) {
 // ============================================================
 
 const CHANGELOG = [
+	['4.12.1', [
+		['bug_report', 'Сообщить о проблеме', 'В меню профиля и в настройках: опиши, что не так, — откроется готовое обращение на GitHub или текст для Telegram с версией и страницей (без личных данных)'],
+	]],
 	['4.12.0', [
 		['verified_user', 'Безопасность', 'Новый ключ подписи приложения, обновления скрипта проверяются по подписи, сохранённый пароль открывается только отпечатком или кодом телефона', 'app'],
 	]],
@@ -4787,3 +4806,110 @@ function initSessionPrep() {
 	fromHash();
 }
 onReady(initSessionPrep);
+
+// ============================================================
+// СООБЩИТЬ О ПРОБЛЕМЕ — готовый отчёт для GitHub или Telegram
+// ============================================================
+// В отчёт попадает только техническое: версия, где запущено, страница (без id и данных),
+// размер экрана, настройки вида и последние ошибки скрипта. Ни ФИО, ни оценок, ни cookie.
+
+const REPORT_REPO = 'https://github.com/sergei20032121-lgtm/etis3.0';
+
+function reportPlatform() {
+	const ua = navigator.userAgent;
+	const os = /iPhone|iPad|iPod/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Mac OS X/.test(ua) ? 'macOS' : /Linux/.test(ua) ? 'Linux' : 'другая ОС';
+	const browser = /YaBrowser\/[\d.]+/.exec(ua)?.[0] || /Edg\/[\d.]+/.exec(ua)?.[0] || /Firefox\/[\d.]+/.exec(ua)?.[0]
+		|| /Chrome\/[\d.]+/.exec(ua)?.[0] || (/Safari/.test(ua) ? 'Safari ' + (/Version\/([\d.]+)/.exec(ua)?.[1] || '') : 'браузер');
+	const kind = IS_APP ? 'Android-приложение' : IS_USERSCRIPT ? (os === 'iOS' ? 'userscript (Stay)' : 'userscript') : 'расширение';
+	return `${kind} · ${os} · ${browser}`;
+}
+
+// Страница без персональных параметров: только имя и режимы
+function reportPage() {
+	const keep = ['p_mode', 'p_term', 'p_week', 'p_cons'];
+	const u = new URL(location.href);
+	const q = keep.filter(k => u.searchParams.has(k)).map(k => `${k}=${u.searchParams.get(k)}`).join('&');
+	return u.pathname.split('/').pop() + (q ? '?' + q : '') + (u.hash && /^#[a-z-]+$/i.test(u.hash) ? u.hash : '');
+}
+
+function reportInfo() {
+	let version = '?';
+	try { version = chrome.runtime.getManifest().version; } catch (e) {}
+	const lines = [
+		`Версия: ${version}`,
+		`Где: ${reportPlatform()}`,
+		`Страница: ${reportPage()}`,
+		`Экран: ${innerWidth}×${innerHeight} @${Math.round(devicePixelRatio * 100) / 100}x`,
+		`Вид: ${settings.layout}, тема ${settings.theme} (${document.documentElement.getAttribute('theme')}), акцент ${settings.accent}, фон ${settings.wallpaper}, шрифт ${settings.fontSize}px`,
+	];
+	if (recentErrors.length) {
+		lines.push('Ошибки скрипта:');
+		recentErrors.forEach(e => lines.push(`  ${e.at} ${e.msg}${e.where ? ' (' + e.where + ')' : ''}`));
+	} else lines.push('Ошибок скрипта не было');
+	return lines.join('\n');
+}
+
+function openReportDialog() {
+	document.getElementById('etis3-report')?.remove();
+	const info = reportInfo();
+	const root = createEl('div', { id: 'etis3-report', className: 'rp', role: 'dialog', 'aria-label': 'Сообщить о проблеме' });
+	root.innerHTML = `
+		<div class="rp-card">
+			<div class="rp-head"><span class="material-icons">bug_report</span><h2>Сообщить о проблеме</h2>
+				<a href="#" class="rp-close" aria-label="Закрыть"><span class="material-icons">close</span></a></div>
+			<textarea class="rp-text" rows="4" placeholder="Что случилось и что ожидали? Например: «на странице оценок не видно последней колонки»"></textarea>
+			<label class="rp-check"><input type="checkbox" checked> Приложить техническую информацию</label>
+			<pre class="rp-info">${escapeHtml(info)}</pre>
+			<div class="rp-note">Без ФИО, оценок и данных входа — только то, что видно выше. Скриншот можно приложить уже на GitHub или в Telegram.</div>
+			<div class="rp-actions">
+				<a href="#" class="rp-btn rp-btn--main" data-act="github"><span class="material-icons">open_in_new</span>Открыть на GitHub</a>
+				<a href="#" class="rp-btn" data-act="copy"><span class="material-icons">content_copy</span>Скопировать для Telegram</a>
+			</div>
+		</div>`;
+	document.body.appendChild(root);
+	requestAnimationFrame(() => root.classList.add('rp--in'));
+	const text = root.querySelector('.rp-text');
+	const withInfo = root.querySelector('.rp-check input');
+	const pre = root.querySelector('.rp-info');
+	withInfo.addEventListener('change', () => { pre.hidden = !withInfo.checked; });
+	setTimeout(() => text.focus(), 50);
+
+	const close = () => { root.classList.remove('rp--in'); setTimeout(() => root.remove(), 200); document.removeEventListener('keydown', onKey, true); };
+	const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+	document.addEventListener('keydown', onKey, true);
+	root.addEventListener('click', e => { if (e.target === root) close(); });
+	root.querySelector('.rp-close').addEventListener('click', e => { e.preventDefault(); close(); });
+
+	const compose = () => {
+		const what = text.value.trim() || '(описание не заполнено)';
+		return { what, full: what + (withInfo.checked ? '\n\n---\n' + info : '') };
+	};
+	root.querySelector('[data-act="github"]').addEventListener('click', e => {
+		e.preventDefault();
+		const { what, full } = compose();
+		const title = what.split('\n')[0].slice(0, 80);
+		const body = full.replace(/\n---\n/, '\n\n**Техническая информация**\n```\n') + (withInfo.checked ? '\n```' : '');
+		window.open(`${REPORT_REPO}/issues/new?labels=bug&title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`, '_blank', 'noopener');
+		close();
+	});
+	root.querySelector('[data-act="copy"]').addEventListener('click', async e => {
+		e.preventDefault();
+		const { full } = compose();
+		let ok = false;
+		try { await navigator.clipboard.writeText(full); ok = true; } catch (err) {
+			const ta = createEl('textarea', { value: full });
+			ta.style.cssText = 'position:fixed;opacity:0';
+			document.body.appendChild(ta); ta.select();
+			try { ok = document.execCommand('copy'); } catch (e2) {}
+			ta.remove();
+		}
+		showToast(ok ? 'Скопировано — вставьте в Telegram' : 'Не получилось скопировать');
+		if (ok) close();
+	});
+}
+
+function initReport() {
+	if (!document.querySelector('div.span3')) return;
+	paletteItems.push({ label: 'Сообщить о проблеме', icon: 'bug_report', hint: 'Действие', run: () => openReportDialog() });
+}
+onReady(initReport);

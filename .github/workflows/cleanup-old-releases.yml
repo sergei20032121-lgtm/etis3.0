@@ -1,0 +1,33 @@
+# Разовая уборка: удаляет релизы младше 4.12.0 вместе с тегами.
+# Их APK подписаны старым публичным ключом (был в репозитории) — ставить их больше нельзя.
+name: Удалить старые релизы
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/cleanup-old-releases.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      KEEP_FROM: '4.12.0'
+    steps:
+      - name: Удалить релизы < 4.12.0
+        run: |
+          gh release list --limit 200 --json tagName -q '.[].tagName' | while read -r tag; do
+            v="${tag#v}"
+            [ "$v" = "$KEEP_FROM" ] && continue
+            if [ "$(printf '%s\n%s\n' "$v" "$KEEP_FROM" | sort -V | head -1)" = "$v" ]; then
+              echo "Удаляю $tag"
+              gh release delete "$tag" --yes --cleanup-tag
+            fi
+          done
+          echo "Осталось:"; gh release list --limit 50

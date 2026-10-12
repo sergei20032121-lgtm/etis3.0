@@ -50,3 +50,24 @@ test('Wrapped: слайды по оценкам и плану', async () => {
 	assert.match(document.querySelector('.wr-slides').textContent, /108\s*пар/);
 	assert.match(document.querySelector('.wr-slides').textContent, /Разгон|Перфекционист|Спринтер|Феникс|Стабильный|Выживший/);
 });
+
+test('Сообщить о проблеме: техническая информация без персональных данных', async () => {
+	const opened = [];
+	const { window, document, errors } = await open('stu.signs-current', {
+		url: BASE + 'stu.signs?p_mode=current&p_stu_id=12345',
+		before: w => { w.open = (u) => opened.push(u); },
+	});
+	assert.deepEqual(errors, []);
+	document.querySelector('.tbm-report').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+	const info = document.querySelector('#etis3-report .rp-info').textContent;
+	assert.match(info, /Версия: \d+\.\d+\.\d+/);
+	assert.match(info, /Страница: stu\.signs\?p_mode=current/);
+	assert.doesNotMatch(info, /12345|Студентов|p_stu_id/);
+	document.querySelector('#etis3-report .rp-text').value = 'Не видно колонки\nподробности';
+	document.querySelector('#etis3-report [data-act="github"]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+	assert.equal(opened.length, 1);
+	const u = new URL(opened[0]);
+	assert.equal(u.pathname, '/sergei20032121-lgtm/etis3.0/issues/new');
+	assert.equal(u.searchParams.get('title'), 'Не видно колонки');
+	assert.match(u.searchParams.get('body'), /Техническая информация/);
+});
