@@ -69,8 +69,10 @@ public class MainActivity extends Activity {
 
     private static final String HOST = "student.psu.ru";
     private static final String START_URL = "https://student.psu.ru/pls/stu_cus_et/stu.timetable";
+    // Свежий скрипт берём из последнего релиза вместе с подписью; без верной подписи — не применяем
     private static final String SCRIPT_URL =
-            "https://raw.githubusercontent.com/sergei20032121-lgtm/etis3.0/main/dist/etis3.user.js";
+            "https://github.com/sergei20032121-lgtm/etis3.0/releases/latest/download/etis3.user.js";
+    private static final String SIG_URL = SCRIPT_URL + ".sig";
     private static final String SCRIPT_FILE = "etis3.user.js";
     private static final int FILE_CHOOSER = 1;
     /** Сколько ждём первую отрисовку, прежде чем показать экран «не грузится». */
@@ -87,6 +89,7 @@ public class MainActivity extends Activity {
     private boolean documentStartSupported;
     private String[] pendingLogin;          // логин/пароль, только что введённые на странице входа
     private boolean bioPrompted;            // отпечаток уже спрашивали на этой странице входа
+    private boolean bioSubmitted;           // форму только что отправили сохранёнными данными
     private ScriptHandler scriptHandler;
     private ValueCallback<Uri[]> fileCallback;
     private ProgressBar progress;
@@ -233,6 +236,7 @@ public class MainActivity extends Activity {
 
         updateScriptInBackground();
         SyncWorker.schedule(this);
+        LoginVault.migrate(this);
         askNotificationsOnce();
     }
 
@@ -256,30 +260,42 @@ public class MainActivity extends Activity {
                 + " ? (document.querySelector('.error_message') ? 'error' : 'login') : 'in'", state -> {
             if ("\"error\"".equals(state)) {
                 // Сохранённый пароль не подошёл (сменили на сайте) — не спрашиваем по кругу; после ручного входа обновим
+                if (bioSubmitted) LoginVault.setStale(this);
+                bioSubmitted = false;
                 pendingLogin = null;
                 return;
             }
+            bioSubmitted = false;
             if ("\"login\"".equals(state)) {
-                if (LoginVault.has(this) && !bioPrompted) { bioPrompted = true; ui.postDelayed(this::biometricLogin, 400); }
+                if (LoginVault.has(this) && !LoginVault.stale(this) && !bioPrompted) { bioPrompted = true; ui.postDelayed(this::biometricLogin, 400); }
                 return;
             }
             String[] cred = pendingLogin;
             pendingLogin = null;
             if (cred == null) return;
-            String[] saved = LoginVault.load(this);
-            if (saved != null) {
-                // Пароль поменялся — тихо обновляем сохранённый
-                if (!saved[0].equals(cred[0]) || !saved[1].equals(cred[1])) LoginVault.save(this, cred[0], cred[1]);
+            if (LoginVault.has(this)) {
+                if (!LoginVault.stale(this)) return;
+                // Сохранённый пароль перестал подходить, а вручную вошли — предложим обновить
+                new android.app.AlertDialog.Builder(this)
+                        .setTitle("Обновить сохранённый вход?")
+                        .setMessage("Запомнить новый логин и пароль для входа по отпечатку.")
+                        .setPositiveButton("Обновить", (d, w) -> withVault("Подтвердите, что это вы", () -> {
+                            LoginVault.save(this, cred[0], cred[1]);
+                            toast("Сохранённый вход обновлён");
+                        }))
+                        .setNegativeButton("Нет", null)
+                        .show();
                 return;
             }
             if (LoginVault.declined(this) || !canAuthenticate()) return;
             new android.app.AlertDialog.Builder(this)
                     .setTitle("Входить по отпечатку?")
-                    .setMessage("ЕТИС 3.0 запомнит логин и пароль в зашифрованном хранилище телефона. "
-                            + "Входить можно будет по отпечатку или коду, а уведомления об оценках не будут пропадать, "
-                            + "когда сессия ЕТИС закончится.")
-                    .setPositiveButton("Да", (d, w) -> authenticate("Подтвердите, что это вы", () -> {
-                        toast(LoginVault.save(this, cred[0], cred[1]) ? "Готово — дальше по отпечатку" : "Не получилось сохранить");
+                    .setMessage("ЕТИС 3.0 запомнит логин и пароль в защищённом хранилище телефона. "
+                            + "Расшифровать их можно только вашим отпечатком или кодом блокировки — "
+                            + "без этого пароль недоступен даже самому приложению.")
+                    .setPositiveButton("Да", (d, w) -> withVault("Подтвердите, что это вы", () -> {
+                        LoginVault.save(this, cred[0], cred[1]);
+                        toast("Готово — дальше по отпечатку");
                     }))
                     .setNegativeButton("Не надо", (d, w) -> LoginVault.setDeclined(this, true))
                     .show();
@@ -296,12 +312,13 @@ public class MainActivity extends Activity {
 
     /** Отпечаток / лицо / PIN телефона; на Android < 9 — экран блокировки. */
     private void authenticate(String title, Runnable onSuccess) {
-        if (!canAuthenticate()) { onSuccess.run(); return; }
+        if (!canAuthenticate()) { toast("Включите блокировку экрана (отпечаток или PIN)"); return; }
         if (Build.VERSION.SDK_INT >= 28) {
             android.hardware.biometrics.BiometricPrompt.Builder b = new android.hardware.biometrics.BiometricPrompt.Builder(this)
                     .setTitle(title).setSubtitle("ЕТИС 3.0");
             if (Build.VERSION.SDK_INT >= 30) {
-                b.setAllowedAuthenticators(android.hardware.biometrics.BiometricManager.Authenticators.BIOMETRIC_WEAK
+                // Только «сильная» биометрия и код блокировки открывают ключ в Keystore
+                b.setAllowedAuthenticators(android.hardware.biometrics.BiometricManager.Authenticators.BIOMETRIC_STRONG
                         | android.hardware.biometrics.BiometricManager.Authenticators.DEVICE_CREDENTIAL);
             } else if (Build.VERSION.SDK_INT == 29) {
                 b.setDeviceCredentialAllowed(true);
@@ -317,22 +334,51 @@ public class MainActivity extends Activity {
                     });
         } else {
             android.app.KeyguardManager km = (android.app.KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
-            Intent i = km.createConfirmDeviceCredentialIntent(title, "ЕТИС 3.0");
-            if (i == null) { onSuccess.run(); return; }
-            authSuccess = onSuccess;
-            startActivityForResult(i, CONFIRM_CREDENTIAL);
+            confirmCredential(title, onSuccess);
+        }
+    }
+
+    private void confirmCredential(String title, Runnable onSuccess) {
+        android.app.KeyguardManager km = (android.app.KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
+        Intent i = km.createConfirmDeviceCredentialIntent(title, "ЕТИС 3.0");
+        if (i == null) return;
+        authSuccess = onSuccess;
+        startActivityForResult(i, CONFIRM_CREDENTIAL);
+    }
+
+    interface VaultAction { void run() throws Exception; }
+
+    /**
+     * Подтверждение владельца → действие с хранилищем. Если ключ не открылся (например, «слабая» биометрия
+     * на Android 10) — спрашиваем код блокировки и повторяем; если ключ аннулирован новым отпечатком — сбрасываем.
+     */
+    private void withVault(String title, VaultAction action) {
+        authenticate(title, () -> runVault(title, action, true));
+    }
+
+    private void runVault(String title, VaultAction action, boolean retry) {
+        try {
+            action.run();
+        } catch (android.security.keystore.KeyPermanentlyInvalidatedException e) {
+            LoginVault.clear(this);
+            toast("В телефоне поменялись отпечатки — войдите паролем, вход сохранится заново");
+        } catch (android.security.keystore.UserNotAuthenticatedException e) {
+            if (retry) confirmCredential(title, () -> runVault(title, action, false));
+        } catch (Exception e) {
+            toast("Не получилось: " + e.getClass().getSimpleName());
         }
     }
 
     private void biometricLogin() {
         if (!LoginVault.has(this)) return;
-        authenticate("Вход в ЕТИС", () -> {
+        withVault("Вход в ЕТИС", () -> {
             String[] cred = LoginVault.load(this);
             if (cred == null) { toast("Сохранённый вход недоступен — войдите паролем"); LoginVault.clear(this); return; }
             String js = "(function(u,p){var l=document.querySelector('#login,input[name=p_username]'),w=document.querySelector('input[type=password]'),"
                     + "f=(w&&w.form)||document.getElementById('form');if(!l||!w||!f)return;l.value=u;w.value=p;"
                     + "var b=document.getElementById('sbmt');if(b)b.classList.add('is-loading');f.submit();})("
                     + org.json.JSONObject.quote(cred[0]) + "," + org.json.JSONObject.quote(cred[1]) + ")";
+            bioSubmitted = true;
             web.evaluateJavascript(js, null);
         });
     }
@@ -438,8 +484,11 @@ public class MainActivity extends Activity {
         File f = new File(getFilesDir(), SCRIPT_FILE);
         if (f.exists()) {
             try {
-                String saved = new String(readAll(new java.io.FileInputStream(f)), StandardCharsets.UTF_8);
-                if (compareVersions(version(saved), version(bundled)) > 0) return saved;
+                byte[] raw = readAll(new java.io.FileInputStream(f));
+                byte[] sig = readAll(new java.io.FileInputStream(new File(getFilesDir(), SCRIPT_FILE + ".sig")));
+                String saved = new String(raw, StandardCharsets.UTF_8);
+                // Скачанный скрипт перепроверяем при каждом запуске: подпись должна сходиться
+                if (verifySignature(raw, sig) && compareVersions(version(saved), version(bundled)) > 0) return saved;
             } catch (Exception ignored) { }
         }
         return bundled;
@@ -462,12 +511,18 @@ public class MainActivity extends Activity {
                 c.setReadTimeout(20000);
                 c.setUseCaches(false);
                 if (c.getResponseCode() != 200) return;
-                String fresh = new String(readAll(c.getInputStream()), StandardCharsets.UTF_8);
+                byte[] body = readAll(c.getInputStream());
+                byte[] sig = download(SIG_URL);
+                if (!verifySignature(body, sig)) return;   // подменённый или неподписанный — мимо
+                String fresh = new String(body, StandardCharsets.UTF_8);
                 if (!fresh.contains("==UserScript==")) return;
                 String current = loadScript();
                 if (compareVersions(version(fresh), version(current)) <= 0) return;
                 try (FileOutputStream out = new FileOutputStream(new File(getFilesDir(), SCRIPT_FILE))) {
-                    out.write(fresh.getBytes(StandardCharsets.UTF_8));
+                    out.write(body);
+                }
+                try (FileOutputStream out = new FileOutputStream(new File(getFilesDir(), SCRIPT_FILE + ".sig"))) {
+                    out.write(sig);
                 }
                 new Handler(Looper.getMainLooper()).post(() -> {
                     script = wrap(fresh);
@@ -477,6 +532,31 @@ public class MainActivity extends Activity {
                 });
             } catch (Exception ignored) { }
         }).start();
+    }
+
+    private static byte[] download(String url) throws java.io.IOException {
+        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        c.setConnectTimeout(10000);
+        c.setReadTimeout(20000);
+        c.setUseCaches(false);
+        if (c.getResponseCode() != 200) throw new java.io.IOException("HTTP " + c.getResponseCode());
+        return readAll(c.getInputStream());
+    }
+
+    /** ECDSA P-256 / SHA-256: открытый ключ встроен в APK (res/raw/script_pub.pem), закрытый — только в секретах CI. */
+    private boolean verifySignature(byte[] data, byte[] sig) {
+        try (InputStream in = getResources().openRawResource(R.raw.script_pub)) {
+            String pem = new String(readAll(in), StandardCharsets.US_ASCII)
+                    .replaceAll("-----[A-Z ]+-----", "").replaceAll("\\s", "");
+            java.security.PublicKey key = java.security.KeyFactory.getInstance("EC")
+                    .generatePublic(new java.security.spec.X509EncodedKeySpec(android.util.Base64.decode(pem, android.util.Base64.DEFAULT)));
+            java.security.Signature v = java.security.Signature.getInstance("SHA256withECDSA");
+            v.initVerify(key);
+            v.update(data);
+            return v.verify(sig);
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private static String version(String userscript) {
