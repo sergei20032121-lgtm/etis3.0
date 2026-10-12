@@ -22,6 +22,17 @@
 	(document.head || document.documentElement).appendChild(style);
 })();
 
+// Последние ошибки скрипта — для «Сообщить о проблеме» (только текст и место, без данных страницы)
+const recentErrors = [];
+(function captureErrors() {
+	const push = (msg, where) => {
+		recentErrors.push({ msg: String(msg || '').slice(0, 200), where: String(where || '').slice(0, 80), at: new Date().toTimeString().slice(0, 8) });
+		if (recentErrors.length > 5) recentErrors.shift();
+	};
+	window.addEventListener('error', e => push(e.message, e.filename ? `${e.filename.split('/').pop()}:${e.lineno}` : ''));
+	window.addEventListener('unhandledrejection', e => push(e.reason?.message || e.reason, 'promise'));
+})();
+
 // ============================================================
 // РАСПИСАНИЕ ПАР (время начала и конца)
 // ============================================================

@@ -186,12 +186,14 @@ function buildTopbar(sidebar) {
 			${quick.map(a => `<a href="${escapeHtml(a.href)}" class="${/logout/.test(a.href) ? 'tbm-danger' : ''}${a.classList.contains('need_redirect') ? ' need_redirect' : ''}"><span class="material-icons">${a.querySelector('.material-icons')?.textContent || 'chevron_right'}</span>${escapeHtml(a.title || navLabel(a))}</a>`).join('')}
 			<a href="#" class="tbm-theme"><span class="material-icons">contrast</span>Тема: <span class="tbm-theme-name">${THEME_LABELS[settings.theme]}</span></a>
 			<a href="#" class="tbm-settings"><span class="material-icons">tune</span>Настройки ЕТИС 3.0</a>
+			<a href="#" class="tbm-report"><span class="material-icons">bug_report</span>Сообщить о проблеме</a>
 		</div>
 	`;
 	// Выход — последним
 	const logout = menu.querySelector('.tbm-danger');
 	if (logout) menu.querySelector('.tbm-links').appendChild(logout);
 	menu.querySelector('.tbm-settings').addEventListener('click', e => { e.preventDefault(); menu.hidden = true; openSettingsPanel(); });
+	menu.querySelector('.tbm-report').addEventListener('click', e => { e.preventDefault(); menu.hidden = true; openReportDialog(); });
 	menu.querySelector('.tbm-theme').addEventListener('click', e => {
 		e.preventDefault(); switchTheme(); syncTheme();
 		menu.querySelector('.tbm-theme-name').textContent = THEME_LABELS[settings.theme];

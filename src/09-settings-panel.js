@@ -116,6 +116,7 @@ function openSettingsPanel() {
 			`).join('')}
 
 			<div class="etis3-sp-section etis3-sp-section-last">
+				<a href="#" class="etis3-sp-report" id="etis3-sp-report"><span class="material-icons">bug_report</span>Сообщить о проблеме</a>
 				<button class="etis3-sp-danger" id="etis3-sp-reset">
 					<span class="material-icons">restart_alt</span>
 					Сбросить все настройки
@@ -222,6 +223,8 @@ function openSettingsPanel() {
 	panel.querySelectorAll('[data-setting]').forEach(el => {
 		el.addEventListener('change', () => saveSettings({ [el.dataset.setting]: el.checked }));
 	});
+
+	panel.querySelector('#etis3-sp-report').addEventListener('click', e => { e.preventDefault(); close(); openReportDialog(); });
 
 	panel.querySelector('#etis3-sp-reset').addEventListener('click', () => {
 		saveSettings({ ...ETIS3_DEFAULTS });
