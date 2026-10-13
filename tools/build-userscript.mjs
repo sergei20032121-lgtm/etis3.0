@@ -81,6 +81,7 @@ const header = `// ==UserScript==
 // @match        https://student.psu.ru/*
 // @run-at       document-start
 // @grant        none
+// @inject-into  content
 // @noframes
 // @updateURL    ${RAW}
 // @downloadURL  ${RAW}
@@ -108,5 +109,10 @@ ${read('scripts.js').replace(/^'use strict';\s*/m, '')}
 `;
 
 fs.mkdirSync(path.join(root, 'dist'), { recursive: true });
-fs.writeFileSync(path.join(root, 'dist', 'etis3.user.js'), body);
+// Stay (Safari на iPhone) переводит скрипт в режим «page», если видит в коде «нестандартное» window.xxx
+// (его список — window.matchMedia() со скобками, без addEventListener и т.п.). В режиме «page» скрипт
+// подключается только после разбора всей страницы — и старый ЕТИС успевает мелькнуть. globalThis — тот же
+// объект window, но эвристика Stay его не видит, и скрипт идёт ранним режимом «content».
+const out = body.replace(/\bwindow\./g, 'globalThis.');
+fs.writeFileSync(path.join(root, 'dist', 'etis3.user.js'), out);
 console.log(`dist/etis3.user.js — ${manifest.version}, ${(body.length / 1024).toFixed(0)} КБ`);
