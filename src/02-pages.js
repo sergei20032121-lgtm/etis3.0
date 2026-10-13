@@ -21,13 +21,20 @@ function stylePages() {
 		showWhatsNew();
 	}
 
-	const span9    = document.querySelector('div.span9');
-	const pageMode = new URLSearchParams(window.location.search).get('p_mode');
-
 	const warning = document.querySelector('div.warning');
+	const span9   = document.querySelector('div.span9');
 	if (warning && span9) span9.prepend(warning);
 
 	animatePageIn();
+	stylePageContent();
+}
+
+// Оформление содержимого страницы. При мягком переходе вызывается снова
+// для подменённого div.span9 — без перестройки сайдбара и панели.
+function stylePageContent() {
+	const page     = window.location.pathname.split('/').pop();
+	const span9    = document.querySelector('div.span9');
+	const pageMode = new URLSearchParams(window.location.search).get('p_mode');
 
 	// Открыл страницу — фоновый счётчик по ней обнуляется
 	const seenKinds = { 'stu.teacher_notes': ['notes'], 'stu_ann.announces': ['ann'], 'stu.announce': ['ann'] }[page]

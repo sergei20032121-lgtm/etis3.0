@@ -50,6 +50,23 @@ function navLabel(a) {
 	return (a.querySelector('.etis3-nav-label')?.textContent || a.textContent).replace(/\s+/g, ' ').trim();
 }
 
+// Заголовок страницы в верхней панели и подсветка активной группы на рельсе
+function topbarTitle(sidebar) {
+	const active  = sidebar.querySelector('.etis3-main-nav > li.active > a');
+	const group   = active?.closest('li')?.dataset.group;
+	const crumb   = NAV_GROUPS.find(g => g[0] === group)?.[1] || '';
+	const pageTtl = active ? navLabel(active) : (document.querySelector('.span9 > h3')?.textContent.trim() || 'ЕТИС');
+
+	sidebar.querySelectorAll('.etis3-nav-head--active').forEach(h => h.classList.remove('etis3-nav-head--active'));
+	if (group && group !== 'main') {
+		[...sidebar.querySelectorAll('.etis3-nav-head')].find(h => h.textContent.includes(crumb))?.classList.add('etis3-nav-head--active');
+	}
+
+	const title = document.querySelector('#etis3-topbar .tb-title');
+	if (title) title.innerHTML = `${crumb ? `<span class="tb-crumb">${escapeHtml(crumb)}</span>` : ''}<span class="tb-page">${escapeHtml(pageTtl)}</span>`;
+	return { crumb, pageTtl };
+}
+
 function buildTopbar(sidebar) {
 	// Пункт «Главная» — первым в навигации
 	const mainNav = sidebar.querySelector('.etis3-main-nav');
@@ -82,15 +99,7 @@ function buildTopbar(sidebar) {
 		mainNav?.querySelector('.etis3-home-li')?.classList.add('active');
 	}
 
-	const active  = sidebar.querySelector('.etis3-main-nav > li.active > a');
-	const group   = active?.closest('li')?.dataset.group;
-	const crumb   = NAV_GROUPS.find(g => g[0] === group)?.[1] || '';
-	const pageTtl = active ? navLabel(active) : (document.querySelector('.span9 > h3')?.textContent.trim() || 'ЕТИС');
-
-	// Активная группа подсвечивается и на свёрнутом рельсе
-	if (group && group !== 'main') {
-		[...sidebar.querySelectorAll('.etis3-nav-head')].find(h => h.textContent.includes(crumb))?.classList.add('etis3-nav-head--active');
-	}
+	const { crumb, pageTtl } = topbarTitle(sidebar);
 
 	// Иконки для блока анкет / опросов, чтобы он жил на рельсе
 	sidebar.querySelectorAll('.nav.nav-tabs.nav-stacked:not(.etis3-main-nav):not(.etis3-quickbar) > li > a').forEach(a => {
