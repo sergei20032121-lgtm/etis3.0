@@ -56,8 +56,8 @@ DEFAULT_CONFIG = {
     "current": "",
     "comments": True,
     "show_results": True,
-    "org": "",
-    "accent": "#1D6B57",
+    "org": "ПСС",
+    "accent": "#DC1448",
     "logo": "",
     "logos": {},
 }
@@ -75,6 +75,26 @@ db.execute("CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT
 db.execute("CREATE TABLE IF NOT EXISTS events(ts INTEGER NOT NULL, action TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '')")
 db.commit()
 os.makedirs(UPLOADS, exist_ok=True)
+
+
+def builtin_logo():
+    """Логотип ПСС лежит в static; кладём его в uploads под именем-хэшем, как обычную загрузку."""
+    try:
+        with open(os.path.join(STATIC, "pss-logo.png"), "rb") as f:
+            raw = f.read()
+    except OSError:
+        return ""
+    name = hashlib.sha256(raw).hexdigest()[:16] + ".png"
+    path = os.path.join(UPLOADS, name)
+    if not os.path.exists(path):
+        with open(path + ".tmp", "wb") as f:
+            f.write(raw)
+        os.replace(path + ".tmp", path)
+    return name
+
+
+PSS_LOGO = builtin_logo()
+DEFAULT_CONFIG["logo"] = PSS_LOGO
 
 
 def query(sql, args=()):
@@ -124,6 +144,22 @@ def log_event(action, detail=""):
         db.execute("INSERT INTO events(ts, action, detail) VALUES(?,?,?)", (int(time.time()), action, detail))
         db.commit()
 
+
+# Один раз ставим оформление ПСС поверх старых настроек, если их не меняли вручную
+if not setting("pss_defaults"):
+    _rows = query("SELECT value FROM settings WHERE key='config'")
+    if _rows:
+        _cfg = json.loads(_rows[0][0])
+        if not _cfg.get("org"):
+            _cfg["org"] = "ПСС"
+        if not _cfg.get("logo"):
+            _cfg["logo"] = PSS_LOGO
+        if _cfg.get("accent", "#1D6B57").lower() == "#1d6b57":
+            _cfg["accent"] = "#DC1448"
+        with lock:
+            db.execute("INSERT OR REPLACE INTO settings(key, value) VALUES('config', ?)", (json.dumps(_cfg, ensure_ascii=False),))
+            db.commit()
+    set_setting("pss_defaults", True)
 
 # Секрет для квитанций: создаётся один раз и хранится в базе
 SECRET = setting("secret")

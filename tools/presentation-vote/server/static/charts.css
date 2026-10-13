@@ -1,11 +1,11 @@
 /* Графики итогов: общие для админки и публичной страницы. Цвета — из токенов страницы. */
 :root{
-  --d1:#B5452A; --d2:#E8A68D; --d3:#CBCEC7; --d4:var(--brand-mid,#86C4AE); --d5:var(--brand,#1D6B57); --grid:#E6E8E1;
+  --d1:#D3D6CF; --d2:var(--brand-d2,#C8E0D7); --d3:var(--brand-d3,#A5CDBE); --d4:var(--brand-mid,#86C4AE); --d5:var(--brand,#1D6B57); --grid:#E6E8E1;
   --ok:#1E7A46; --ok-bg:#E3F3E9; --warn:#8A5A00; --warn-bg:#FFF4D6; --bad-c:#B3261E; --bad-bg:#FBE6E4;
   --gold:#E9B949; --silver:#C3C9CF; --bronze:#D29468; --medal-ink:#17191B;
 }
 @media (prefers-color-scheme: dark){:root{
-  --d1:#E5795A; --d2:#8E4C3A; --d3:#4B514D; --d4:var(--brand-mid-dk,#2E7C66); --d5:var(--brand-hi,#6AD1B0); --grid:#262B28;
+  --d1:#3A403C; --d2:var(--brand-d2-dk,#1E3A31); --d3:var(--brand-d3-dk,#25493D); --d4:var(--brand-mid-dk,#2E7C66); --d5:var(--brand-hi,#6AD1B0); --grid:#262B28;
   --ok:#6FD39A; --ok-bg:#16301F; --warn:#F2CC45; --warn-bg:#332A10; --bad-c:#FF8A80; --bad-bg:#3A1A17;
   --gold:#E2B33F; --silver:#AEB6BD; --bronze:#C9875A;
 }}
@@ -111,7 +111,7 @@
 .vc-ci{display:block;font-size:11px;color:var(--muted);margin-top:2px}
 .vc-brand{display:flex;align-items:center;gap:10px;min-width:0}
 .vc-brand img{height:36px;width:auto;max-width:180px;object-fit:contain}
-.vc-brand span{font-weight:600;color:var(--muted);font-size:14px;overflow-wrap:anywhere}
+.vc-brand span{font-weight:800;color:var(--ink);font-size:18px;letter-spacing:.06em;overflow-wrap:anywhere}
 
 /* Главное */
 .vc-ins{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:10px}

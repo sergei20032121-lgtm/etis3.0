@@ -82,9 +82,9 @@ body{background:var(--bg);color:var(--ink);font-family:"Segoe UI",system-ui,-app
 .bcard .s{font-size:6vh;font-weight:800;line-height:1}
 
 /* Логотипы */
-.corner{position:fixed;top:4vh;right:6vw;display:flex;align-items:center;gap:1.2vw;z-index:4;color:var(--muted);font-size:2vh;font-weight:600}
+.corner{position:fixed;top:4vh;right:6vw;display:flex;align-items:center;gap:1vw;z-index:4;color:var(--ink);font-size:2.6vh;font-weight:800;letter-spacing:.08em}
 .corner img{height:5vh;width:auto;max-width:18vw;object-fit:contain}
-.cover-brand{display:flex;align-items:center;gap:2vw;color:var(--muted);font-size:3vh;font-weight:600}
+.cover-brand{display:flex;align-items:center;gap:2vw;color:var(--ink);font-size:6vh;font-weight:800;letter-spacing:.08em}
 .cover-brand img{height:12vh;width:auto;max-width:40vw;object-fit:contain}
 .brow .vc-av{width:6vh;height:6vh;border-radius:1.4vh;font-size:2.2vh}
 .brow{grid-template-columns:7vh 6vh minmax(0,1fr) 30vw 12vh}
@@ -164,7 +164,7 @@ function build(){
   if (!rows.length){ message('Оценок пока нет', 'Экран обновится сам, как только появятся первые оценки.'); return; }
   $('msg').hidden = true; $('nav').hidden = false;
   VC.applyBrand(cfg);
-  $('corner').innerHTML = (cfg.logo ? `<img src="/u/${esc(cfg.logo)}" alt="">` : '') + (cfg.org && !cfg.logo ? `<span>${esc(cfg.org)}</span>` : '');
+  $('corner').innerHTML = (cfg.logo ? `<img src="/u/${esc(cfg.logo)}" alt="">` : '') + (cfg.org ? `<span>${esc(cfg.org)}</span>` : '');
   const av = (n, cls) => VC.avatar(n, cfg, cls);
   const avg = C.map((_, k) => { const v = rows.map(r => r.avgs[k]).filter(a => a != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; });
   const out = [];

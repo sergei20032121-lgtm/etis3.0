@@ -21,6 +21,11 @@ window.VoteCharts = (() => {
     st.setProperty('--brand-soft-dk', mixHex(base, '#121514', 0.8));
     st.setProperty('--brand-mid', mixHex(base, '#ffffff', 0.5));
     st.setProperty('--brand-mid-dk', mixHex(base, '#121514', 0.45));
+    // Шкала распределения оценок: от серого к фирменному цвету (без красного «плохо», чтобы не спорить с красным брендом)
+    st.setProperty('--brand-d2', mixHex(base, '#ffffff', 0.78));
+    st.setProperty('--brand-d3', mixHex(base, '#ffffff', 0.6));
+    st.setProperty('--brand-d2-dk', mixHex(base, '#121514', 0.72));
+    st.setProperty('--brand-d3-dk', mixHex(base, '#121514', 0.58));
     let fav = document.querySelector('link[rel="icon"]');
     if (cfg && cfg.logo){ if (!fav){ fav = document.createElement('link'); fav.rel = 'icon'; document.head.appendChild(fav); } fav.href = '/u/' + cfg.logo; }
     return base;
