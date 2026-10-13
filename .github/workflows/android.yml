@@ -103,6 +103,13 @@ jobs:
           cp android/app/build/outputs/apk/release/app-release.apk out/etis3.apk
           cp out/etis3.apk "out/etis3-${{ steps.v.outputs.version }}.apk"
 
+      - name: Архив расширения для компьютера
+        run: |
+          mkdir -p ext/etis-3.0
+          cp -r manifest.json settings.js scripts.js styles.css popup.html popup.js background.js icon.svg icons fonts LICENSE ext/etis-3.0/
+          (cd ext && zip -qr ../out/etis-3.0.zip etis-3.0)
+          unzip -l out/etis-3.0.zip | grep -q 'etis-3.0/manifest.json'
+
       - name: Проверка APK
         run: |
           APK=out/etis3.apk
@@ -124,9 +131,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="v${{ steps.v.outputs.version }}"
-          NOTES="ЕТИС 3.0 для Android. Скачайте etis3.apk и установите (разрешите установку из этого источника). Скрипт внутри приложения обновляется сам."
+          NOTES="Android — etis3.apk (скрипт внутри обновляется сам). Компьютер — etis-3.0.zip (расширение для Chrome / Edge / Яндекс / Opera). Инструкции: https://github.com/${{ github.repository }}/tree/main/docs"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" out/*.apk out/etis3.user.js out/etis3.user.js.sig --clobber
+            gh release upload "$TAG" out/*.apk out/etis-3.0.zip out/etis3.user.js out/etis3.user.js.sig --clobber
           else
-            gh release create "$TAG" out/*.apk out/etis3.user.js out/etis3.user.js.sig --title "ЕТИС 3.0 $TAG" --notes "$NOTES" --latest
+            gh release create "$TAG" out/*.apk out/etis-3.0.zip out/etis3.user.js out/etis3.user.js.sig --title "ЕТИС 3.0 $TAG" --notes "$NOTES" --latest
           fi
