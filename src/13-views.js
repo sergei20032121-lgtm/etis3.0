@@ -286,8 +286,8 @@ function buildTimetableDays(span9, week) {
 		}).join('');
 	};
 	render();
-	setInterval(render, 60 * 1000);
-	document.addEventListener('etis3-notes-changed', render);
+	pageInterval(render, 60 * 1000);
+	pageListen(document, 'etis3-notes-changed', render);
 	days[0].before(wrap);
 	days.forEach(d => d.classList.add('etis3-orig'));
 	return wrap;

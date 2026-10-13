@@ -252,7 +252,7 @@ function stylePage_timetable(span9) {
 		widget = fresh;
 	}
 	refresh();
-	setInterval(refresh, 60 * 1000);
+	pageInterval(refresh, 60 * 1000);
 
 	initHomeRoute(span9);
 

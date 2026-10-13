@@ -472,3 +472,27 @@ function showToast(text, duration = 2400) {
 }
 
 
+
+
+// ---------- Жизнь одной страницы ----------
+// При мягком переходе (iPhone) документ не перезагружается, поэтому таймеры
+// и подписки, которые относятся к содержимому страницы, регистрируем здесь —
+// перед подменой содержимого они снимаются.
+const pageScope = [];
+
+function pageInterval(fn, ms) {
+	const id = setInterval(fn, ms);
+	pageScope.push(() => clearInterval(id));
+	return id;
+}
+
+function pageListen(target, type, fn, opts) {
+	target.addEventListener(type, fn, opts);
+	pageScope.push(() => target.removeEventListener(type, fn, opts));
+}
+
+function pageCleanup(fn) { pageScope.push(fn); }
+
+function resetPageScope() {
+	while (pageScope.length) { try { pageScope.pop()(); } catch (e) {} }
+}

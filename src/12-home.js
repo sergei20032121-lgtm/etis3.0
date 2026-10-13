@@ -24,7 +24,8 @@ function initHomeRoute(span9) {
 		if (on) { renderHome(span9); window.scrollTo(0, 0); }
 		else document.getElementById('etis3-home')?.remove();
 	};
-	window.addEventListener('hashchange', apply);
+	pageListen(window, 'hashchange', apply);
+	pageCleanup(() => document.documentElement.classList.remove('etis3-home'));
 	apply();
 }
 
@@ -136,7 +137,7 @@ function renderHome(span9) {
 	refreshHomeData().then(fresh => { if (isHomeRoute()) draw(fresh, false); });
 	if (!home.dataset.notesHooked) {
 		home.dataset.notesHooked = '1';
-		document.addEventListener('etis3-notes-changed', () => { if (isHomeRoute() && document.getElementById('etis3-home')) draw(lastData, lastLoading); });
+		pageListen(document, 'etis3-notes-changed', () => { if (isHomeRoute() && document.getElementById('etis3-home')) draw(lastData, lastLoading); });
 	}
 
 	function draw(data, loading) {

@@ -43,7 +43,8 @@ function stylePage_signs(span9, pageMode) {
 	};
 
 	const removeTooltip = () => { if (tooltipWrapper) { tooltipWrapper.remove(); tooltipWrapper = null; } };
-	document.addEventListener('wheel', removeTooltip);
+	pageListen(document, 'wheel', removeTooltip);
+	pageCleanup(removeTooltip);
 
 	document.querySelectorAll('table.common').forEach(table => {
 		let idx = 0;
