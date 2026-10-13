@@ -96,6 +96,8 @@
 
 ## Установка
 
+Подробные пошаговые инструкции: **[компьютер](docs/install-pc.md)** · **[iPhone и iPad](docs/install-ios.md)** · **[Android](docs/install-android.md)**. Ниже — коротко.
+
 ### iPhone и iPad (Safari)
 
 Расширения Chrome на iPhone не ставятся, поэтому есть userscript-версия — тот же ЕТИС 3.0 одним файлом.
@@ -141,7 +143,7 @@
 
 ### Chrome, Edge, Opera, Яндекс.Браузер
 
-1. Скачай архив `etis-3.0.zip` и распакуй в любую папку
+1. Скачай архив [etis-3.0.zip](https://github.com/sergei20032121-lgtm/etis3.0/releases/latest/download/etis-3.0.zip) и распакуй в папку, которую не будешь удалять
 2. Открой в браузере: `chrome://extensions/` (или `edge://extensions/`)
 3. Включи **Режим разработчика** (переключатель справа вверху)
 4. Нажми **Загрузить распакованное расширение**
