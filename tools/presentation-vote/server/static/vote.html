@@ -3,60 +3,111 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#F3F4EF">
 <title>Оценка презентаций</title>
 <link rel="stylesheet" href="/charts.css">
 <style>
+/* Телефон прежде всего: одна колонна, крупные кнопки, кнопка отправки всегда под пальцем */
 :root{
-  --bg:#F3F4EF; --surface:#FFFFFF; --ink:#17191B; --muted:#5D6460; --line:#D9DCD3;
-  --accent:#1D6B57; --accent-ink:#FFFFFF; --soft:#E7EEE9; --mark:#FFD84D; --mark-ink:#17191B; --bad:#B3261E;
+  --bg:#F3F4EF; --surface:#FFFFFF; --ink:#17191B; --muted:#5D6460; --line:#DEE1D8;
+  --accent:var(--brand,#1D6B57); --accent-ink:#FFFFFF; --soft:var(--brand-soft,#E7EEE9);
+  --mark:#FFD84D; --mark-ink:#17191B; --bad:#B3261E;
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){:root{
   --bg:#121514; --surface:#1A1E1C; --ink:#ECEFEA; --muted:#9BA39E; --line:#2D3330;
-  --accent:#4FBF9F; --accent-ink:#0D1412; --soft:#203029; --mark:#F2CC45; --mark-ink:#17191B; --bad:#FF8A80;
+  --accent:var(--brand-hi,#4FBF9F); --accent-ink:#0D1412; --soft:var(--brand-soft-dk,#203029);
+  --mark:#F2CC45; --mark-ink:#17191B; --bad:#FF8A80;
   color-scheme:dark}}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-  padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(110px + env(safe-area-inset-bottom,0px));-webkit-tap-highlight-color:transparent}
+  padding:calc(14px + env(safe-area-inset-top,0px)) 16px calc(112px + env(safe-area-inset-bottom,0px));-webkit-tap-highlight-color:transparent}
 .wrap{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
-.wrap.wide{max-width:1100px;gap:28px}
-.res-head{display:flex;flex-direction:column;gap:8px}
+.wrap.wide{max-width:1100px;gap:30px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:36px}
 .eyebrow{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
-h1{font-size:24px;line-height:1.2;margin:4px 0 0;text-wrap:balance}
-h2{font-size:19px;line-height:1.25;margin:0;text-wrap:balance}
+h1{font-size:26px;line-height:1.15;margin:0;text-wrap:balance;letter-spacing:-.01em}
+h2{font-size:20px;line-height:1.25;margin:0;text-wrap:balance}
+h3{font-size:16px;margin:0}
 p{margin:0}
-.muted{color:var(--muted)}
-.small{font-size:14px}
+.muted{color:var(--muted)} .small{font-size:14px}
+.head{display:flex;flex-direction:column;gap:6px}
+
+/* Прогресс */
+.prog{display:flex;flex-direction:column;gap:8px}
+.prog-row{display:flex;justify-content:space-between;font-size:14px;color:var(--muted)}
+.prog-row b{color:var(--ink)}
+.prog-bar{height:8px;border-radius:4px;background:var(--soft);overflow:hidden}
+.prog-bar i{display:block;height:100%;background:var(--accent);border-radius:4px;transition:width .5s}
+
+/* Карточки презентаций */
+.now{appearance:none;width:100%;text-align:left;font:inherit;color:var(--accent-ink);background:var(--accent);border:0;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px;cursor:pointer;box-shadow:0 8px 24px -12px var(--accent)}
+.now .lbl{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;opacity:.9}
+.now .lbl i{width:8px;height:8px;border-radius:50%;background:var(--mark);box-shadow:0 0 0 0 var(--mark);animation:pulse 1.6s infinite}
+.now .row{display:flex;align-items:center;gap:12px}
+.now .nm{font-size:19px;font-weight:700;line-height:1.25;overflow-wrap:anywhere;flex:1;min-width:0}
+.now .go{font-weight:600;font-size:15px;display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.14);border-radius:10px;padding:10px 12px}
+.now .vc-av{border-color:transparent}
+@keyframes pulse{70%{box-shadow:0 0 0 8px transparent}}
 .list{display:flex;flex-direction:column;gap:8px}
-.pres{appearance:none;width:100%;text-align:left;font:inherit;color:var(--ink);background:var(--surface);border:1.5px solid var(--line);
-  border-radius:12px;padding:14px 16px;display:flex;gap:12px;align-items:center;cursor:pointer;min-height:56px}
-.pres .name{flex:1;min-width:0;overflow-wrap:anywhere;font-weight:500}
-.pres .tag{font-size:12px;font-weight:600;padding:3px 8px;border-radius:999px;white-space:nowrap}
-.pres .tag.now{background:var(--mark);color:var(--mark-ink)}
-.pres .tag.done{background:var(--soft);color:var(--accent)}
-.pres.current{border-color:var(--accent)}
-.crit{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
-.crit.missing{border-color:var(--bad)}
-.crit .cname{font-weight:600}
-.crit .cdesc{font-size:14px;color:var(--muted);margin-top:-6px}
+.pres{appearance:none;width:100%;text-align:left;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);
+  border-radius:14px;padding:12px 14px;display:flex;gap:12px;align-items:center;cursor:pointer;min-height:62px}
+.pres .name{flex:1;min-width:0;overflow-wrap:anywhere;font-weight:600;line-height:1.3}
+.pres .st{font-size:12px;font-weight:600;padding:4px 9px;border-radius:999px;white-space:nowrap;background:var(--bg);color:var(--muted)}
+.pres .st.done{background:var(--soft);color:var(--accent)}
+.pres.isdone .name{color:var(--muted)}
+
+/* Оценивание */
+.rhead{display:flex;align-items:center;gap:12px}
+.rhead .nm{min-width:0}
+.back{appearance:none;background:none;border:0;color:var(--accent);font:inherit;font-weight:600;padding:6px 0;cursor:pointer;align-self:flex-start}
+.steps{display:flex;gap:4px}
+.steps i{flex:1;height:4px;border-radius:2px;background:var(--line);transition:background .3s}
+.steps i.on{background:var(--accent)}
+.crit{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px;scroll-margin:90px;transition:border-color .2s,box-shadow .2s}
+.crit.missing{border-color:var(--bad);box-shadow:0 0 0 3px color-mix(in srgb,var(--bad) 18%,transparent)}
+.crit .ch{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.crit .cname{font-weight:700;font-size:17px}
+.crit .cnum{font-size:12px;color:var(--muted);white-space:nowrap}
+.crit .cdesc{font-size:14px;color:var(--muted);margin-top:-8px}
 .scale{display:grid;gap:6px}
-.scale button{appearance:none;font:600 18px/1 system-ui,sans-serif;color:var(--ink);background:var(--bg);border:1.5px solid var(--line);
-  border-radius:10px;height:48px;cursor:pointer;font-variant-numeric:tabular-nums}
+.scale button{appearance:none;font:700 19px/1 system-ui,sans-serif;color:var(--ink);background:var(--bg);border:1.5px solid var(--line);
+  border-radius:12px;height:52px;cursor:pointer;font-variant-numeric:tabular-nums;transition:transform .12s,background .15s,border-color .15s}
+.scale button:active{transform:scale(.94)}
 .scale button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-.ends{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
-textarea{width:100%;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;min-height:90px;resize:vertical}
-.bar{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:var(--bg);border-top:1px solid var(--line)}
+.word{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);min-height:20px}
+.word b{color:var(--accent)}
+textarea{width:100%;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;min-height:96px;resize:vertical}
+
+/* Нижняя панель */
+.bar{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid var(--line);z-index:5}
 .bar .in{max-width:560px;margin:0 auto;display:flex;gap:8px}
-.btn{appearance:none;font:600 16px system-ui,sans-serif;border-radius:12px;padding:0 18px;height:52px;cursor:pointer;border:1.5px solid var(--line);background:var(--surface);color:var(--ink)}
+.btn{appearance:none;font:600 16px system-ui,sans-serif;border-radius:14px;padding:0 18px;height:54px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px}
 .btn.primary{flex:1;background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-.btn.primary:disabled{opacity:.45;cursor:default}
-.back{appearance:none;background:none;border:0;color:var(--accent);font:inherit;padding:0;cursor:pointer;align-self:flex-start}
-.center{text-align:center;padding:48px 0 0;display:flex;flex-direction:column;gap:12px;align-items:center}
-.big{font-size:56px;line-height:1}
+.btn.primary:disabled{opacity:.5;cursor:default}
+.btn.sm{height:44px;font-size:15px;border-radius:12px}
+
+/* Готово */
+.done{display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;padding-top:28px}
+.check{width:84px;height:84px}
+.check circle{fill:var(--soft)}
+.check path{fill:none;stroke:var(--accent);stroke-width:7;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:60;stroke-dashoffset:60;animation:draw .5s .15s ease-out forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.receipt{width:100%;background:var(--surface);border:1px dashed var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:6px;align-items:center}
+.receipt .code{font:700 26px ui-monospace,Menlo,Consolas,monospace;letter-spacing:.12em;color:var(--ink)}
+.receipt p{font-size:13px;color:var(--muted);max-width:42ch}
+.next{width:100%;text-align:left}
+
+.center{text-align:center;padding:56px 0 0;display:flex;flex-direction:column;gap:12px;align-items:center}
 .err{color:var(--bad);font-size:14px}
-button:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:10px;font-size:14px;z-index:9}
+.mine{display:flex;flex-direction:column;gap:6px}
+.mine li{display:flex;justify-content:space-between;gap:10px;font-size:14px;border-bottom:1px solid var(--line);padding:6px 0}
+.mine code{font:600 14px ui-monospace,Menlo,Consolas,monospace;letter-spacing:.06em}
+button:focus-visible,textarea:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.check path{animation:none;stroke-dashoffset:0}.now .lbl i{animation:none}}
 </style>
 </head>
 <body>
@@ -66,81 +117,92 @@ button:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outl
 <script>
 (() => {
 const app = document.getElementById('app'), bar = document.getElementById('bar'), barIn = document.getElementById('bar-in');
-let cfg = null, sel = null, scores = {}, comment = '', sending = false, error = '';
-const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const VC = window.VoteCharts;
+let cfg = null, sel = null, scores = {}, comment = '', sending = false, error = '', lastReceipt = '';
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pl = (n, a, b, c) => VC.plural(n, a, b, c);
+const WORDS5 = ['', 'Слабо', 'Ниже среднего', 'Нормально', 'Хорошо', 'Отлично'];
+const av = (name, cls) => VC.avatar(name, cfg, cls);
+const buzz = () => { try { navigator.vibrate && navigator.vibrate(8); } catch(e){} };
+
+function toast(m){ const t = document.createElement('div'); t.className = 'toast'; t.textContent = m; document.body.appendChild(t); setTimeout(() => t.remove(), 1800); }
+function header(){
+  return `<div class="top">${VC.brandHead(cfg) || '<span></span>'}</div>`;
+}
 
 async function load(){
   try {
     const r = await fetch('/api/config', {cache:'no-store', credentials:'same-origin'});
     cfg = await r.json();
   } catch(e){ app.innerHTML = '<div class="center"><h2>Нет связи с сервером</h2><p class="muted">Проверьте интернет и обновите страницу.</p></div>'; return; }
+  VC.applyBrand(cfg);
   document.title = cfg.title;
   if (cfg.open && cfg.current && !cfg.mine[cfg.current] && location.pathname !== '/results') open(cfg.current); else list();
 }
 
 function list(){
-  sel = null; window.scrollTo(0,0);
-  if (!cfg.open){ bar.hidden = true; if (cfg.results) return showResults(); app.classList.remove('wide'); app.innerHTML = `<div class="center"><h2>Голосование закрыто</h2><p class="muted">Спасибо за участие! Итоги объявят организаторы.</p></div>`; return; }
+  sel = null; window.scrollTo(0, 0); bar.hidden = true;
+  if (!cfg.open){ if (cfg.results) return showResults(); app.classList.remove('wide'); app.innerHTML = `${header()}<div class="center"><h2>Голосование закрыто</h2><p class="muted">Спасибо за участие! Итоги объявят организаторы.</p></div>`; return; }
   app.classList.remove('wide');
-  if (!cfg.presentations.length){ bar.hidden = true; app.innerHTML = `<h1>${esc(cfg.title)}</h1><p class="muted">Презентации ещё не добавлены. Обновите страницу чуть позже.</p>`; return; }
-  const done = Object.keys(cfg.mine).filter(p => cfg.presentations.includes(p)).length;
-  app.innerHTML = `
-    <h1>${esc(cfg.title)}</h1>
-    <p class="muted">Выберите презентацию, которую хотите оценить.${done ? ` Оценено: ${done} из ${cfg.presentations.length}.` : ''}</p>
-    <div class="list">${cfg.presentations.map((p,i) => `
-      <button class="pres${p === cfg.current ? ' current' : ''}" data-i="${i}">
-        <span class="name">${esc(p)}</span>
-        ${p === cfg.current ? '<span class="tag now">Сейчас</span>' : ''}
-        ${cfg.mine[p] ? '<span class="tag done">✓ Оценено</span>' : ''}
-      </button>`).join('')}</div>`;
-  app.querySelectorAll('.pres').forEach(b => b.addEventListener('click', () => open(cfg.presentations[+b.dataset.i])));
-  bar.hidden = true;
+  const P = cfg.presentations;
+  if (!P.length){ app.innerHTML = `${header()}<div class="head"><h1>${esc(cfg.title)}</h1><p class="muted">Презентации ещё не добавлены. Обновите страницу чуть позже.</p></div>`; return; }
+  const done = P.filter(p => cfg.mine[p]).length;
+  const cur = cfg.current && P.includes(cfg.current) ? cfg.current : '';
+  const others = P.filter(p => p !== cur);
+  app.innerHTML = `${header()}
+    <div class="head"><span class="eyebrow">Оценка презентаций</span><h1>${esc(cfg.title)}</h1></div>
+    <div class="prog"><div class="prog-row"><span>Вы оценили <b>${done} из ${P.length}</b></span><span>${done === P.length ? 'Всё оценено ✓' : 'анонимно'}</span></div>
+      <div class="prog-bar"><i style="width:${P.length ? done / P.length * 100 : 0}%"></i></div></div>
+    ${cur ? `<button class="now" data-p="${esc(cur)}"><span class="lbl"><i></i>Сейчас выступает</span>
+        <span class="row">${av(cur, 'lg')}<span class="nm">${esc(cur)}</span></span>
+        <span class="go"><span>${cfg.mine[cur] ? 'Изменить оценку' : 'Оценить'}</span><span>→</span></span></button>` : ''}
+    ${others.length ? `${cur ? '<h3 style="margin-top:4px">Остальные</h3>' : ''}<div class="list">${others.map(p => `
+      <button class="pres${cfg.mine[p] ? ' isdone' : ''}" data-p="${esc(p)}">
+        ${av(p)}<span class="name">${esc(p)}</span>
+        <span class="st${cfg.mine[p] ? ' done' : ''}">${cfg.mine[p] ? '✓ Оценено' : 'Оценить'}</span>
+      </button>`).join('')}</div>` : ''}`;
+  app.querySelectorAll('[data-p]').forEach(b => b.addEventListener('click', () => open(b.dataset.p)));
 }
-
-function showResults(){
-  const r = cfg.results, n = r.total_votes;
-  document.title = 'Итоги: ' + cfg.title;
-  app.classList.add('wide');
-  app.innerHTML = `<div class="res-head"><span class="eyebrow">Итоги голосования</span><h1>${esc(cfg.title)}</h1>
-    <p class="muted">${n} ${VC_pl(n, 'оценка', 'оценки', 'оценок')} от ${r.voters} ${VC_pl(r.voters, 'человека', 'человек', 'человек')} · спасибо всем, кто голосовал!</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="shot" style="height:44px">Сохранить картинку итогов</button><a class="btn" href="/screen" style="height:44px;display:inline-flex;align-items:center;text-decoration:none">Открыть на весь экран</a></div></div>
-    ${window.VoteCharts ? VoteCharts.full(r, cfg) : '<p class="muted">Не загрузились графики. Обновите страницу.</p>'}`;
-  const b = document.getElementById('shot');
-  if (b) b.addEventListener('click', () => VoteCharts.showShot(r, cfg));
-  if (window.VoteCharts) VoteCharts.tooltips();
-}
-const VC_pl = (n, one, few, many) => n % 10 === 1 && n % 100 !== 11 ? one : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)) ? few : many;
 
 function open(p){
   sel = p; error = '';
   const prev = cfg.mine[p];
-  scores = prev ? {...prev.scores} : {};
+  scores = prev ? Object.assign({}, prev.scores) : {};
   comment = prev ? prev.comment : '';
-  rate(); window.scrollTo(0,0);
+  rate(); window.scrollTo(0, 0);
 }
 
+function word(v){ const n = cfg.scale; if (!v) return ''; return n === 5 ? WORDS5[v] : v <= 3 ? 'Слабо' : v <= 5 ? 'Ниже среднего' : v <= 7 ? 'Хорошо' : 'Отлично'; }
+
 function rate(){
-  const n = cfg.scale;
+  const n = cfg.scale, C = cfg.criteria;
   app.innerHTML = `
     ${cfg.presentations.length > 1 ? '<button class="back" id="back">← Все презентации</button>' : ''}
-    <div><p class="muted small">Вы оцениваете</p><h2>${esc(sel)}</h2></div>
+    <div class="rhead">${av(sel, 'lg')}<div class="nm"><span class="eyebrow">Вы оцениваете</span><h2>${esc(sel)}</h2></div></div>
+    <div class="steps" id="steps">${C.map(c => `<i class="${scores[c.name] ? 'on' : ''}"></i>`).join('')}</div>
     ${cfg.mine[sel] ? '<p class="muted small">Вы уже оценивали эту презентацию — новые оценки заменят прежние.</p>' : ''}
-    ${cfg.criteria.map((c,i) => `
+    ${C.map((c, i) => `
       <div class="crit" id="c${i}">
-        <div class="cname">${esc(c.name)}</div>
+        <div class="ch"><span class="cname">${esc(c.name)}</span><span class="cnum">${i + 1} из ${C.length}</span></div>
         ${c.desc ? `<div class="cdesc">${esc(c.desc)}</div>` : ''}
-        <div class="scale" style="grid-template-columns:repeat(${Math.min(n,5)},1fr)">
-          ${Array.from({length:n},(_,k)=>k+1).map(v => `<button data-c="${i}" data-v="${v}" aria-pressed="${scores[c.name]===v}" aria-label="${esc(c.name)}: ${v}">${v}</button>`).join('')}
+        <div class="scale" style="grid-template-columns:repeat(${Math.min(n, 5)},1fr)">
+          ${Array.from({length: n}, (_, k) => k + 1).map(v => `<button data-c="${i}" data-v="${v}" aria-pressed="${scores[c.name] === v}" aria-label="${esc(c.name)}: ${v}">${v}</button>`).join('')}
         </div>
-        <div class="ends"><span>1 — слабо</span><span>${n} — отлично</span></div>
+        <div class="word" id="w${i}">${scores[c.name] ? `<b>${scores[c.name]} — ${word(scores[c.name])}</b>` : `<span>1 — слабо</span><span>${n} — отлично</span>`}</div>
       </div>`).join('')}
-    ${cfg.comments ? `<label class="small muted" for="cm">Комментарий (необязательно)</label><textarea id="cm" maxlength="1000" placeholder="Что понравилось или что улучшить?">${esc(comment)}</textarea>` : ''}
+    ${cfg.comments ? `<label class="small muted" for="cm">Комментарий для выступающего (необязательно)</label><textarea id="cm" maxlength="1000" placeholder="Что понравилось или что улучшить?">${esc(comment)}</textarea>` : ''}
     ${error ? `<p class="err">${esc(error)}</p>` : ''}`;
   const back = document.getElementById('back'); if (back) back.addEventListener('click', list);
   app.querySelectorAll('.scale button').forEach(b => b.addEventListener('click', () => {
-    const c = cfg.criteria[+b.dataset.c]; scores[c.name] = +b.dataset.v;
+    const i = +b.dataset.c, c = C[i], first = !scores[c.name];
+    scores[c.name] = +b.dataset.v; buzz();
     b.parentElement.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
-    b.closest('.crit').classList.remove('missing'); updateBar();
+    b.closest('.crit').classList.remove('missing');
+    document.getElementById('w' + i).innerHTML = `<b>${scores[c.name]} — ${word(scores[c.name])}</b>`;
+    document.querySelectorAll('#steps i')[i].classList.add('on');
+    updateBar();
+    // Сразу ведём к следующему неоценённому критерию
+    if (first){ const nx = C.findIndex((cc, k) => k > i && !scores[cc.name]); if (nx >= 0) setTimeout(() => { const el = document.getElementById('c' + nx); if (el) el.scrollIntoView({behavior: 'smooth', block: 'center'}); }, 180); }
   }));
   const cm = document.getElementById('cm'); if (cm) cm.addEventListener('input', () => comment = cm.value);
   bar.hidden = false; updateBar();
@@ -148,34 +210,66 @@ function rate(){
 
 function updateBar(){
   const left = cfg.criteria.filter(c => !scores[c.name]).length;
-  barIn.innerHTML = `<button class="btn primary" id="send" ${sending ? 'disabled' : ''}>${sending ? 'Отправляю…' : left ? `Осталось оценить: ${left}` : 'Отправить'}</button>`;
+  barIn.innerHTML = `<button class="btn primary" id="send" ${sending ? 'disabled' : ''}>${sending ? 'Отправляю…' : left ? `Осталось оценить: ${left}` : 'Отправить оценку'}</button>`;
   document.getElementById('send').addEventListener('click', send);
 }
 
 async function send(){
   const missing = cfg.criteria.findIndex(c => !scores[c.name]);
-  if (missing >= 0){ const el = document.getElementById('c'+missing); el.classList.add('missing'); el.scrollIntoView({behavior:'smooth', block:'center'}); return; }
+  if (missing >= 0){ const el = document.getElementById('c' + missing); el.classList.add('missing'); el.scrollIntoView({behavior: 'smooth', block: 'center'}); return; }
   sending = true; updateBar();
   try {
-    const r = await fetch('/api/vote', {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+    const r = await fetch('/api/vote', {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({presentation: sel, scores, comment})});
     const d = await r.json();
     sending = false;
-    if (r.ok){ cfg.mine[sel] = {scores:{...scores}, comment}; done(); return; }
-    if (d.error === 'closed'){ cfg.open = false; list(); return; }
+    if (r.ok){ cfg.mine[sel] = {scores: Object.assign({}, scores), comment, receipt: d.receipt}; lastReceipt = d.receipt; done(); return; }
+    if (d.error === 'closed'){ cfg.open = false; await load(); return; }
     error = d.error === 'unknown_presentation' ? 'Эту презентацию убрали из списка. Вернитесь к списку.' : 'Не получилось отправить. Попробуйте ещё раз.';
     rate();
   } catch(e){ sending = false; error = 'Нет связи с сервером. Проверьте интернет и нажмите «Отправить» ещё раз.'; rate(); }
 }
 
 function done(){
-  window.scrollTo(0,0);
-  const left = cfg.presentations.filter(p => !cfg.mine[p]);
-  app.innerHTML = `<div class="center"><div class="big">✓</div><h2>Спасибо, оценки приняты!</h2>
-    <p class="muted">${left.length ? `Осталось оценить: ${left.length}.` : 'Вы оценили все презентации.'}</p></div>`;
-  barIn.innerHTML = `<button class="btn primary" id="more">${left.length ? 'Оценить другую презентацию' : 'К списку презентаций'}</button>`;
-  document.getElementById('more').addEventListener('click', load);
+  window.scrollTo(0, 0);
+  const P = cfg.presentations, left = P.filter(p => !cfg.mine[p]);
+  const next = cfg.current && !cfg.mine[cfg.current] ? cfg.current : left[0];
+  app.innerHTML = `${header()}<div class="done">
+      <svg class="check" viewBox="0 0 84 84" aria-hidden="true"><circle cx="42" cy="42" r="42"/><path d="M25 43 L37 55 L60 31"/></svg>
+      <h2>Спасибо, оценка принята!</h2>
+      <p class="muted">${esc(sel)}</p>
+      ${lastReceipt ? `<div class="receipt"><span class="small muted">Ваш код проверки</span><span class="code">${esc(lastReceipt)}</span>
+        <p>После закрытия голосования по этому коду можно найти свои оценки в открытых данных и убедиться, что они учтены.</p>
+        <button class="btn sm" id="copy">Скопировать код</button></div>` : ''}
+      <p class="muted small">${left.length ? `Осталось оценить: ${left.length} из ${P.length}` : 'Вы оценили все презентации. Спасибо!'}</p>
+    </div>`;
+  const cp = document.getElementById('copy');
+  if (cp) cp.addEventListener('click', async () => { try { await navigator.clipboard.writeText(lastReceipt); toast('Код скопирован'); } catch(e){ toast(lastReceipt); } });
+  barIn.innerHTML = next
+    ? `<button class="btn" id="all">Список</button><button class="btn primary" id="more" style="min-width:0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Дальше: ${esc(next)}</span></button>`
+    : `<button class="btn primary" id="all">К списку презентаций</button>`;
+  document.getElementById('all').addEventListener('click', list);
+  const m = document.getElementById('more'); if (m) m.addEventListener('click', () => open(next));
   bar.hidden = false;
+}
+
+function showResults(){
+  const r = cfg.results, n = r.total_votes;
+  document.title = 'Итоги: ' + cfg.title;
+  app.classList.add('wide');
+  const mine = Object.keys(cfg.mine).filter(p => cfg.mine[p].receipt);
+  app.innerHTML = `${header()}
+    <div class="head"><span class="eyebrow">Итоги голосования</span><h1>${esc(cfg.title)}</h1>
+      <p class="muted">${n} ${pl(n, 'оценка', 'оценки', 'оценок')} от ${r.voters} ${pl(r.voters, 'человека', 'человек', 'человек')} · спасибо всем, кто голосовал!</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"><button class="btn sm" id="shot">Сохранить картинку итогов</button><a class="btn sm" href="/screen">Открыть на весь экран</a><a class="btn sm" href="#chestno">Проверка честности</a></div></div>
+    ${VC.full(r, cfg)}
+    <section class="vc-section" id="chestno"><h2>Проверка честности</h2>
+      <p class="vc-sub" style="margin:0">Здесь можно убедиться, что итоги посчитаны по всем голосам и никто их не менял.</p>
+      ${mine.length ? `<div class="vc-section"><h3>Ваши голоса на этом устройстве</h3><ul class="mine" style="list-style:none;margin:0;padding:0">${mine.map(p => `<li><span>${esc(p)}</span><code>${esc(cfg.mine[p].receipt)}</code></li>`).join('')}</ul></div>` : ''}
+      ${VC.audit(cfg.audit)}
+    </section>`;
+  document.getElementById('shot').addEventListener('click', () => VC.showShot(r, cfg));
+  VC.tooltips(); VC.bindLookup(cfg);
 }
 
 load();

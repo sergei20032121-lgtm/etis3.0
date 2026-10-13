@@ -54,6 +54,26 @@ def post(path, data, voter=None):
 P = ["Анализ рынка — Иванова А.", "Редизайн сайта — Петров С.", "Новая система отчётности — Ким Д.",
      "Автоматизация закупок — Смирнова Е.", "Онбординг новичков — Орлов В.", "Чат-бот поддержки — Белова М."]
 post("/api/admin/config?key=demo", {"title": "Демо: защита проектов", "presentations": P, "open": True})
+
+# Тестовые логотипы: простые SVG-значки, чтобы было видно оформление
+import base64
+
+def upload_svg(svg):
+    req = urllib.request.Request(B + "/api/admin/upload?key=demo", json.dumps(
+        {"data": "data:image/svg+xml;base64," + base64.b64encode(svg.encode("utf-8")).decode()}).encode(),
+        {"Content-Type": "application/json"})
+    return json.loads(urllib.request.urlopen(req).read().decode())["file"]
+
+org_logo = upload_svg('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 60"><rect x="2" y="6" width="48" height="48" rx="12" fill="#1F5FBF"/>'
+                      '<path d="M14 40 L26 18 L38 40 Z" fill="#fff"/><text x="62" y="40" font-family="Arial" font-weight="700" font-size="26" fill="#1F5FBF">Демо·Ко</text></svg>')
+shapes = ['<circle cx="32" cy="32" r="18" fill="#fff"/>', '<rect x="16" y="16" width="32" height="32" rx="6" fill="#fff"/>',
+          '<path d="M32 12 L52 50 L12 50 Z" fill="#fff"/>', '<path d="M14 32 L32 14 L50 32 L32 50 Z" fill="#fff"/>']
+colors = ["#E4572E", "#2E86AB", "#7B2CBF", "#2A9D8F"]
+logos = {}
+for i, p in enumerate(P[:4]):
+    logos[p] = upload_svg('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="%s"/>%s</svg>'
+                          % (colors[i], shapes[i]))
+post("/api/admin/config?key=demo", {"org": "Демо·Ко · Демо-день", "logo": org_logo, "logos": logos, "accent": "#1F5FBF"})
 C = ["Содержание", "Структура", "Оформление", "Выступление", "Ответы на вопросы"]
 base = [[4.6, 4.2, 3.8, 4.4, 4.0], [3.4, 3.8, 4.8, 3.2, 3.0], [4.0, 4.4, 3.6, 3.8, 4.6],
         [3.0, 3.2, 3.4, 4.2, 3.6], [3.8, 3.6, 4.2, 4.6, 3.4], [3.2, 2.8, 3.0, 3.4, 3.8]]

@@ -5,6 +5,42 @@ window.VoteCharts = (() => {
   const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
   const plural = (n, one, few, many) => n % 10 === 1 && n % 100 !== 11 ? one : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)) ? few : many;
 
+  // ---------- Фирменный цвет и логотипы ----------
+  const hex2rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const rgb2hex = c => '#' + c.map(v => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')).join('');
+  const mixHex = (a, b, t) => { const A = hex2rgb(a), B = hex2rgb(b); return rgb2hex(A.map((v, i) => v + (B[i] - v) * t)); };
+  const lum = h => { const c = hex2rgb(h).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+  function applyBrand(cfg){
+    const a = /^#[0-9a-f]{6}$/i.test(cfg && cfg.accent || '') ? cfg.accent : '#1D6B57';
+    // Слишком светлый цвет темним, чтобы белый текст на кнопках читался
+    const base = lum(a) > 0.32 ? mixHex(a, '#000000', 0.35) : a;
+    const st = document.documentElement.style;
+    st.setProperty('--brand', base);
+    st.setProperty('--brand-hi', mixHex(base, '#ffffff', 0.42));
+    st.setProperty('--brand-soft', mixHex(base, '#ffffff', 0.88));
+    st.setProperty('--brand-soft-dk', mixHex(base, '#121514', 0.8));
+    st.setProperty('--brand-mid', mixHex(base, '#ffffff', 0.5));
+    st.setProperty('--brand-mid-dk', mixHex(base, '#121514', 0.45));
+    let fav = document.querySelector('link[rel="icon"]');
+    if (cfg && cfg.logo){ if (!fav){ fav = document.createElement('link'); fav.rel = 'icon'; document.head.appendChild(fav); } fav.href = '/u/' + cfg.logo; }
+    return base;
+  }
+  const logoUrl = f => f ? '/u/' + f : '';
+  const initials = name => {
+    const w = String(name).split(/\s+[—–-]\s+/)[0].split(/\s+/).filter(x => /[\wА-Яа-яЁё]/.test(x));
+    return ((w[0] || '?')[0] + (w[1] ? w[1][0] : (w[0] || '').slice(1, 2))).toUpperCase();
+  };
+  // Логотип презентации или монограмма из первых букв названия
+  function avatar(name, cfg, cls){
+    const f = cfg && cfg.logos && cfg.logos[name];
+    return f ? `<span class="vc-av ${cls || ''}"><img src="/u/${esc(f)}" alt=""></span>`
+             : `<span class="vc-av mono ${cls || ''}" aria-hidden="true">${esc(initials(name))}</span>`;
+  }
+  function brandHead(cfg){
+    if (!cfg.logo && !cfg.org) return '';
+    return `<div class="vc-brand">${cfg.logo ? `<img src="/u/${esc(cfg.logo)}" alt="${esc(cfg.org || 'Логотип')}">` : ''}${cfg.org ? `<span>${esc(cfg.org)}</span>` : ''}</div>`;
+  }
+
   // Строки с оценками, места с учётом равенства баллов
   function ranked(res){
     let place = 0, prev = null;
@@ -15,15 +51,16 @@ window.VoteCharts = (() => {
   }
   const medal = p => p <= 3 ? ' m' + p : '';
 
-  function table(rows, criteria, S){
+  const FEW = 5;
+  function table(rows, criteria, S, cfg){
     const best = criteria.map((_, k) => Math.max(...rows.map(r => r.avgs[k] == null ? -1 : r.avgs[k])));
     return `<div class="vc-tablebox"><table class="vc-table"><thead><tr>
       <th class="c-place">Место</th><th class="c-name">Презентация</th><th>Средний балл</th><th>Голосов</th>
       ${criteria.map(n => `<th>${esc(n)}</th>`).join('')}</tr></thead><tbody>
       ${rows.map(r => `<tr>
         <td class="c-place"><span class="vc-place${medal(r.place)}">${r.place}</span></td>
-        <td class="c-name">${esc(r.name)}</td>
-        <td class="c-total"><span class="vc-total"><span class="vc-mini"><i style="width:${r.total / S * 100}%"></i></span><b>${fmt(r.total)}</b></span></td>
+        <td class="c-name"><span class="vc-namecell">${avatar(r.name, cfg)}<span>${esc(r.name)}${r.votes < FEW ? '<span class="vc-few">мало голосов</span>' : ''}</span></span></td>
+        <td class="c-total"><span class="vc-total"><span class="vc-mini"><i style="width:${r.total / S * 100}%"></i></span><b>${fmt(r.total)}</b></span>${r.ci != null ? `<span class="vc-ci" data-tip="С вероятностью 95% настоящий средний балл лежит в пределах ${fmt(Math.max(0, r.total - r.ci))}–${fmt(Math.min(S, r.total + r.ci))}">± ${fmt(r.ci)}</span>` : ''}</td>
         <td>${r.votes}</td>
         ${r.avgs.map((a, k) => `<td class="${a != null && a === best[k] ? 'vc-cell-best' : ''}">${fmt(a)}</td>`).join('')}
       </tr>`).join('')}</tbody></table></div>`;
@@ -56,12 +93,12 @@ window.VoteCharts = (() => {
       ${dots}${labels}</svg>`;
   }
 
-  function radars(rows, criteria, S){
+  function radars(rows, criteria, S, cfg){
     if (criteria.length < 3) return '<p class="vc-empty">Профиль строится, когда критериев три и больше.</p>';
     const avg = criteria.map((_, k) => { const v = rows.map(r => r.avgs[k]).filter(a => a != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; });
     return `<div class="vc-legend"><span><i class="line"></i>презентация</span><span><i class="dash"></i>среднее по всем</span></div>
       <div class="vc-radars">${rows.map(r => `<div class="vc-radar">
-        <div class="vc-radar-h"><span class="vc-place${medal(r.place)}">${r.place}</span><span class="n">${esc(r.name)}</span><b>${fmt(r.total)}</b></div>
+        <div class="vc-radar-h"><span class="vc-place${medal(r.place)}">${r.place}</span>${avatar(r.name, cfg, 'sm')}<span class="n">${esc(r.name)}</span><b>${fmt(r.total)}</b></div>
         ${radarSvg(r, avg, criteria, S)}</div>`).join('')}</div>`;
   }
 
@@ -115,18 +152,103 @@ window.VoteCharts = (() => {
       <div class="vc-cols-ax"><span>${hm(start)}</span><span>${hm(end)}</span></div>`;
   }
 
-  // Полный набор: пьедестал, таблица, профили, средний балл, тепловая карта, распределение (+активность в админке)
+  // «Главное»: короткие выводы простыми словами
+  function insights(rows, criteria, S){
+    const out = [];
+    if (!rows.length) return out;
+    const q = s => '«' + s + '»';
+    const a = rows[0], b = rows[1];
+    if (b){
+      const d = a.total - b.total, err = Math.sqrt(Math.pow(a.ci || 0, 2) + Math.pow(b.ci || 0, 2));
+      if (d < 0.005) out.push({k: 'tie', t: `${q(a.name)} и ${q(b.name)} делят первое место: у обеих ${fmt(a.total)}.`});
+      else if (err && d < err) out.push({k: 'tie', t: `Первое место — ${q(a.name)} (${fmt(a.total)}), но отрыв от ${q(b.name)} всего ${fmt(d)}: это в пределах погрешности, по сути они почти равны.`});
+      else out.push({k: 'win', t: `Первое место — ${q(a.name)} (${fmt(a.total)}), уверенный отрыв от второго места: ${fmt(d)}.`});
+    } else out.push({k: 'win', t: `Оценена одна презентация: ${q(a.name)} — ${fmt(a.total)}.`});
+    const withSd = rows.filter(r => r.sd != null && r.votes >= FEW);
+    if (withSd.length >= 2){
+      const lo = withSd.reduce((m, r) => r.sd < m.sd ? r : m), hi = withSd.reduce((m, r) => r.sd > m.sd ? r : m);
+      if (hi.sd - lo.sd >= 0.15){
+        out.push({k: 'agree', t: `Самое единодушное мнение — о ${q(lo.name)}: оценки почти у всех близки.`});
+        out.push({k: 'split', t: `Сильнее всего мнения разошлись о ${q(hi.name)}: кому-то очень понравилось, кому-то нет.`});
+      }
+    }
+    const cAvg = criteria.map((n, k) => { const v = rows.map(r => r.avgs[k]).filter(x => x != null); return {n, v: v.length ? v.reduce((x, y) => x + y, 0) / v.length : null}; }).filter(c => c.v != null);
+    if (cAvg.length >= 2){
+      const best = cAvg.reduce((m, c) => c.v > m.v ? c : m), worst = cAvg.reduce((m, c) => c.v < m.v ? c : m);
+      if (best.v - worst.v >= 0.1) out.push({k: 'crit', t: `По всем выступлениям выше всего оценили критерий ${q(best.n)} (${fmt(best.v)}), ниже всего — ${q(worst.n)} (${fmt(worst.v)}): здесь есть куда расти.`});
+    }
+    const few = rows.filter(r => r.votes < FEW);
+    if (few.length) out.push({k: 'few', t: `Мало голосов у ${few.map(r => q(r.name)).join(', ')} — их балл менее точный.`});
+    return out;
+  }
+  const ICONS = {win: '★', tie: '≈', agree: '◎', split: '⇅', crit: '◆', few: '!'};
+  function insightsHtml(list){
+    return `<ul class="vc-ins">${list.map(i => `<li class="i-${i.k}"><span class="ic" aria-hidden="true">${ICONS[i.k]}</span><span>${esc(i.t)}</span></li>`).join('')}</ul>`;
+  }
+
+  // Полный набор: главное, таблица, профили, средний балл, тепловая карта, распределение (+активность в админке)
   function full(res, cfg, opts){
     opts = opts || {};
     const S = cfg.scale, rows = ranked(res);
     if (!rows.length) return '<p class="vc-empty">Графики появятся после первых оценок.</p>';
     const sec = (title, sub, body) => `<section class="vc-section"><h3>${title}</h3>${sub ? `<p class="vc-sub">${sub}</p>` : ''}${body}</section>`;
+    const ins = insights(rows, res.criteria, S);
     return [
-      sec('Турнирная таблица', `Средний балл — среднее по ${res.criteria.length} ${plural(res.criteria.length, 'критерию', 'критериям', 'критериям')}. Выделена лучшая оценка в каждом критерии.`, table(rows, res.criteria, S)),
-      sec('Профиль каждой презентации', 'Чем дальше точка от центра, тем выше оценка по критерию', radars(rows, res.criteria, S)),
+      ins.length ? sec('Главное', '', insightsHtml(ins)) : '',
+      sec('Турнирная таблица', `Средний балл — среднее по ${res.criteria.length} ${plural(res.criteria.length, 'критерию', 'критериям', 'критериям')}. «±» — погрешность: чем больше голосов, тем она меньше. Выделена лучшая оценка в каждом критерии.`, table(rows, res.criteria, S, cfg)),
+      sec('Профиль каждой презентации', 'Чем дальше точка от центра, тем выше оценка по критерию', radars(rows, res.criteria, S, cfg)),
       `<div class="vc-grid2">${sec('Средний балл', `Шкала 0–${S}`, bars(rows, S))}${sec('Сильные и слабые стороны', 'Чем ярче цвет клетки, тем выше оценка', heat(rows, res.criteria, S))}</div>`,
       `<div class="vc-grid2">${sec('Как распределились оценки', 'Доля каждой оценки среди всех оценок презентации', dist(rows, S))}${opts.activity ? sec('Активность', '', activity(res.times, res.now)) : ''}</div>`,
     ].join('');
+  }
+
+  // ---------- Проверка честности ----------
+  const dt = t => new Date(t * 1000).toLocaleString('ru-RU', {day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'});
+  function audit(a, opts){
+    if (!a) return '';
+    opts = opts || {};
+    const seal = a.seal;
+    const status = !seal
+      ? `<div class="vc-seal warn"><b>Итоги ещё не опечатаны</b><span>Отпечаток фиксируется в момент закрытия приёма.</span></div>`
+      : a.intact
+        ? `<div class="vc-seal ok"><b>✓ Данные не менялись после закрытия</b><span>Итоги опечатаны ${dt(seal.ts)}: ${seal.count} ${plural(seal.count, 'голос', 'голоса', 'голосов')}. Отпечаток сейчас совпадает с опечатанным.</span></div>`
+        : `<div class="vc-seal bad"><b>⚠ Данные изменились после закрытия</b><span>Опечатанный отпечаток не совпадает с текущим. Спросите организатора, что произошло.</span></div>`;
+    const ev = a.events.length ? `<ol class="vc-log">${a.events.slice().reverse().map(e => `<li class="${esc(e.action)}"><time>${dt(e.ts)}</time><span>${esc(e.detail)}</span></li>`).join('')}</ol>` : '<p class="vc-empty">Записей пока нет.</p>';
+    return `<div class="vc-audit">
+      ${status}
+      <div class="vc-grid2">
+        <div class="vc-section"><h3>Найти свой голос</h3>
+          <p class="vc-sub">После каждой оценки вы видели код проверки. Введите его — покажем, что записано.</p>
+          <form class="vc-lookup" id="vc-lookup"><input id="vc-code" placeholder="ABCD-EF23" maxlength="9" autocomplete="off" aria-label="Код проверки"><button class="btn" type="submit">Проверить</button></form>
+          <div id="vc-found" aria-live="polite"></div>
+          <h3 style="margin-top:12px">Открытые данные</h3>
+          <p class="vc-sub">Все оценки без имён и комментариев. Можно пересчитать места самостоятельно в Excel.</p>
+          <div><a class="btn" href="/api/open.csv${opts.key ? '?key=' + encodeURIComponent(opts.key) : ''}">Скачать все оценки (CSV)</a></div>
+          <details class="vc-hash"><summary>Отпечаток данных (SHA-256)</summary>
+            <code>${esc(seal ? seal.hash : a.current)}</code>
+            <p class="vc-sub">Как пересчитать: для каждой строки CSV собрать «код;презентация;оценки через ;», отсортировать строки, соединить переводом строки и посчитать SHA-256.</p></details>
+        </div>
+        <div class="vc-section"><h3>Журнал организатора</h3><p class="vc-sub">Всё, что влияет на итоги: открытие и закрытие приёма, изменения списка и критериев, удаление оценок.</p>${ev}</div>
+      </div></div>`;
+  }
+  function bindLookup(cfg, key){
+    const f = document.getElementById('vc-lookup');
+    if (!f) return;
+    let cache = null;
+    f.addEventListener('submit', async e => {
+      e.preventDefault();
+      const out = document.getElementById('vc-found');
+      const code = document.getElementById('vc-code').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (code.length !== 8){ out.innerHTML = '<p class="vc-sub">Код — 8 символов, например ABCD-EF23.</p>'; return; }
+      const want = code.slice(0, 4) + '-' + code.slice(4);
+      try {
+        if (!cache) cache = await (await fetch('/api/open' + (key ? '?key=' + encodeURIComponent(key) : ''), {cache: 'no-store'})).json();
+        const r = cache.rows.find(x => x.receipt === want);
+        out.innerHTML = r
+          ? `<div class="vc-found ok"><b>✓ Голос найден и учтён</b><span>${esc(r.presentation)}</span><span>${cache.criteria.map((n, i) => `${esc(n)}: <b>${r.scores[i] == null ? '—' : r.scores[i]}</b>`).join(' · ')}</span></div>`
+          : `<div class="vc-found bad"><b>Голос с таким кодом не найден</b><span>Проверьте код. Если вы переоценивали презентацию, действует код последней оценки.</span></div>`;
+      } catch(err){ out.innerHTML = '<p class="vc-sub">Не удалось загрузить данные. Попробуйте ещё раз.</p>'; }
+    });
   }
 
   // ---------- Картинка итогов (canvas) ----------
@@ -153,7 +275,9 @@ window.VoteCharts = (() => {
   }
   const medalColor = p => p === 1 ? C.gold : p === 2 ? C.silver : p === 3 ? C.bronze : C.soft;
 
-  function image(res, cfg, W, H){
+  function image(res, cfg, W, H, imgs){
+    imgs = imgs || {logos: {}};
+    C.accent = applyBrandColor(cfg); C.soft = mixHex(C.accent, '#ffffff', 0.88); C.track = mixHex(C.accent, '#ffffff', 0.9);
     const S = cfg.scale, rows = ranked(res), land = W > H;
     const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     const x = cv.getContext('2d'), M = Math.round(Math.min(W, H) * 0.06);
@@ -161,8 +285,14 @@ window.VoteCharts = (() => {
     x.fillStyle = C.accent; x.fillRect(0, 0, W, Math.round(H * 0.012));
     x.textBaseline = 'alphabetic';
 
-    // Шапка
+    // Шапка: логотип и название организации справа, если есть
     let y = M + 26;
+    if (imgs.logo || cfg.org){
+      const lh = 64, right = W - M;
+      let lx2 = right;
+      if (cfg.org){ x.font = `600 24px ${FONT}`; x.fillStyle = C.muted; x.textAlign = 'right'; x.fillText(ellipsis(x, cfg.org, W * 0.3), right, M + 26 + (imgs.logo ? lh / 2 - 4 : 0)); lx2 = right - Math.min(x.measureText(cfg.org).width, W * 0.3) - 18; x.textAlign = 'left'; }
+      if (imgs.logo){ const r = imgs.logo.naturalWidth / imgs.logo.naturalHeight || 1, w = Math.min(lh * r, 260); x.drawImage(imgs.logo, lx2 - w, M - 6, w, w / r); }
+    }
     x.fillStyle = C.accent; x.font = `700 24px ${FONT}`; x.fillText('ИТОГИ ГОЛОСОВАНИЯ', M, y);
     y += land ? 66 : 64;
     x.fillStyle = C.ink; x.font = `800 ${land ? 58 : 54}px ${FONT}`;
@@ -177,7 +307,7 @@ window.VoteCharts = (() => {
     // Таблица мест с полосами + лучшие по критериям.
     // 16:9: слева шапка и лучшие по критериям, справа таблица. Вертикально: всё друг под другом.
     const lx = land ? W * 0.5 : M, lw = land ? W * 0.5 - M : W - 2 * M;
-    let ly = land ? M + 20 : headBottom + 50;
+    let ly = land ? M + 20 + ((imgs.logo || cfg.org) ? 90 : 0) : headBottom + 50;
     const lb = H - M;
     const crit = res.criteria.map((name, k) => {
       let bestR = null;
@@ -201,7 +331,10 @@ window.VoteCharts = (() => {
       x.beginPath(); x.arc(lx + rad, cy, rad, 0, Math.PI * 2); x.fillStyle = medalColor(r.place); x.fill();
       x.fillStyle = r.place <= 3 ? C.ink : C.accent; x.font = `800 ${Math.round(rad * 0.95)}px ${FONT}`; x.textAlign = 'center';
       x.fillText(String(r.place), lx + rad, cy + rad * 0.34); x.textAlign = 'left';
-      const nameX = lx + rad * 2 + 18, valW = 90, barW = Math.max(120, lw * 0.3), nameW = lw - (nameX - lx) - barW - valW - 24;
+      let nameX = lx + rad * 2 + 18;
+      const pl = imgs.logos[r.name];
+      if (pl){ const sz = Math.min(rowH * 0.62, 56); rr(x, '#ffffff', nameX, cy - sz / 2, sz, sz, 8); const k = Math.min(sz / pl.naturalWidth, sz / pl.naturalHeight); x.drawImage(pl, nameX + (sz - pl.naturalWidth * k) / 2, cy - pl.naturalHeight * k / 2, pl.naturalWidth * k, pl.naturalHeight * k); nameX += sz + 14; }
+      const valW = 90, barW = Math.max(120, lw * 0.3), nameW = lw - (nameX - lx) - barW - valW - 24;
       const fs = Math.round(Math.min(28, rowH * 0.32));
       x.font = `600 ${fs}px ${FONT}`;
       const fs2 = Math.round(Math.min(20, rowH * 0.24)), lh = Math.round(fs * 1.18);
@@ -249,11 +382,22 @@ window.VoteCharts = (() => {
     return cv;
   }
 
-  function showShot(res, cfg){
+  function applyBrandColor(cfg){
+    const a = /^#[0-9a-f]{6}$/i.test(cfg && cfg.accent || '') ? cfg.accent : '#1D6B57';
+    return lum(a) > 0.32 ? mixHex(a, '#000000', 0.35) : a;
+  }
+  const loadImg = src => new Promise(ok => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = src; });
+  async function loadImages(cfg){
+    const out = {logo: cfg.logo ? await loadImg('/u/' + cfg.logo) : null, logos: {}};
+    await Promise.all(Object.keys(cfg.logos || {}).map(async n => { const i = await loadImg('/u/' + cfg.logos[n]); if (i) out.logos[n] = i; }));
+    return out;
+  }
+  async function showShot(res, cfg){
+    const imgs = await loadImages(cfg);
     let wrapEl = document.querySelector('.vc-shot');
     if (!wrapEl){ wrapEl = document.createElement('div'); wrapEl.className = 'vc-shot'; document.body.appendChild(wrapEl); }
     const set = (W, H, tag) => {
-      const url = image(res, cfg, W, H).toDataURL('image/png');
+      const url = image(res, cfg, W, H, imgs).toDataURL('image/png');
       wrapEl.innerHTML = `<img alt="Итоги голосования" src="${url}">
         <div class="row"><button class="btn" data-f="l">16:9 для слайда</button><button class="btn" data-f="p">Для телефона</button>
         <a class="btn primary" download="itogi-${tag}.png" href="${url}">Скачать картинку</a><button class="btn" data-f="x">Закрыть</button></div>
@@ -274,5 +418,6 @@ window.VoteCharts = (() => {
     document.addEventListener('mousemove', e => { if (tip.hidden) return; tip.style.left = Math.min(innerWidth - tip.offsetWidth - 8, e.clientX + 12) + 'px'; tip.style.top = (e.clientY + 16) + 'px'; });
   }
 
-  return {full, image, showShot, tooltips, ranked, fmt, radarSvg, plural};
+  return {full, image, showShot, tooltips, ranked, fmt, radarSvg, plural, applyBrand, avatar, brandHead, logoUrl,
+          insights, insightsHtml, audit, bindLookup, loadImages, initials};
 })();
