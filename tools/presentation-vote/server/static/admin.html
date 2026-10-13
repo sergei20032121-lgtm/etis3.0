@@ -205,7 +205,8 @@ function render(){
         <div class="field"><label for="s-crit">Критерии, по одному в строке: «Название — пояснение»</label><textarea id="s-crit" rows="5"></textarea></div>
         <div class="row">
           <label for="s-scale">Шкала</label>
-          <select id="s-scale" style="width:auto"><option value="5">1–5</option><option value="10">1–10</option></select>
+          <select id="s-scale" style="width:auto"><option value="10">1–10</option><option value="5">1–5</option></select>
+          <span class="small muted" id="s-scale-note"></span>
           <label class="row" style="font-weight:500"><input type="checkbox" id="s-comments"> Поле для комментария</label>
         </div>
         <div class="row"><button class="btn primary" type="submit">Сохранить</button><span class="small muted" id="s-msg"></span></div>
@@ -334,11 +335,14 @@ function fillSettings(){
   $('s-pres').value = c.presentations.join('\n');
   $('s-crit').value = c.criteria.map(x => x.desc ? `${x.name} — ${x.desc}` : x.name).join('\n');
   $('s-scale').value = String(c.scale);
+  const locked = data.results.total_votes > 0;
+  $('s-scale').disabled = locked;
+  $('s-scale-note').textContent = locked ? 'Шкалу можно сменить только до первых оценок или после «Удалить все оценки».' : '';
   $('s-comments').checked = c.comments;
 }
 async function save(patch){
   try { const d = await api('/api/admin/config', patch); data.config = d.config; render(); }
-  catch(e){ toast(e.message === 'bad_key' ? 'Неверный ключ' : 'Не удалось сохранить'); }
+  catch(e){ toast(e.message === 'bad_key' ? 'Неверный ключ' : e.message === 'scale_locked' ? 'Шкалу нельзя менять, пока есть оценки' : 'Не удалось сохранить'); }
 }
 function showStage(){
   const c = data.config;

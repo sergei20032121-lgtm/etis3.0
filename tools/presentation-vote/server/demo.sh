@@ -40,7 +40,7 @@ done
 [ "$ok" = 1 ] || { echo "Демо не запустилось:"; cat "$LOG"; exit 1; }
 
 echo "→ Заполняю выдуманными голосами"
-PORT="$PORT" DB="$DB" python3 - <<'PY'
+PORT="$PORT" DB="$DB" SCALE="${DEMO_SCALE:-10}" python3 - <<'PY'
 import json, os, random, sqlite3, time, urllib.request
 B = "http://127.0.0.1:%s" % os.environ["PORT"]
 
@@ -53,7 +53,8 @@ def post(path, data, voter=None):
 
 P = ["Анализ рынка — Иванова А.", "Редизайн сайта — Петров С.", "Новая система отчётности — Ким Д.",
      "Автоматизация закупок — Смирнова Е.", "Онбординг новичков — Орлов В.", "Чат-бот поддержки — Белова М."]
-post("/api/admin/config?key=demo", {"title": "Демо: защита проектов", "presentations": P, "open": True})
+S = int(os.environ.get("SCALE", "10"))
+post("/api/admin/config?key=demo", {"title": "Демо: защита проектов", "presentations": P, "open": True, "scale": S})
 
 # Тестовые логотипы: простые SVG-значки, чтобы было видно оформление
 import base64
@@ -85,7 +86,7 @@ for v in range(32):
         if random.random() < 0.85:
             sc = {}
             for k, c in enumerate(C):
-                sc[c] = max(1, min(5, int(round(base[i][k] + random.gauss(0, 0.8)))))
+                sc[c] = max(1, min(S, int(round((base[i][k] + random.gauss(0, 0.8)) * S / 5))))
             post("/api/vote", {"presentation": p, "scores": sc, "comment": random.choice(notes)}, voter)
 # Раскладываем время голосов по последнему часу, как будто выступления шли по очереди
 db = sqlite3.connect(os.environ["DB"])

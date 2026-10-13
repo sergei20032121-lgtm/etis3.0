@@ -73,6 +73,7 @@ p{margin:0}
 .crit .cnum{font-size:12px;color:var(--muted);white-space:nowrap}
 .crit .cdesc{font-size:14px;color:var(--muted);margin-top:-8px}
 .scale{display:grid;gap:6px}
+.scale.s10 button{height:48px;font-size:18px}
 .scale button{appearance:none;font:700 19px/1 system-ui,sans-serif;color:var(--ink);background:var(--bg);border:1.5px solid var(--line);
   border-radius:12px;height:52px;cursor:pointer;font-variant-numeric:tabular-nums;transition:transform .12s,background .15s,border-color .15s}
 .scale button:active{transform:scale(.94)}
@@ -122,6 +123,7 @@ let cfg = null, sel = null, scores = {}, comment = '', sending = false, error = 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const pl = (n, a, b, c) => VC.plural(n, a, b, c);
 const WORDS5 = ['', 'Слабо', 'Ниже среднего', 'Нормально', 'Хорошо', 'Отлично'];
+const WORDS10 = ['', 'Очень слабо', 'Очень слабо', 'Слабо', 'Слабо', 'Ниже среднего', 'Нормально', 'Хорошо', 'Очень хорошо', 'Отлично', 'Великолепно'];
 const av = (name, cls) => VC.avatar(name, cfg, cls);
 const buzz = () => { try { navigator.vibrate && navigator.vibrate(8); } catch(e){} };
 
@@ -172,7 +174,7 @@ function open(p){
   rate(); window.scrollTo(0, 0);
 }
 
-function word(v){ const n = cfg.scale; if (!v) return ''; return n === 5 ? WORDS5[v] : v <= 3 ? 'Слабо' : v <= 5 ? 'Ниже среднего' : v <= 7 ? 'Хорошо' : 'Отлично'; }
+function word(v){ if (!v) return ''; return (cfg.scale === 10 ? WORDS10 : WORDS5)[v] || ''; }
 
 function rate(){
   const n = cfg.scale, C = cfg.criteria;
@@ -185,7 +187,7 @@ function rate(){
       <div class="crit" id="c${i}">
         <div class="ch"><span class="cname">${esc(c.name)}</span><span class="cnum">${i + 1} из ${C.length}</span></div>
         ${c.desc ? `<div class="cdesc">${esc(c.desc)}</div>` : ''}
-        <div class="scale" style="grid-template-columns:repeat(${Math.min(n, 5)},1fr)">
+        <div class="scale${n > 5 ? ' s10' : ''}" style="grid-template-columns:repeat(${Math.min(n, 5)},1fr)">
           ${Array.from({length: n}, (_, k) => k + 1).map(v => `<button data-c="${i}" data-v="${v}" aria-pressed="${scores[c.name] === v}" aria-label="${esc(c.name)}: ${v}">${v}</button>`).join('')}
         </div>
         <div class="word" id="w${i}">${scores[c.name] ? `<b>${scores[c.name]} — ${word(scores[c.name])}</b>` : `<span>1 — слабо</span><span>${n} — отлично</span>`}</div>

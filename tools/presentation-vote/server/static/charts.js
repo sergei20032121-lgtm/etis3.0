@@ -115,7 +115,8 @@ window.VoteCharts = (() => {
     const best = criteria.map((_, k) => Math.max(...rows.map(r => r.avgs[k] == null ? -1 : r.avgs[k])));
     const all = [].concat(...rows.map(r => r.avgs)).filter(a => a != null);
     let lo = Math.min(...all), hi = Math.max(...all);
-    if (hi - lo < 0.5){ const m = (hi + lo) / 2; lo = Math.max(1, m - 0.25); hi = Math.min(S, m + 0.25); }
+    const span = 0.5 * S / 5;
+    if (hi - lo < span){ const m = (hi + lo) / 2; lo = Math.max(1, m - span / 2); hi = Math.min(S, m + span / 2); }
     return `<div class="vc-heat"><table><thead><tr><th>Презентация</th>${criteria.map(n => `<th>${esc(n)}</th>`).join('')}</tr></thead><tbody>
       ${rows.map(r => `<tr><td>${esc(r.name)}</td>${r.avgs.map((a, k) => {
         if (a == null) return '<td>—</td>';
@@ -154,7 +155,7 @@ window.VoteCharts = (() => {
 
   // «Главное»: короткие выводы простыми словами
   function insights(rows, criteria, S){
-    const out = [];
+    const out = [], k = S / 5;  // пороги рассчитаны на шкалу 1–5, для 1–10 масштабируем
     if (!rows.length) return out;
     const q = s => '«' + s + '»';
     const a = rows[0], b = rows[1];
@@ -167,7 +168,7 @@ window.VoteCharts = (() => {
     const withSd = rows.filter(r => r.sd != null && r.votes >= FEW);
     if (withSd.length >= 2){
       const lo = withSd.reduce((m, r) => r.sd < m.sd ? r : m), hi = withSd.reduce((m, r) => r.sd > m.sd ? r : m);
-      if (hi.sd - lo.sd >= 0.15){
+      if (hi.sd - lo.sd >= 0.15 * k){
         out.push({k: 'agree', t: `Самое единодушное мнение — о ${q(lo.name)}: оценки почти у всех близки.`});
         out.push({k: 'split', t: `Сильнее всего мнения разошлись о ${q(hi.name)}: кому-то очень понравилось, кому-то нет.`});
       }
@@ -175,7 +176,7 @@ window.VoteCharts = (() => {
     const cAvg = criteria.map((n, k) => { const v = rows.map(r => r.avgs[k]).filter(x => x != null); return {n, v: v.length ? v.reduce((x, y) => x + y, 0) / v.length : null}; }).filter(c => c.v != null);
     if (cAvg.length >= 2){
       const best = cAvg.reduce((m, c) => c.v > m.v ? c : m), worst = cAvg.reduce((m, c) => c.v < m.v ? c : m);
-      if (best.v - worst.v >= 0.1) out.push({k: 'crit', t: `По всем выступлениям выше всего оценили критерий ${q(best.n)} (${fmt(best.v)}), ниже всего — ${q(worst.n)} (${fmt(worst.v)}): здесь есть куда расти.`});
+      if (best.v - worst.v >= 0.1 * k) out.push({k: 'crit', t: `По всем выступлениям выше всего оценили критерий ${q(best.n)} (${fmt(best.v)}), ниже всего — ${q(worst.n)} (${fmt(worst.v)}): здесь есть куда расти.`});
     }
     const few = rows.filter(r => r.votes < FEW);
     if (few.length) out.push({k: 'few', t: `Мало голосов у ${few.map(r => q(r.name)).join(', ')} — их балл менее точный.`});

@@ -51,7 +51,7 @@ DEFAULT_CONFIG = {
         {"name": "Выступление", "desc": "уверенность, речь, контакт с залом"},
         {"name": "Ответы на вопросы", "desc": "понятно и по делу"},
     ],
-    "scale": 5,
+    "scale": 10,
     "open": True,
     "current": "",
     "comments": True,
@@ -430,7 +430,10 @@ class Handler(BaseHTTPRequestHandler):
                         crit.append({"name": clean_text(c.get("name"), 80), "desc": clean_text(c.get("desc"), 200)})
                 if crit:
                     cfg["criteria"] = crit[:10]
-            if "scale" in data and data["scale"] in (5, 10):
+            if "scale" in data and data["scale"] in (5, 10) and data["scale"] != cfg["scale"]:
+                # Нельзя менять шкалу поверх уже собранных оценок: 1–5 и 1–10 смешались бы в средних
+                if query("SELECT COUNT(*) FROM votes")[0][0]:
+                    return self.send(409, {"error": "scale_locked"})
                 cfg["scale"] = data["scale"]
             if "open" in data:
                 cfg["open"] = bool(data["open"])
