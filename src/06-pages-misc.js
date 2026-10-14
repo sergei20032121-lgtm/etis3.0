@@ -5,12 +5,14 @@
 function stylePage_changePass(span9) {
 	if (!span9) return;
 	const form  = span9.querySelector('.form');
+	if (!form) return; // страница с результатом смены пароля — без формы
 	const items = createEl('div', { className: 'items' });
 	form.prepend(items);
 	form.prepend(span9.querySelector('h3'));
 	const labels = form.querySelectorAll('label');
 	const inputs = form.querySelectorAll('input');
 	for (let i = 0; i < inputs.length; i++) {
+		if (!labels[i] || /^(hidden|submit|button)$/i.test(inputs[i].type)) continue;
 		inputs[i].placeholder = ' ';
 		const item = createEl('div', { className: 'item' });
 		item.appendChild(inputs[i]);
@@ -23,6 +25,7 @@ function stylePage_changeEmail(span9) {
 	if (!span9) return;
 	const form = span9.querySelector('.form');
 	const info = span9.querySelector('div');
+	if (!form || !info) return;
 	info.className = 'form-info';
 	const wrap = createEl('div', { className: 'items' });
 	form.prepend(wrap);

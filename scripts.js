@@ -53,8 +53,15 @@ const PAIR_SCHEDULE = [
 	{ num: 8, start: [20, 25], end: [22, 0]   },
 ];
 
+// ЕТИС живёт по пермскому времени (UTC+5, без перехода на летнее). Если на устройстве
+// другой пояс (Москва, поездка), «сейчас» для пар считаем по Перми: etisNow() —
+// дата, у которой часы и минуты совпадают с пермскими.
+const PERM_UTC_OFFSET_MIN = 5 * 60;
+function etisShiftMs(d = new Date()) { return (d.getTimezoneOffset() + PERM_UTC_OFFSET_MIN) * 60000; }
+function etisNow() { const d = new Date(); return new Date(d.getTime() + etisShiftMs(d)); }
+
 function nowMinutes() {
-	const d = new Date();
+	const d = etisNow();
 	return d.getHours() * 60 + d.getMinutes();
 }
 
@@ -623,7 +630,7 @@ function styleSidebar(sidebar) {
 		const a    = li.querySelector('a');
 		const href = a ? navKey(a) : '';
 		if (href === 'stu_plus.add_snils' || href === 'ebl_stu.ebl_choice' || li.classList.contains('warn_menu'))
-			a.appendChild(createEl('span', { className: 'badge-point' }));
+			a?.appendChild(createEl('span', { className: 'badge-point' }));
 	});
 
 	groupSidebarNav(sidebar);
@@ -1273,6 +1280,23 @@ function stylePage_portfolio(span9) {
 }
 
 
+
+
+// Строки учебного плана. Дисциплины по выбору ЕТИС объединяет фигурной скобкой «{»
+// (ячейка с rowspan): group — номер группы выбора, 0 — обычная дисциплина; first — первая в группе.
+function planRows(table) {
+	const out = [];
+	let group = 0, left = 0, groups = 0;
+	table?.querySelectorAll('tr.cgrldatarow').forEach(tr => {
+		const brace = [...tr.children].find(td => td.textContent.trim() === '{' && td.rowSpan > 1);
+		let first = false;
+		if (brace) { group = ++groups; left = brace.rowSpan; first = true; }
+		const g = left > 0 ? group : 0;
+		if (left > 0) left--;
+		out.push({ tr, c: [...tr.children].filter(td => td.textContent.trim() !== '{'), group: g, first: !g || first });
+	});
+	return out;
+}
 // ============================================================
 // РАСПИСАНИЕ
 // ============================================================
@@ -1299,7 +1323,7 @@ const MONTH_RES = [/^январ/, /^феврал/, /^март/, /^апрел/, /
 
 // Заголовок дня → сегодня ли это. Понимает «06.10», «6 октября» и просто число.
 function isTodayTitle(text) {
-	const now = new Date();
+	const now = etisNow();
 	const d = now.getDate(), m = now.getMonth() + 1;
 	const t = (text || '').toLowerCase();
 	const numeric = t.match(/(\d{1,2})\.(\d{1,2})/);
@@ -1453,13 +1477,17 @@ function stylePage_timetable(span9) {
 	buttonbar.appendChild(icsBtn);
 
 	span9.querySelectorAll('div.day > table > tbody > tr').forEach(row => {
-		// Перенос преподавателя
-		const teacher = row.querySelector('span.teacher');
-		if (teacher) {
-			const td = createEl('td', { className: 'pair_teacher', innerHTML: teacher.innerHTML });
+		// Перенос преподавателя. У подгрупп в одной ячейке несколько пар — у каждой свой преподаватель
+		const teachers = [...row.querySelectorAll('span.teacher')];
+		row.querySelectorAll('.pair_info > div').forEach(box => {
+			const t = box.querySelector('span.teacher');
+			if (t) box.dataset.teacher = t.textContent.replace(/\s+/g, ' ').trim();
+		});
+		if (teachers.length) {
+			const td = createEl('td', { className: 'pair_teacher', innerHTML: teachers.map(t => t.innerHTML).join('<br>') });
 			row.appendChild(td);
 			row.querySelector('td.pair_jour')?.remove();
-			teacher.remove();
+			teachers.forEach(t => t.remove());
 		}
 
 		// Тип пары — чип. Исходный текст «(лек.)» оставляем скрытым:
@@ -1529,6 +1557,12 @@ function stylePage_timetable(span9) {
 	refresh();
 	pageInterval(refresh, 60 * 1000);
 
+	// Наступили новые сутки — «сегодня» уже другое: перерисовываем страницу, когда её видно
+	const loadDay = ymd(etisNow());
+	const dayChanged = () => ymd(etisNow()) !== loadDay;
+	pageInterval(() => { if (dayChanged() && document.visibilityState === 'visible') location.reload(); }, 60 * 1000);
+	pageListen(document, 'visibilitychange', () => { if (document.visibilityState === 'visible' && dayChanged()) location.reload(); });
+
 	initHomeRoute(span9);
 
 	if (todayBlock && !span9.classList.contains('etis3-tt-grid') && !isHomeRoute()) {
@@ -1558,7 +1592,7 @@ function readWeek(span9) {
 					name:    type ? type.name : full.trim(),
 					type,
 					aud:     (box.querySelector('.aud') || row.querySelector('.aud'))?.textContent.replace(/\s+/g, ' ').trim() || '',
-					teacher: row.querySelector('.pair_teacher a')?.textContent.trim() || '',
+					teacher: box.dataset?.teacher || box.querySelector('span.teacher a')?.textContent.trim() || row.querySelector('.pair_teacher a')?.textContent.trim() || '',
 				});
 			});
 		});
@@ -1575,7 +1609,7 @@ function parseDayDate(title) {
 	if (numeric) { d = +numeric[1]; m = +numeric[2] - 1; }
 	else if (worded) { d = +worded[1]; m = MONTH_RES.findIndex(re => re.test(worded[2])); }
 	if (!d || m === undefined || m < 0) return null;
-	const now = new Date();
+	const now = etisNow();
 	let y = now.getFullYear();
 	if (m - now.getMonth() > 6) y--;
 	if (now.getMonth() - m > 6) y++;
@@ -1704,10 +1738,13 @@ function copyTimetable(span9) {
 		lines.push('\n' + title.toUpperCase());
 		day.querySelectorAll('table tbody tr').forEach(row => {
 			const num  = row.querySelector('.pair_num .eval')?.textContent.trim(); // время начала, «8:00»
-			const dis  = row.querySelector('.pair_info .dis a')?.textContent.trim();
-			const aud  = row.querySelector('.pair_info .aud')?.textContent.trim();
-			const tchr = row.querySelector('.pair_teacher a')?.textContent.trim();
-			if (dis) lines.push(`  ${num ? num+' ' : ''}${dis}${aud ? ' · '+aud : ''}${tchr ? ' — '+tchr : ''}`);
+			row.querySelectorAll('.pair_info .dis a').forEach(a => {
+				const box  = a.closest('.pair_info > div') || row;
+				const dis  = a.textContent.trim();
+				const aud  = (box.querySelector('.aud') || row.querySelector('.pair_info .aud'))?.textContent.trim();
+				const tchr = box.dataset?.teacher || row.querySelector('.pair_teacher a')?.textContent.trim();
+				if (dis) lines.push(`  ${num ? num+' ' : ''}${dis}${aud ? ' · '+aud : ''}${tchr ? ' — '+tchr : ''}`);
+			});
 		});
 		const noPairs = day.querySelector('.no_pairs')?.textContent.trim();
 		if (noPairs) lines.push('  ' + noPairs);
@@ -1725,12 +1762,14 @@ function copyTimetable(span9) {
 function stylePage_changePass(span9) {
 	if (!span9) return;
 	const form  = span9.querySelector('.form');
+	if (!form) return; // страница с результатом смены пароля — без формы
 	const items = createEl('div', { className: 'items' });
 	form.prepend(items);
 	form.prepend(span9.querySelector('h3'));
 	const labels = form.querySelectorAll('label');
 	const inputs = form.querySelectorAll('input');
 	for (let i = 0; i < inputs.length; i++) {
+		if (!labels[i] || /^(hidden|submit|button)$/i.test(inputs[i].type)) continue;
 		inputs[i].placeholder = ' ';
 		const item = createEl('div', { className: 'item' });
 		item.appendChild(inputs[i]);
@@ -1743,6 +1782,7 @@ function stylePage_changeEmail(span9) {
 	if (!span9) return;
 	const form = span9.querySelector('.form');
 	const info = span9.querySelector('div');
+	if (!form || !info) return;
 	info.className = 'form-info';
 	const wrap = createEl('div', { className: 'items' });
 	form.prepend(wrap);
@@ -1983,6 +2023,11 @@ function parseSignsTable(table) {
 		return parseFloat(t.replace(',', '.'));
 	};
 
+	const textGrade = td => {
+		const t = (td?.textContent || '').replace(/\s+/g, ' ').trim();
+		return t && !/^[-—–.]*$/.test(t) && !/^-?\d+([.,]\d+)?$/.test(t) ? t.slice(0, 20) : '';
+	};
+
 	const kts = [];
 	let total = null;
 	rows.forEach(tr => {
@@ -1995,8 +2040,11 @@ function parseSignsTable(table) {
 		if (cells.length < pos) return;
 		const grade = num(cells[col.grade]);
 		const pass  = num(cells[col.pass]);
-		const status = grade === null ? 'pending' : (pass === null || grade >= pass ? 'passed' : 'failed');
-		kts.push({ row: tr, gradeCell: cells[col.grade], grade, pass, status,
+		// Оценка словами («н/я», «незачёт», «зачтено») — КТ уже прошла, это не «впереди»
+		const text  = grade === null ? textGrade(cells[col.grade]) : '';
+		const status = grade !== null ? (pass === null || grade >= pass ? 'passed' : 'failed')
+			: text ? (/н\s*\/\s*я|не\s*яв|неуд|незач|не\s*зач|^2$/i.test(text) ? 'failed' : 'passed') : 'pending';
+		kts.push({ row: tr, gradeCell: cells[col.grade], grade, text, pass, status,
 			topic: cells[0]?.textContent.replace(/\s+/g, ' ').trim() || '',
 			cur: col.cur !== undefined ? num(cells[col.cur]) : null,
 			max: col.cur !== undefined ? num(cells[col.max]) : null,
@@ -2031,7 +2079,7 @@ function styleSignsTable(d) {
 		if (k.status === 'failed') k.row.classList.add('row-red');
 		if (k.status === 'pending') return;
 		const dot = createEl('span', { className: 'score-dot ' + (k.status === 'passed' ? 'score-dot--high' : 'score-dot--low') });
-		dot.title = `${k.grade} из проходных ${k.pass}`;
+		dot.title = k.grade === null ? k.text : `${k.grade} из проходных ${k.pass}`;
 		k.gradeCell.appendChild(dot);
 	});
 
@@ -2041,10 +2089,10 @@ function styleSignsTable(d) {
 	const pct = d.max ? Math.round(d.cur / d.max * 100) : 0;
 	const sum = createEl('div', { className: 'etis3-dis-summary' });
 	sum.innerHTML = `
-		<span class="eds-chip">рейтинг <b>${d.cur}</b> / ${d.max}</span>
+		<span class="eds-chip">рейтинг <b>${fmtNum(d.cur)}</b> / ${fmtNum(d.max)}</span>
 		<span class="eds-chip eds-chip--ok">сдано ${d.passed}</span>
 		${d.failed ? `<span class="eds-chip eds-chip--bad">не сдано ${d.failed}</span>` : ''}
-		${d.pending ? `<span class="eds-chip">впереди ${d.pending}${d.left ? ` · до +${d.left}` : ''}</span>` : ''}
+		${d.pending ? `<span class="eds-chip">впереди ${d.pending}${d.left ? ` · до +${fmtNum(d.left)}` : ''}</span>` : ''}
 		${d.fresh ? `<span class="eds-chip eds-chip--new">новых ${d.fresh}</span>` : ''}
 		<span class="eds-chip eds-chip--goal" hidden></span>
 		<span class="eds-bar"><span class="eds-bar-fill" style="width:${pct}%"></span></span>
@@ -2059,7 +2107,19 @@ function styleSignsTable(d) {
 const SEEN_GRADES_KEY = 'etis3-seen-grades';
 const NEW_GRADE_DAYS  = 3;
 
-function gradeKey(dkey, i, topic) { return `${dkey}|${i}|${topic.slice(0, 60)}`; }
+// Ключ оценки — дисциплина, семестр и тема КТ (с номером повтора, если темы совпадают).
+// Номер строки в ключ не входит: ЕТИС может добавить КТ, и оценки ниже не должны стать «новыми».
+function gradeTerm(search = location.search) { return new URLSearchParams(search).get('p_term') || 'cur'; }
+function gradeKeys(dkey, kts, term) {
+	const seenTopics = {};
+	return kts.map(k => {
+		const t = k.topic.slice(0, 60);
+		seenTopics[t] = (seenTopics[t] || 0) + 1;
+		return `${dkey}|${term}|${t}|${seenTopics[t]}`;
+	});
+}
+// Ключ до 4.13.3 — чтобы после обновления старые оценки не подсветились как новые
+function legacyGradeKey(dkey, i, topic) { return `${dkey}|${i}|${topic.slice(0, 60)}`; }
 
 function markNewGrades(disciplines) {
 	let seen = null;
@@ -2072,14 +2132,17 @@ function markNewGrades(disciplines) {
 		d.fresh = 0;
 		// Дисциплину, которую видим впервые (другой семестр, первый заход), только запоминаем
 		const dkey  = disciplineKey(d.name);
-		const known = `#${dkey}` in seen;
-		seen[`#${dkey}`] = 1;
+		const term  = gradeTerm();
+		const known = `#${dkey}|${term}` in seen || (term === 'cur' && `#${dkey}` in seen);
+		seen[`#${dkey}|${term}`] = 1;
+		const keys = gradeKeys(dkey, d.kts, term);
 		d.kts.forEach((k, i) => {
 			if (k.grade === null) return;
-			const key  = gradeKey(dkey, i, k.topic);
-			const prev = seen[key];
+			const key  = keys[i];
+			const prev = seen[key] ?? (term === 'cur' ? seen[legacyGradeKey(dkey, i, k.topic)] : undefined);
 			if (!known) seen[key] = { g: k.grade, t: 0 };
 			else if (!prev || prev.g !== k.grade) seen[key] = { g: k.grade, t: now };
+			else seen[key] = prev;
 			if (now - seen[key].t < NEW_GRADE_DAYS * 864e5) {
 				k.fresh = true;
 				k.row.classList.add('kt-new');
@@ -2104,9 +2167,9 @@ function goalHint(d, goal) {
 	if (!goal) return null;
 	const need = goal - d.cur;
 	if (need <= 0) return { cls: 'ok', text: 'цель есть ✓' };
-	if (need > d.left) return { cls: 'bad', text: `до ${goal} не добрать: максимум ${d.cur + d.left}${d.failed ? ' без пересдач' : ''}` };
+	if (need > d.left) return { cls: 'bad', text: `до ${goal} не добрать: максимум ${fmtNum(d.cur + d.left)}${d.failed ? ' без пересдач' : ''}` };
 	const share = d.left ? Math.round(need / d.left * 100) : 100;
-	return { cls: share > 80 ? 'warn' : '', text: `нужно ещё ${need} из ${d.left} (${share}%)` };
+	return { cls: share > 80 ? 'warn' : '', text: `нужно ещё ${fmtNum(need)} из ${fmtNum(d.left)} (${share}%)` };
 }
 
 function updateGoalHints(disciplines) {
@@ -2190,12 +2253,16 @@ function initPageTransitions() {
 		try { url = new URL(href, location.href); } catch (err) { return; }
 		if (url.origin !== location.origin) return; // заодно отсекает javascript: и mailto:
 		if (url.pathname === location.pathname && url.search === location.search && url.hash) return;
+		// Файлы (вложения сообщений, документы) скачиваются, а не открываются — страница остаётся, затемнять нельзя
+		if (/file_download|get_file|download|\.(pdf|docx?|xlsx?|pptx?|zip|rar|7z|jpe?g|png)$/i.test(url.pathname + url.search)) return;
 
 		e.preventDefault();
 		if (soft && canSoftNav(url)) { softNavigate(url.href); return; }
 		if (reduced) { window.location.href = url.href; return; }
 		overlay.classList.add('etis3-overlay--out');
 		setTimeout(() => { window.location.href = url.href; }, 200);
+		// Если вместо перехода началось скачивание или ссылка никуда не ведёт — снять затемнение
+		setTimeout(() => overlay.classList.remove('etis3-overlay--out'), 2500);
 	});
 }
 
@@ -2530,6 +2597,11 @@ function openSettingsPanel() {
 		fontVal.textContent  = settings.fontSize + 'px';
 	}
 	render();
+	// Своё фото загружаем, даже если сейчас выбран готовый фон — чтобы плитка «Своё фото» его показывала
+	if (!wallImgLoaded) {
+		wallImgLoaded = true;
+		try { chrome.storage.local.get(ETIS3_WALL_IMG_KEY, res => { wallImg = res?.[ETIS3_WALL_IMG_KEY] || null; render(); }); } catch (e) {}
+	}
 	panel.etis3Render = render;
 
 	requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -2644,7 +2716,7 @@ function buildSignsStats(span9, disciplines, fresh = 0) {
 		<div class="esw-grid">
 			<div class="esw-card">
 				<div class="esw-label">Баллов в рейтинг</div>
-				<div class="esw-value">${cur}<small> / ${max}</small></div>
+				<div class="esw-value">${fmtNum(cur)}<small> / ${fmtNum(max)}</small></div>
 			</div>
 			<div class="esw-card">
 				<div class="esw-label">КТ сдано</div>
@@ -2665,7 +2737,7 @@ function buildSignsStats(span9, disciplines, fresh = 0) {
 				return `<div class="esw-dis etis3-dis${d.failed ? ' esw-dis--bad' : ''}" style="--dis-h:${disciplineHue(d.name)}">
 					<div class="esw-dis-name" title="${escapeHtml(d.name)}">${escapeHtml(d.name)}</div>
 					<div class="esw-dis-bar"><span style="width:${pct}%"></span></div>
-					<div class="esw-dis-val">${d.cur} / ${d.max}${d.failed ? ` · <b>${d.failed} не сдано</b>` : ''}</div>
+					<div class="esw-dis-val">${fmtNum(d.cur)} / ${fmtNum(d.max)}${d.failed ? ` · <b>${d.failed} не сдано</b>` : ''}</div>
 					<div class="esw-dis-goal" hidden></div>
 				</div>`;
 			}).join('')}
@@ -2727,7 +2799,7 @@ function cacheWeek(week) {
 function todayStatus() {
 	const c = readWeekCache();
 	if (!c) return null;
-	const today = c.days[ymd(new Date())];
+	const today = c.days[ymd(etisNow())];
 	if (!today) return null;
 	const now = nowMinutes();
 	const pairs = today.map(p => ({ ...p, slot: c.times.find(t => t.num === p.num) })).filter(p => p.slot)
@@ -3096,12 +3168,12 @@ function readGrades(doc) {
 	try { seen = JSON.parse(localStorage.getItem(SEEN_GRADES_KEY)) || {}; } catch (e) {}
 	const now = Date.now();
 	const recent = [];
-	discs.forEach(d => d.kts.forEach((k, i) => {
+	discs.forEach(d => { const keys = gradeKeys(disciplineKey(d.name), d.kts, 'cur'); d.kts.forEach((k, i) => {
 		if (k.grade === null) return;
-		const s = seen[gradeKey(disciplineKey(d.name), i, k.topic)];
+		const s = seen[keys[i]] ?? seen[legacyGradeKey(disciplineKey(d.name), i, k.topic)];
 		recent.push({ dis: d.name, topic: k.topic, grade: k.grade, max: k.max, pass: k.pass, status: k.status,
 			date: k.date, t: parseRuDate(k.date), fresh: !!(s && s.t && now - s.t < NEW_GRADE_DAYS * 864e5) });
-	}));
+	}); });
 	recent.sort((a, b) => b.t - a.t);
 	return {
 		term: /триместр/i.test(doc.querySelector('.submenu')?.textContent || '') ? 'триместр' : 'семестр',
@@ -3111,7 +3183,13 @@ function readGrades(doc) {
 	};
 }
 
-function readHomeCache() { try { return JSON.parse(localStorage.getItem(HOME_CACHE_KEY)) || {}; } catch (e) { return {}; } }
+// Кэш привязан к студенту: на общем компьютере второй не увидит оценки первого
+function homeOwner() { return document.querySelector('.etis3-profile')?.title || ''; }
+function readHomeCache() {
+	let c = {};
+	try { c = JSON.parse(localStorage.getItem(HOME_CACHE_KEY)) || {}; } catch (e) {}
+	return c.owner === homeOwner() ? c : { owner: homeOwner() };
+}
 
 async function refreshHomeData() {
 	const cache = readHomeCache();
@@ -3121,7 +3199,7 @@ async function refreshHomeData() {
 		['ann',    'stu_ann.announces',        doc => readFeed(doc, 'ann')],
 	];
 	await Promise.all(jobs.map(async ([key, path, parse]) => {
-		try { cache[key] = parse(await fetchEtisPage(path)); cache[key + 'At'] = Date.now(); }
+		try { cache[key] = parse(await fetchEtisPage(path)); cache[key + 'At'] = Date.now(); delete cache[key + 'Err']; }
 		catch (e) { cache[key + 'Err'] = String(e.message || e); }
 	}));
 	try { localStorage.setItem(HOME_CACHE_KEY, JSON.stringify(cache)); } catch (e) {}
@@ -3139,12 +3217,23 @@ async function refreshHomeData() {
 
 function relTime(t) {
 	if (!t) return '';
-	const d = new Date(t), now = new Date();
+	const d = new Date(t), now = etisNow();
 	const days = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 864e5);
 	if (days === 0) return 'сегодня';
 	if (days === 1) return 'вчера';
 	if (days < 7)   return `${days} дн. назад`;
 	return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }).replace('.', '');
+}
+
+let homeRedraw = null;
+
+// Ближайший учебный день из кэша расписания (на воскресенье и конец недели)
+function nextDayFromCache(now) {
+	const c = readWeekCache();
+	if (!c) return null;
+	const today = ymd(now);
+	const key = Object.keys(c.days).filter(k => k > today && c.days[k].length).sort()[0];
+	return key ? { date: dateFromYmd(key), count: c.days[key].length } : null;
 }
 
 function renderHome(span9) {
@@ -3157,10 +3246,15 @@ function renderHome(span9) {
 	const cache  = readHomeCache();
 	let lastData = cache, lastLoading = true;
 	draw(cache, true);
-	refreshHomeData().then(fresh => { if (isHomeRoute()) draw(fresh, false); });
-	if (!home.dataset.notesHooked) {
-		home.dataset.notesHooked = '1';
-		pageListen(document, 'etis3-notes-changed', () => { if (isHomeRoute() && document.getElementById('etis3-home')) draw(lastData, lastLoading); });
+	refreshHomeData().then(fresh => { if (isHomeRoute() && home.isConnected) draw(fresh, false); });
+	// Перерисовка по заметкам и раз в минуту (следующая пара, прогресс). Подписка одна на страницу,
+	// а рисует всегда текущий дашборд — его пересоздают при каждом заходе на #home.
+	homeRedraw = () => { if (isHomeRoute() && home.isConnected) draw(lastData, lastLoading); };
+	if (!span9.dataset.homeHooked) {
+		span9.dataset.homeHooked = '1';
+		pageListen(document, 'etis3-notes-changed', () => homeRedraw?.());
+		pageInterval(() => homeRedraw?.(), 60 * 1000);
+		pageCleanup(() => { homeRedraw = null; });
 	}
 
 	function draw(data, loading) {
@@ -3168,7 +3262,7 @@ function renderHome(span9) {
 		let seenFeed = {};
 		try { seenFeed = JSON.parse(localStorage.getItem(SEEN_FEED_KEY)) || {}; } catch (e) {}
 		const name  = (document.querySelector('.etis3-profile')?.title || '').split(/\s+/)[1] || '';
-		const now   = new Date();
+		const now   = etisNow();
 		const today = week.find(d => d.isToday);
 		const nextDay = week.find(d => d.date && d.date > now && !d.isToday && d.pairs.length);
 		const st    = todayStatus();
@@ -3176,7 +3270,10 @@ function renderHome(span9) {
 		// --- герой ---
 		const todayPairs = today ? today.pairs : [];
 		let summary;
-		if (!today) summary = 'Расписание этой недели не загружено.';
+		const later   = !today && !nextDay ? nextDayFromCache(now) : null;
+		const laterTx = later ? ` Следующие пары — ${later.date.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })}.` : '';
+		if (!today && !week.length) summary = 'Расписание этой недели не загружено.';
+		else if (!today) summary = nextDay ? `Сегодня пар нет. Следующие — ${nextDay.title.split(',')[0].toLowerCase()}.` : `Сегодня выходной.${laterTx || ' Отдыхай.'}`;
 		else if (!todayPairs.length) summary = nextDay ? `Сегодня пар нет. Следующие — ${nextDay.title.split(',')[0].toLowerCase()}.` : 'Сегодня пар нет — отдыхай.';
 		else if (st?.state === 'now') summary = `Сейчас идёт ${st.pair.num}-я пара, до конца ${formatDuration(st.mins)}.`;
 		else if (st?.state === 'next') summary = `Следующая пара через ${formatDuration(st.mins)}, всего сегодня ${todayPairs.length}.`;
@@ -3375,7 +3472,7 @@ function buildSignsCards(span9, disciplines) {
 			<div class="sv-kts">
 				${d.kts.map((k, i) => `
 					<a class="sv-kt sv-kt--${k.status}${k.fresh ? ' sv-kt--new' : ''}" ${k.href ? `href="${escapeHtml(k.href)}"` : ''} title="${escapeHtml(k.topic)}">
-						<span class="sv-kt-score"><b>${k.grade === null ? '—' : fmtNum(k.grade)}</b><small>${k.max ? 'из ' + fmtNum(k.max) : ''}</small></span>
+						<span class="sv-kt-score"><b>${k.grade === null ? (k.text ? escapeHtml(k.text) : '—') : fmtNum(k.grade)}</b><small>${k.max ? 'из ' + fmtNum(k.max) : ''}</small></span>
 						<span class="sv-kt-info">
 							<span class="sv-kt-topic"><em>КТ ${i + 1}</em>${escapeHtml(k.topic)}</span>
 							<span class="sv-kt-sub">${[k.work, k.ctrl, k.pass !== null ? 'проходной ' + fmtNum(k.pass) : ''].filter(Boolean).map(escapeHtml).join(' · ')}</span>
@@ -3616,7 +3713,7 @@ function buildTimetableDays(span9, week) {
 			const slots = d.pairs.map(p => PAIR_SCHEDULE.find(x => x.num === p.num)).filter(Boolean);
 			const span = slots.length ? `${formatTime(...slots[0].start)}–${formatTime(...slots[slots.length - 1].end)}` : '';
 			const [wd, ...rest] = d.title.split(',');
-			const past = d.date && !d.isToday && d.date < new Date(new Date().setHours(0, 0, 0, 0));
+			const past = d.date && !d.isToday && d.date < new Date(etisNow().setHours(0, 0, 0, 0));
 			const count = d.pairs.length;
 			return `<section class="ttv-day${d.isToday ? ' ttv-day--today' : ''}${past ? ' ttv-day--past' : ''}${count ? '' : ' ttv-day--free'}" data-i="${i}">
 				<header class="ttv-head">
@@ -3642,6 +3739,11 @@ function buildTimetableDays(span9, week) {
 // ============================================================
 
 const CHANGELOG = [
+	['4.13.3', [
+		['bug_report', 'Исправления', 'Время пар считается по Перми, даже если на телефоне другой пояс; в полночь расписание само переходит на новый день; у подгрупп — свои преподаватели; «н/я» и «незачёт» больше не считаются «впереди»; новая КТ не делает старые оценки «новыми»; дисциплины по выбору не попадают в сессию лишними'],
+		['notifications_active', 'Уведомления', 'Новая оценка больше не теряется, если в этот момент открыть сообщения; после техработ ЕТИСа не приходят старые оценки пачкой'],
+		['security', 'Безопасность приложения', 'Приложение открывает только https-страницы ЕТИСа и не доверяет сертификатам, установленным вручную; напоминания приходят вовремя', 'app'],
+	]],
 	['4.13.2', [
 		['phone_iphone', 'iPhone: переходы без мелькания', 'На iPhone страницы ЕТИСа больше не перезагружаются целиком: ЕТИС 3.0 сам подгружает следующую и меняет только содержимое — старый интерфейс не показывается, и переходы стали быстрее'],
 	]],
@@ -4024,7 +4126,7 @@ function dateFromYmd(s) { const m = (s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
 function relDay(s) {
 	const d = dateFromYmd(s);
 	if (!d) return '';
-	const today = new Date(new Date().setHours(0, 0, 0, 0));
+	const today = new Date(etisNow().setHours(0, 0, 0, 0));
 	const diff = Math.round((d - today) / 864e5);
 	if (diff === 0) return 'сегодня';
 	if (diff === 1) return 'завтра';
@@ -4035,7 +4137,7 @@ function relDay(s) {
 
 // Блок «Заметки и ДЗ» на Главной: невыполненное (включая просроченное) и выполненное за сегодня
 function tasksHtml() {
-	const today = ymd(new Date());
+	const today = ymd(etisNow());
 	const list = Object.entries(pairNotes)
 		.filter(([, n]) => n.text?.trim() && (!n.done || n.pair?.date === today))
 		.sort((a, b) => (a[1].done - b[1].done) || String(a[1].pair?.date).localeCompare(String(b[1].pair?.date)))
@@ -4138,7 +4240,9 @@ document.addEventListener('keydown', e => {
 // Вечером накануне (19:00), а если уже поздно — за час до пары. Только невыполненные заметки с текстом.
 function syncAppReminders() {
 	if (!window.ETIS3Native?.setReminders) return;
-	const now = Date.now();
+	// Считаем в пермском времени, приложению отдаём настоящие метки времени
+	const shift = etisShiftMs();
+	const now = Date.now() + shift;
 	const list = [];
 	Object.entries(pairNotes).forEach(([key, n]) => {
 		if (n.done || !n.text?.trim() || !n.pair?.date) return;
@@ -4151,7 +4255,7 @@ function syncAppReminders() {
 		const at = eve.getTime() > now ? eve.getTime() : start.getTime() - 3600e3;
 		if (at <= now) return;
 		const when = eve.getTime() > now ? 'Завтра' : 'Через час';
-		list.push({ id: key, at, title: `${when}: ${n.pair.name}${n.pair.num ? ` · ${n.pair.num} пара` : ''}`, text: n.text.trim().slice(0, 300) });
+		list.push({ id: key, at: at - shift, title: `${when}: ${n.pair.name}${n.pair.num ? ` · ${n.pair.num} пара` : ''}`, text: n.text.trim().slice(0, 300) });
 	});
 	try { window.ETIS3Native.setReminders(JSON.stringify(list)); } catch (e) {}
 }
@@ -4202,8 +4306,8 @@ async function wrappedCollect(term) {
 			const table = h?.nextElementSibling?.matches('table.common') ? h.nextElementSibling : null;
 			if (!table) return null;
 			let aud = 0, self = 0, count = 0;
-			table.querySelectorAll('tr.cgrldatarow').forEach(tr => {
-				const c = [...tr.children].filter(td => td.textContent.trim() !== '{');
+			// Из группы «по выбору» студент изучает одну дисциплину — считаем только первую
+			planRows(table).filter(r => r.first).forEach(({ c }) => {
 				const n = c.slice(2).map(td => parseFloat(td.textContent.replace(',', '.')) || 0);
 				aud += n[0] || 0; self += n[1] || 0; count++;
 			});
@@ -4476,7 +4580,11 @@ async function saveCanvasImage(canvas, name, title) {
 	setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 
+let wrappedClose = null;
+
 async function openWrapped(term) {
+	// Переключение семестра: прошлое окно закрываем целиком, вместе с таймером и клавишами
+	wrappedClose?.(true);
 	document.getElementById('etis3-wrapped')?.remove();
 	const root = createEl('div', { id: 'etis3-wrapped', className: 'wr' });
 	root.innerHTML = `
@@ -4494,8 +4602,10 @@ async function openWrapped(term) {
 
 	let timer = null, idx = 0, slides = [], paused = false, startedAt = 0, elapsed = 0;
 	const DURATION = 6500;
-	const close = () => {
+	const close = instant => {
+		if (wrappedClose === close) wrappedClose = null;
 		clearTimeout(timer);
+		if (instant === true) { root.remove(); document.removeEventListener('keydown', onKey, true); return; }
 		root.classList.remove('wr--in');
 		document.documentElement.classList.remove('etis3-wr-open');
 		document.removeEventListener('keydown', onKey, true);
@@ -4508,6 +4618,7 @@ async function openWrapped(term) {
 		else if (e.key === 'ArrowLeft') { e.preventDefault(); go(idx - 1); }
 	};
 	document.addEventListener('keydown', onKey, true);
+	wrappedClose = close;
 	root.querySelector('.wr-close').addEventListener('click', close);
 	root.addEventListener('click', e => { if (e.target === root) close(); });
 
@@ -4728,7 +4839,7 @@ function readScale() {
 // Баллы → оценка по шкале (в процентах от максимума дисциплины)
 function gradeFor(points, max, report, scale) {
 	const pct = max ? points / max * 100 : 0;
-	if (/зач/i.test(report) && !/диф/i.test(report)) return pct >= scale[3] ? { mark: 'зачёт', cls: 'g5' } : { mark: 'незачёт', cls: 'g2' };
+	if (/зач/i.test(report) && !/диф|с\s*оценк/i.test(report)) return pct >= scale[3] ? { mark: 'зачёт', cls: 'g5' } : { mark: 'незачёт', cls: 'g2' };
 	if (pct >= scale[5]) return { mark: '5', cls: 'g5' };
 	if (pct >= scale[4]) return { mark: '4', cls: 'g4' };
 	if (pct >= scale[3]) return { mark: '3', cls: 'g3' };
@@ -4794,14 +4905,13 @@ async function sessionCollect() {
 	if (planDoc && term) {
 		const h = [...planDoc.querySelectorAll('h3')].find(x => x.textContent.replace(/\s+/g, ' ').trim().toLowerCase() === term.toLowerCase());
 		const table = h?.nextElementSibling?.matches('table.common') ? h.nextElementSibling : null;
-		table?.querySelectorAll('tr.cgrldatarow').forEach(tr => {
-			const c = [...tr.children].filter(td => td.textContent.trim() !== '{');
-			reports[disciplineKey(c[0]?.textContent || '')] = { name: c[0]?.textContent.trim() || '', report: c[1]?.textContent.trim() || '' };
+		planRows(table).forEach(({ c, group }) => {
+			reports[disciplineKey(c[0]?.textContent || '')] = { name: c[0]?.textContent.trim() || '', report: c[1]?.textContent.trim() || '', choice: group > 0 };
 		});
 	}
 
 	const weeks = ttDoc ? readWeeks(ttDoc) : [];
-	const now = new Date();
+	const now = etisNow();
 	const sessionWeeks = weeks.filter(w => w.session && w.href && (!w.start || w.start.getTime() + 7 * 864e5 > now.getTime()));
 	const pairs = [];
 	if (ttDoc && sessionWeeks.length) {
@@ -4820,6 +4930,8 @@ function sessionModel(data) {
 	data.dis.forEach(d => { const it = add(disciplineKey(d.name)); it.name = d.name; it.dis = d; });
 	Object.entries(data.reports).forEach(([k, r]) => {
 		if (!/экз|зач/i.test(r.report)) return;
+		// Дисциплина по выбору — только та, которую студент выбрал (она есть в оценках или расписании)
+		if (r.choice && !items[k] && !data.pairs.some(p => disciplineKey(p.name) === k)) return;
 		const it = add(k); it.name = it.name || r.name; it.report = r.report;
 	});
 	data.pairs.filter(p => p.when.getTime() > now - 864e5).sort((a, b) => a.when - b.when).forEach(p => {
@@ -4830,13 +4942,14 @@ function sessionModel(data) {
 	});
 	const list = Object.values(items).filter(it => it.report || it.exam);
 	list.sort((a, b) => (a.exam ? a.exam.when : Infinity) - (b.exam ? b.exam.when : Infinity) || (/экз/i.test(b.report) - /экз/i.test(a.report)) || a.name.localeCompare(b.name));
-	const firstExam = list.find(it => it.exam)?.exam || null;
+	// Ближайший экзамен — из ещё не прошедших
+	const firstExam = list.map(it => it.exam).filter(e => e && e.when.getTime() >= now).sort((a, b) => a.when - b.when)[0] || null;
 	const sessionStart = data.sessionWeeks.find(w => w.start)?.start || null;
 	return { list, firstExam, sessionStart };
 }
 
 function daysUntil(date) {
-	const a = new Date(); a.setHours(0, 0, 0, 0);
+	const a = etisNow(); a.setHours(0, 0, 0, 0);
 	const b = new Date(date); b.setHours(0, 0, 0, 0);
 	return Math.round((b - a) / 864e5);
 }

@@ -33,8 +33,8 @@ public class ReminderReceiver extends BroadcastReceiver {
         return c.getSharedPreferences("etis3-reminders", Context.MODE_PRIVATE);
     }
 
-    /** Полная замена списка напоминаний: старые будильники снимаем, новые ставим. */
-    static void replace(Context c, String json) {
+    /** Полная замена списка напоминаний: старые будильники снимаем, новые ставим. Вызовы не пересекаются. */
+    static synchronized void replace(Context c, String json) {
         try {
             JSONArray list = new JSONArray(json);
             Set<String> old = prefs(c).getStringSet("ids", new HashSet<>());
@@ -62,7 +62,13 @@ public class ReminderReceiver extends BroadcastReceiver {
 
     private static void schedule(Context c, String id, long at, String title, String text) {
         AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
-        am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, intent(c, id, title, text));
+        PendingIntent pi = intent(c, id, title, text);
+        // Точный будильник, если система разрешает; иначе — окно в 10 минут (setAndAllowWhileIdle может опоздать на часы)
+        if (Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms()) {
+            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi);
+        } else {
+            am.setWindow(AlarmManager.RTC_WAKEUP, at, 10 * 60000L, pi);
+        }
     }
 
     private static void cancel(Context c, String id) {

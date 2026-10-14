@@ -44,8 +44,8 @@ async function wrappedCollect(term) {
 			const table = h?.nextElementSibling?.matches('table.common') ? h.nextElementSibling : null;
 			if (!table) return null;
 			let aud = 0, self = 0, count = 0;
-			table.querySelectorAll('tr.cgrldatarow').forEach(tr => {
-				const c = [...tr.children].filter(td => td.textContent.trim() !== '{');
+			// Из группы «по выбору» студент изучает одну дисциплину — считаем только первую
+			planRows(table).filter(r => r.first).forEach(({ c }) => {
 				const n = c.slice(2).map(td => parseFloat(td.textContent.replace(',', '.')) || 0);
 				aud += n[0] || 0; self += n[1] || 0; count++;
 			});
@@ -318,7 +318,11 @@ async function saveCanvasImage(canvas, name, title) {
 	setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 
+let wrappedClose = null;
+
 async function openWrapped(term) {
+	// Переключение семестра: прошлое окно закрываем целиком, вместе с таймером и клавишами
+	wrappedClose?.(true);
 	document.getElementById('etis3-wrapped')?.remove();
 	const root = createEl('div', { id: 'etis3-wrapped', className: 'wr' });
 	root.innerHTML = `
@@ -336,8 +340,10 @@ async function openWrapped(term) {
 
 	let timer = null, idx = 0, slides = [], paused = false, startedAt = 0, elapsed = 0;
 	const DURATION = 6500;
-	const close = () => {
+	const close = instant => {
+		if (wrappedClose === close) wrappedClose = null;
 		clearTimeout(timer);
+		if (instant === true) { root.remove(); document.removeEventListener('keydown', onKey, true); return; }
 		root.classList.remove('wr--in');
 		document.documentElement.classList.remove('etis3-wr-open');
 		document.removeEventListener('keydown', onKey, true);
@@ -350,6 +356,7 @@ async function openWrapped(term) {
 		else if (e.key === 'ArrowLeft') { e.preventDefault(); go(idx - 1); }
 	};
 	document.addEventListener('keydown', onKey, true);
+	wrappedClose = close;
 	root.querySelector('.wr-close').addEventListener('click', close);
 	root.addEventListener('click', e => { if (e.target === root) close(); });
 

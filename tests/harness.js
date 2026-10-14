@@ -19,13 +19,21 @@ const opened = [];
 /** Закрыть все окна — иначе таймеры страницы (часы, небо) не дают процессу завершиться. */
 export function closeAll() { opened.splice(0).forEach(w => w.close()); }
 
-export async function open(name, { url, routes = {}, width = 1280, storage = {}, before } = {}) {
+export async function open(name, { url, routes = {}, width = 1280, storage = {}, before, mutate, now } = {}) {
 	const errors = [];
 	const vc = new VirtualConsole();
 	vc.on('jsdomError', e => errors.push(e.message));
-	const dom = new JSDOM(fixture(name), { url: url || BASE + name.replace(/-.*$/, ''), runScripts: 'outside-only', pretendToBeVisual: true, virtualConsole: vc });
+	const dom = new JSDOM(mutate ? mutate(fixture(name)) : fixture(name), { url: url || BASE + name.replace(/-.*$/, ''), runScripts: 'outside-only', pretendToBeVisual: true, virtualConsole: vc });
 	const w = dom.window;
 	opened.push(w);
+	// Подменённое «сейчас»: время идёт, но от заданной точки
+	if (now) {
+		const RealDate = w.Date, shift = new RealDate(now).getTime() - RealDate.now();
+		w.Date = class extends RealDate {
+			constructor(...a) { super(...(a.length ? a : [RealDate.now() + shift])); }
+			static now() { return RealDate.now() + shift; }
+		};
+	}
 	// Чего нет в jsdom
 	w.matchMedia = q => ({ matches: /max-width:\s*(\d+)/.test(q) ? width <= +q.match(/max-width:\s*(\d+)/)[1] : false, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} });
 	w.HTMLCanvasElement.prototype.getContext = () => null;

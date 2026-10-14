@@ -47,7 +47,7 @@ function dateFromYmd(s) { const m = (s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
 function relDay(s) {
 	const d = dateFromYmd(s);
 	if (!d) return '';
-	const today = new Date(new Date().setHours(0, 0, 0, 0));
+	const today = new Date(etisNow().setHours(0, 0, 0, 0));
 	const diff = Math.round((d - today) / 864e5);
 	if (diff === 0) return 'сегодня';
 	if (diff === 1) return 'завтра';
@@ -58,7 +58,7 @@ function relDay(s) {
 
 // Блок «Заметки и ДЗ» на Главной: невыполненное (включая просроченное) и выполненное за сегодня
 function tasksHtml() {
-	const today = ymd(new Date());
+	const today = ymd(etisNow());
 	const list = Object.entries(pairNotes)
 		.filter(([, n]) => n.text?.trim() && (!n.done || n.pair?.date === today))
 		.sort((a, b) => (a[1].done - b[1].done) || String(a[1].pair?.date).localeCompare(String(b[1].pair?.date)))
@@ -161,7 +161,9 @@ document.addEventListener('keydown', e => {
 // Вечером накануне (19:00), а если уже поздно — за час до пары. Только невыполненные заметки с текстом.
 function syncAppReminders() {
 	if (!window.ETIS3Native?.setReminders) return;
-	const now = Date.now();
+	// Считаем в пермском времени, приложению отдаём настоящие метки времени
+	const shift = etisShiftMs();
+	const now = Date.now() + shift;
 	const list = [];
 	Object.entries(pairNotes).forEach(([key, n]) => {
 		if (n.done || !n.text?.trim() || !n.pair?.date) return;
@@ -174,7 +176,7 @@ function syncAppReminders() {
 		const at = eve.getTime() > now ? eve.getTime() : start.getTime() - 3600e3;
 		if (at <= now) return;
 		const when = eve.getTime() > now ? 'Завтра' : 'Через час';
-		list.push({ id: key, at, title: `${when}: ${n.pair.name}${n.pair.num ? ` · ${n.pair.num} пара` : ''}`, text: n.text.trim().slice(0, 300) });
+		list.push({ id: key, at: at - shift, title: `${when}: ${n.pair.name}${n.pair.num ? ` · ${n.pair.num} пара` : ''}`, text: n.text.trim().slice(0, 300) });
 	});
 	try { window.ETIS3Native.setReminders(JSON.stringify(list)); } catch (e) {}
 }

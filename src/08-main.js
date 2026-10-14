@@ -65,12 +65,16 @@ function initPageTransitions() {
 		try { url = new URL(href, location.href); } catch (err) { return; }
 		if (url.origin !== location.origin) return; // заодно отсекает javascript: и mailto:
 		if (url.pathname === location.pathname && url.search === location.search && url.hash) return;
+		// Файлы (вложения сообщений, документы) скачиваются, а не открываются — страница остаётся, затемнять нельзя
+		if (/file_download|get_file|download|\.(pdf|docx?|xlsx?|pptx?|zip|rar|7z|jpe?g|png)$/i.test(url.pathname + url.search)) return;
 
 		e.preventDefault();
 		if (soft && canSoftNav(url)) { softNavigate(url.href); return; }
 		if (reduced) { window.location.href = url.href; return; }
 		overlay.classList.add('etis3-overlay--out');
 		setTimeout(() => { window.location.href = url.href; }, 200);
+		// Если вместо перехода началось скачивание или ссылка никуда не ведёт — снять затемнение
+		setTimeout(() => overlay.classList.remove('etis3-overlay--out'), 2500);
 	});
 }
 

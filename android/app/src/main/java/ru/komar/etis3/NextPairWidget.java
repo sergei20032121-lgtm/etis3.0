@@ -107,22 +107,26 @@ public class NextPairWidget extends AppWidgetProvider {
     }
 
     private static String hm(long t) {
-        return new SimpleDateFormat("H:mm", Locale.getDefault()).format(t);
+        SimpleDateFormat f = new SimpleDateFormat("H:mm", Locale.getDefault());
+        f.setTimeZone(EtisClient.TZ);   // время пар — пермское, как в ЕТИС
+        return f.format(t);
     }
 
     private static boolean sameDay(long a, long b) {
-        Calendar x = Calendar.getInstance(), y = Calendar.getInstance();
+        Calendar x = Calendar.getInstance(EtisClient.TZ), y = Calendar.getInstance(EtisClient.TZ);
         x.setTimeInMillis(a); y.setTimeInMillis(b);
         return x.get(Calendar.YEAR) == y.get(Calendar.YEAR) && x.get(Calendar.DAY_OF_YEAR) == y.get(Calendar.DAY_OF_YEAR);
     }
 
     private static String dayLabel(long t, long now) {
         if (sameDay(t, now + 86400000L)) return "ЗАВТРА";
-        return new SimpleDateFormat("EEE, d MMM", new Locale("ru")).format(t).toUpperCase(new Locale("ru")).replace(".", "");
+        SimpleDateFormat f = new SimpleDateFormat("EEE, d MMM", new Locale("ru"));
+        f.setTimeZone(EtisClient.TZ);
+        return f.format(t).toUpperCase(new Locale("ru")).replace(".", "");
     }
 
     private static long startOfTomorrow(long now) {
-        Calendar c = Calendar.getInstance();
+        Calendar c = Calendar.getInstance(EtisClient.TZ);
         c.setTimeInMillis(now);
         c.add(Calendar.DAY_OF_YEAR, 1);
         c.set(Calendar.HOUR_OF_DAY, 0); c.set(Calendar.MINUTE, 0); c.set(Calendar.SECOND, 5); c.set(Calendar.MILLISECOND, 0);

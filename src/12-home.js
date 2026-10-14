@@ -73,12 +73,12 @@ function readGrades(doc) {
 	try { seen = JSON.parse(localStorage.getItem(SEEN_GRADES_KEY)) || {}; } catch (e) {}
 	const now = Date.now();
 	const recent = [];
-	discs.forEach(d => d.kts.forEach((k, i) => {
+	discs.forEach(d => { const keys = gradeKeys(disciplineKey(d.name), d.kts, 'cur'); d.kts.forEach((k, i) => {
 		if (k.grade === null) return;
-		const s = seen[gradeKey(disciplineKey(d.name), i, k.topic)];
+		const s = seen[keys[i]] ?? seen[legacyGradeKey(disciplineKey(d.name), i, k.topic)];
 		recent.push({ dis: d.name, topic: k.topic, grade: k.grade, max: k.max, pass: k.pass, status: k.status,
 			date: k.date, t: parseRuDate(k.date), fresh: !!(s && s.t && now - s.t < NEW_GRADE_DAYS * 864e5) });
-	}));
+	}); });
 	recent.sort((a, b) => b.t - a.t);
 	return {
 		term: /триместр/i.test(doc.querySelector('.submenu')?.textContent || '') ? 'триместр' : 'семестр',
@@ -88,7 +88,13 @@ function readGrades(doc) {
 	};
 }
 
-function readHomeCache() { try { return JSON.parse(localStorage.getItem(HOME_CACHE_KEY)) || {}; } catch (e) { return {}; } }
+// Кэш привязан к студенту: на общем компьютере второй не увидит оценки первого
+function homeOwner() { return document.querySelector('.etis3-profile')?.title || ''; }
+function readHomeCache() {
+	let c = {};
+	try { c = JSON.parse(localStorage.getItem(HOME_CACHE_KEY)) || {}; } catch (e) {}
+	return c.owner === homeOwner() ? c : { owner: homeOwner() };
+}
 
 async function refreshHomeData() {
 	const cache = readHomeCache();
@@ -98,7 +104,7 @@ async function refreshHomeData() {
 		['ann',    'stu_ann.announces',        doc => readFeed(doc, 'ann')],
 	];
 	await Promise.all(jobs.map(async ([key, path, parse]) => {
-		try { cache[key] = parse(await fetchEtisPage(path)); cache[key + 'At'] = Date.now(); }
+		try { cache[key] = parse(await fetchEtisPage(path)); cache[key + 'At'] = Date.now(); delete cache[key + 'Err']; }
 		catch (e) { cache[key + 'Err'] = String(e.message || e); }
 	}));
 	try { localStorage.setItem(HOME_CACHE_KEY, JSON.stringify(cache)); } catch (e) {}
@@ -116,12 +122,23 @@ async function refreshHomeData() {
 
 function relTime(t) {
 	if (!t) return '';
-	const d = new Date(t), now = new Date();
+	const d = new Date(t), now = etisNow();
 	const days = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 864e5);
 	if (days === 0) return 'сегодня';
 	if (days === 1) return 'вчера';
 	if (days < 7)   return `${days} дн. назад`;
 	return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }).replace('.', '');
+}
+
+let homeRedraw = null;
+
+// Ближайший учебный день из кэша расписания (на воскресенье и конец недели)
+function nextDayFromCache(now) {
+	const c = readWeekCache();
+	if (!c) return null;
+	const today = ymd(now);
+	const key = Object.keys(c.days).filter(k => k > today && c.days[k].length).sort()[0];
+	return key ? { date: dateFromYmd(key), count: c.days[key].length } : null;
 }
 
 function renderHome(span9) {
@@ -134,10 +151,15 @@ function renderHome(span9) {
 	const cache  = readHomeCache();
 	let lastData = cache, lastLoading = true;
 	draw(cache, true);
-	refreshHomeData().then(fresh => { if (isHomeRoute()) draw(fresh, false); });
-	if (!home.dataset.notesHooked) {
-		home.dataset.notesHooked = '1';
-		pageListen(document, 'etis3-notes-changed', () => { if (isHomeRoute() && document.getElementById('etis3-home')) draw(lastData, lastLoading); });
+	refreshHomeData().then(fresh => { if (isHomeRoute() && home.isConnected) draw(fresh, false); });
+	// Перерисовка по заметкам и раз в минуту (следующая пара, прогресс). Подписка одна на страницу,
+	// а рисует всегда текущий дашборд — его пересоздают при каждом заходе на #home.
+	homeRedraw = () => { if (isHomeRoute() && home.isConnected) draw(lastData, lastLoading); };
+	if (!span9.dataset.homeHooked) {
+		span9.dataset.homeHooked = '1';
+		pageListen(document, 'etis3-notes-changed', () => homeRedraw?.());
+		pageInterval(() => homeRedraw?.(), 60 * 1000);
+		pageCleanup(() => { homeRedraw = null; });
 	}
 
 	function draw(data, loading) {
@@ -145,7 +167,7 @@ function renderHome(span9) {
 		let seenFeed = {};
 		try { seenFeed = JSON.parse(localStorage.getItem(SEEN_FEED_KEY)) || {}; } catch (e) {}
 		const name  = (document.querySelector('.etis3-profile')?.title || '').split(/\s+/)[1] || '';
-		const now   = new Date();
+		const now   = etisNow();
 		const today = week.find(d => d.isToday);
 		const nextDay = week.find(d => d.date && d.date > now && !d.isToday && d.pairs.length);
 		const st    = todayStatus();
@@ -153,7 +175,10 @@ function renderHome(span9) {
 		// --- герой ---
 		const todayPairs = today ? today.pairs : [];
 		let summary;
-		if (!today) summary = 'Расписание этой недели не загружено.';
+		const later   = !today && !nextDay ? nextDayFromCache(now) : null;
+		const laterTx = later ? ` Следующие пары — ${later.date.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })}.` : '';
+		if (!today && !week.length) summary = 'Расписание этой недели не загружено.';
+		else if (!today) summary = nextDay ? `Сегодня пар нет. Следующие — ${nextDay.title.split(',')[0].toLowerCase()}.` : `Сегодня выходной.${laterTx || ' Отдыхай.'}`;
 		else if (!todayPairs.length) summary = nextDay ? `Сегодня пар нет. Следующие — ${nextDay.title.split(',')[0].toLowerCase()}.` : 'Сегодня пар нет — отдыхай.';
 		else if (st?.state === 'now') summary = `Сейчас идёт ${st.pair.num}-я пара, до конца ${formatDuration(st.mins)}.`;
 		else if (st?.state === 'next') summary = `Следующая пара через ${formatDuration(st.mins)}, всего сегодня ${todayPairs.length}.`;

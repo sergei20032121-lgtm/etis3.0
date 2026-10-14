@@ -31,7 +31,7 @@ function cacheWeek(week) {
 function todayStatus() {
 	const c = readWeekCache();
 	if (!c) return null;
-	const today = c.days[ymd(new Date())];
+	const today = c.days[ymd(etisNow())];
 	if (!today) return null;
 	const now = nowMinutes();
 	const pairs = today.map(p => ({ ...p, slot: c.times.find(t => t.num === p.num) })).filter(p => p.slot)

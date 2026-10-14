@@ -24,7 +24,7 @@ const MONTH_RES = [/^январ/, /^феврал/, /^март/, /^апрел/, /
 
 // Заголовок дня → сегодня ли это. Понимает «06.10», «6 октября» и просто число.
 function isTodayTitle(text) {
-	const now = new Date();
+	const now = etisNow();
 	const d = now.getDate(), m = now.getMonth() + 1;
 	const t = (text || '').toLowerCase();
 	const numeric = t.match(/(\d{1,2})\.(\d{1,2})/);
@@ -178,13 +178,17 @@ function stylePage_timetable(span9) {
 	buttonbar.appendChild(icsBtn);
 
 	span9.querySelectorAll('div.day > table > tbody > tr').forEach(row => {
-		// Перенос преподавателя
-		const teacher = row.querySelector('span.teacher');
-		if (teacher) {
-			const td = createEl('td', { className: 'pair_teacher', innerHTML: teacher.innerHTML });
+		// Перенос преподавателя. У подгрупп в одной ячейке несколько пар — у каждой свой преподаватель
+		const teachers = [...row.querySelectorAll('span.teacher')];
+		row.querySelectorAll('.pair_info > div').forEach(box => {
+			const t = box.querySelector('span.teacher');
+			if (t) box.dataset.teacher = t.textContent.replace(/\s+/g, ' ').trim();
+		});
+		if (teachers.length) {
+			const td = createEl('td', { className: 'pair_teacher', innerHTML: teachers.map(t => t.innerHTML).join('<br>') });
 			row.appendChild(td);
 			row.querySelector('td.pair_jour')?.remove();
-			teacher.remove();
+			teachers.forEach(t => t.remove());
 		}
 
 		// Тип пары — чип. Исходный текст «(лек.)» оставляем скрытым:
@@ -254,6 +258,12 @@ function stylePage_timetable(span9) {
 	refresh();
 	pageInterval(refresh, 60 * 1000);
 
+	// Наступили новые сутки — «сегодня» уже другое: перерисовываем страницу, когда её видно
+	const loadDay = ymd(etisNow());
+	const dayChanged = () => ymd(etisNow()) !== loadDay;
+	pageInterval(() => { if (dayChanged() && document.visibilityState === 'visible') location.reload(); }, 60 * 1000);
+	pageListen(document, 'visibilitychange', () => { if (document.visibilityState === 'visible' && dayChanged()) location.reload(); });
+
 	initHomeRoute(span9);
 
 	if (todayBlock && !span9.classList.contains('etis3-tt-grid') && !isHomeRoute()) {
@@ -283,7 +293,7 @@ function readWeek(span9) {
 					name:    type ? type.name : full.trim(),
 					type,
 					aud:     (box.querySelector('.aud') || row.querySelector('.aud'))?.textContent.replace(/\s+/g, ' ').trim() || '',
-					teacher: row.querySelector('.pair_teacher a')?.textContent.trim() || '',
+					teacher: box.dataset?.teacher || box.querySelector('span.teacher a')?.textContent.trim() || row.querySelector('.pair_teacher a')?.textContent.trim() || '',
 				});
 			});
 		});
@@ -300,7 +310,7 @@ function parseDayDate(title) {
 	if (numeric) { d = +numeric[1]; m = +numeric[2] - 1; }
 	else if (worded) { d = +worded[1]; m = MONTH_RES.findIndex(re => re.test(worded[2])); }
 	if (!d || m === undefined || m < 0) return null;
-	const now = new Date();
+	const now = etisNow();
 	let y = now.getFullYear();
 	if (m - now.getMonth() > 6) y--;
 	if (now.getMonth() - m > 6) y++;
@@ -429,10 +439,13 @@ function copyTimetable(span9) {
 		lines.push('\n' + title.toUpperCase());
 		day.querySelectorAll('table tbody tr').forEach(row => {
 			const num  = row.querySelector('.pair_num .eval')?.textContent.trim(); // время начала, «8:00»
-			const dis  = row.querySelector('.pair_info .dis a')?.textContent.trim();
-			const aud  = row.querySelector('.pair_info .aud')?.textContent.trim();
-			const tchr = row.querySelector('.pair_teacher a')?.textContent.trim();
-			if (dis) lines.push(`  ${num ? num+' ' : ''}${dis}${aud ? ' · '+aud : ''}${tchr ? ' — '+tchr : ''}`);
+			row.querySelectorAll('.pair_info .dis a').forEach(a => {
+				const box  = a.closest('.pair_info > div') || row;
+				const dis  = a.textContent.trim();
+				const aud  = (box.querySelector('.aud') || row.querySelector('.pair_info .aud'))?.textContent.trim();
+				const tchr = box.dataset?.teacher || row.querySelector('.pair_teacher a')?.textContent.trim();
+				if (dis) lines.push(`  ${num ? num+' ' : ''}${dis}${aud ? ' · '+aud : ''}${tchr ? ' — '+tchr : ''}`);
+			});
 		});
 		const noPairs = day.querySelector('.no_pairs')?.textContent.trim();
 		if (noPairs) lines.push('  ' + noPairs);
