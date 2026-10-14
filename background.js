@@ -72,7 +72,16 @@ function parseAnn(html) {
 }
 
 // ---------- Проверка ----------
-async function check({ silent = false } = {}) {
+// Проверки идут строго по очереди: иначе две параллельные затирают состояние друг друга
+let checkChain = Promise.resolve();
+function check(opts) {
+	const run = checkChain.then(() => runCheck(opts));
+	checkChain = run.catch(() => {});
+	return run;
+}
+
+// silentKinds — разделы, которые пользователь только что открыл: по ним новое не считаем и не уведомляем
+async function runCheck({ silentKinds = [] } = {}) {
 	const state = await getState();
 	state.unseen = state.unseen || { grades: 0, notes: 0, ann: 0 };
 	const found = [];
@@ -97,18 +106,20 @@ async function check({ silent = false } = {}) {
 			ann.filter(a => a.t > state.annMax).forEach(a => found.push({ kind: 'ann', text: a.title }));
 		}
 
-		state.grades   = grades;
+		// Пустой разбор (техработы, страница-заглушка) не затирает снимок — иначе потом все оценки придут как новые
+		if (Object.keys(grades).length) state.grades = grades;
 		state.notesMax = Math.max(state.notesMax || 0, ...notes.map(n => n.id));
 		state.annMax   = Math.max(state.annMax || 0, ...ann.map(a => a.t));
 		state.status   = 'ok';
-		if (!silent) found.forEach(f => { state.unseen[f.kind] = (state.unseen[f.kind] || 0) + 1; });
+		found.forEach(f => { if (!silentKinds.includes(f.kind)) state.unseen[f.kind] = (state.unseen[f.kind] || 0) + 1; });
 	} catch (e) {
 		state.status = e.message === 'login' ? 'login' : 'error';
 	}
 	state.lastCheck = Date.now();
 	await setState(state);
 	await updateBadge(state);
-	if (!silent && found.length) await notify(found);
+	const loud = found.filter(f => !silentKinds.includes(f.kind));
+	if (loud.length) await notify(loud);
 	return state;
 }
 
@@ -165,13 +176,15 @@ chrome.storage.onChanged.addListener((changes, area) => {
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
 	if (msg?.type === 'etis3-seen') {
 		// Пользователь открыл страницу — сбрасываем счётчик и обновляем снимок без уведомлений
-		getState().then(async state => {
+		const kinds = msg.kinds || [];
+		checkChain = checkChain.then(async () => {
+			const state = await getState();
 			state.unseen = state.unseen || {};
-			(msg.kinds || []).forEach(k => { state.unseen[k] = 0; });
+			kinds.forEach(k => { state.unseen[k] = 0; });
 			await setState(state);
 			await updateBadge(state);
-			check({ silent: true });
-		});
+		}).catch(() => {});
+		check({ silentKinds: kinds });
 		return false;
 	}
 	if (msg?.type === 'etis3-check-now') {

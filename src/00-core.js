@@ -52,8 +52,15 @@ const PAIR_SCHEDULE = [
 	{ num: 8, start: [20, 25], end: [22, 0]   },
 ];
 
+// ЕТИС живёт по пермскому времени (UTC+5, без перехода на летнее). Если на устройстве
+// другой пояс (Москва, поездка), «сейчас» для пар считаем по Перми: etisNow() —
+// дата, у которой часы и минуты совпадают с пермскими.
+const PERM_UTC_OFFSET_MIN = 5 * 60;
+function etisShiftMs(d = new Date()) { return (d.getTimezoneOffset() + PERM_UTC_OFFSET_MIN) * 60000; }
+function etisNow() { const d = new Date(); return new Date(d.getTime() + etisShiftMs(d)); }
+
 function nowMinutes() {
-	const d = new Date();
+	const d = etisNow();
 	return d.getHours() * 60 + d.getMinutes();
 }
 

@@ -124,7 +124,7 @@ function styleSidebar(sidebar) {
 		const a    = li.querySelector('a');
 		const href = a ? navKey(a) : '';
 		if (href === 'stu_plus.add_snils' || href === 'ebl_stu.ebl_choice' || li.classList.contains('warn_menu'))
-			a.appendChild(createEl('span', { className: 'badge-point' }));
+			a?.appendChild(createEl('span', { className: 'badge-point' }));
 	});
 
 	groupSidebarNav(sidebar);

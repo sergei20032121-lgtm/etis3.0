@@ -32,7 +32,7 @@ function buildSignsCards(span9, disciplines) {
 			<div class="sv-kts">
 				${d.kts.map((k, i) => `
 					<a class="sv-kt sv-kt--${k.status}${k.fresh ? ' sv-kt--new' : ''}" ${k.href ? `href="${escapeHtml(k.href)}"` : ''} title="${escapeHtml(k.topic)}">
-						<span class="sv-kt-score"><b>${k.grade === null ? '—' : fmtNum(k.grade)}</b><small>${k.max ? 'из ' + fmtNum(k.max) : ''}</small></span>
+						<span class="sv-kt-score"><b>${k.grade === null ? (k.text ? escapeHtml(k.text) : '—') : fmtNum(k.grade)}</b><small>${k.max ? 'из ' + fmtNum(k.max) : ''}</small></span>
 						<span class="sv-kt-info">
 							<span class="sv-kt-topic"><em>КТ ${i + 1}</em>${escapeHtml(k.topic)}</span>
 							<span class="sv-kt-sub">${[k.work, k.ctrl, k.pass !== null ? 'проходной ' + fmtNum(k.pass) : ''].filter(Boolean).map(escapeHtml).join(' · ')}</span>
@@ -273,7 +273,7 @@ function buildTimetableDays(span9, week) {
 			const slots = d.pairs.map(p => PAIR_SCHEDULE.find(x => x.num === p.num)).filter(Boolean);
 			const span = slots.length ? `${formatTime(...slots[0].start)}–${formatTime(...slots[slots.length - 1].end)}` : '';
 			const [wd, ...rest] = d.title.split(',');
-			const past = d.date && !d.isToday && d.date < new Date(new Date().setHours(0, 0, 0, 0));
+			const past = d.date && !d.isToday && d.date < new Date(etisNow().setHours(0, 0, 0, 0));
 			const count = d.pairs.length;
 			return `<section class="ttv-day${d.isToday ? ' ttv-day--today' : ''}${past ? ' ttv-day--past' : ''}${count ? '' : ' ttv-day--free'}" data-i="${i}">
 				<header class="ttv-head">

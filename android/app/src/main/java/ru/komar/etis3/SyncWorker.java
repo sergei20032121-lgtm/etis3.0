@@ -90,9 +90,12 @@ public class SyncWorker extends Worker {
 
     private void syncGrades(Context c) throws Exception {
         Map<String, EtisClient.Grade> fresh = EtisClient.parseGrades(EtisClient.fetch("stu.signs?p_mode=current"));
+        // Ни одной строки — скорее сбой разбора или пустая страница: старый снимок не трогаем
         if (fresh.isEmpty()) return;
-        boolean first = !EtisStore.hasGrades(c);
         Map<String, String> old = EtisStore.loadGrades(c);
+        // Первый запуск, пустой снимок или ни одного общего ключа (старый формат ключей / новый семестр) —
+        // просто запоминаем, без уведомлений
+        boolean first = !EtisStore.hasGrades(c) || java.util.Collections.disjoint(old.keySet(), fresh.keySet());
         List<EtisClient.Grade> news = new ArrayList<>();
         for (Map.Entry<String, EtisClient.Grade> e : fresh.entrySet()) {
             String v = e.getValue().value;

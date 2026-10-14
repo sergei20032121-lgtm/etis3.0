@@ -151,6 +151,11 @@ function openSettingsPanel() {
 		fontVal.textContent  = settings.fontSize + 'px';
 	}
 	render();
+	// Своё фото загружаем, даже если сейчас выбран готовый фон — чтобы плитка «Своё фото» его показывала
+	if (!wallImgLoaded) {
+		wallImgLoaded = true;
+		try { chrome.storage.local.get(ETIS3_WALL_IMG_KEY, res => { wallImg = res?.[ETIS3_WALL_IMG_KEY] || null; render(); }); } catch (e) {}
+	}
 	panel.etis3Render = render;
 
 	requestAnimationFrame(() => requestAnimationFrame(() => {

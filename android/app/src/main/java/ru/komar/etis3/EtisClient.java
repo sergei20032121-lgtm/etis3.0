@@ -16,13 +16,18 @@ import java.util.Calendar;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
+import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /** Загрузка и разбор страниц ЕТИС без WebView — для виджета и уведомлений. */
 final class EtisClient {
 
-    static final String BASE = "https://student.psu.ru/pls/stu_cus_et/";
+    static final String HOST = "student.psu.ru";
+    static final String BASE = "https://" + HOST + "/pls/stu_cus_et/";
+    /** Время в расписании ЕТИС — пермское, независимо от часового пояса телефона. */
+    static final TimeZone TZ = TimeZone.getTimeZone("Asia/Yekaterinburg");
     static final long PAIR_MINUTES = 95;
 
     static final class LoginRequired extends IOException {
@@ -37,14 +42,8 @@ final class EtisClient {
 
     static Document fetch(String path) throws IOException {
         String url = path.startsWith("http") ? path : BASE + path;
-        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-        c.setConnectTimeout(15000);
-        c.setReadTimeout(30000);
-        c.setInstanceFollowRedirects(true);
-        String cookie = CookieManager.getInstance().getCookie(url);
-        if (cookie == null) throw new LoginRequired();
-        c.setRequestProperty("Cookie", cookie);
-        c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) ETIS3App");
+        if (!isEtis(new URL(url))) throw new IOException("not etis");
+        HttpURLConnection c = open(url, "Mozilla/5.0 (Linux; Android) ETIS3App", 30000, true);
         int code = c.getResponseCode();
         if (code >= 400) throw new IOException("HTTP " + code);
         String type = c.getContentType();
@@ -54,10 +53,39 @@ final class EtisClient {
             if (m.find()) charset = m.group(1);
         }
         try (InputStream in = c.getInputStream()) {
-            Document doc = Jsoup.parse(in, charset, url);
+            Document doc = Jsoup.parse(in, charset, c.getURL().toString());
             boolean login = !doc.select("input[type=password]").isEmpty() && doc.select("div.span3").isEmpty();
             if (login) throw new LoginRequired();
             return doc;
+        }
+    }
+
+    static boolean isEtis(URL u) {
+        return "https".equalsIgnoreCase(u.getProtocol()) && HOST.equalsIgnoreCase(u.getHost());
+    }
+
+    /**
+     * GET с cookie из WebView. Редиректы — вручную и только на https://student.psu.ru:
+     * HttpURLConnection сам перенёс бы заголовок Cookie на любой хост.
+     */
+    static HttpURLConnection open(String url, String userAgent, int readTimeout, boolean needCookie) throws IOException {
+        URL u = new URL(url);
+        for (int hop = 0; ; hop++) {
+            HttpURLConnection c = (HttpURLConnection) u.openConnection();
+            c.setConnectTimeout(15000);
+            c.setReadTimeout(readTimeout);
+            c.setInstanceFollowRedirects(false);
+            String cookie = CookieManager.getInstance().getCookie(u.toString());
+            if (cookie == null && needCookie) throw new LoginRequired();
+            if (cookie != null) c.setRequestProperty("Cookie", cookie);
+            if (userAgent != null) c.setRequestProperty("User-Agent", userAgent);
+            int code = c.getResponseCode();
+            if (code < 300 || code >= 400 || code == 304) return c;
+            String loc = c.getHeaderField("Location");
+            c.disconnect();
+            if (loc == null || hop >= 5) throw new IOException("redirect");
+            u = new URL(u, loc);
+            if (!isEtis(u)) throw new IOException("redirect to " + u.getHost());
         }
     }
 
@@ -80,11 +108,11 @@ final class EtisClient {
             }
         }
         if (d < 1 || mon < 0) return -1;
-        Calendar now = Calendar.getInstance();
+        Calendar now = Calendar.getInstance(TZ);
         int y = now.get(Calendar.YEAR);
         if (mon - now.get(Calendar.MONTH) > 6) y--;
         if (now.get(Calendar.MONTH) - mon > 6) y++;
-        Calendar c = Calendar.getInstance();
+        Calendar c = Calendar.getInstance(TZ);
         c.clear();
         c.set(y, mon, d, 0, 0, 0);
         return c.getTimeInMillis();
@@ -159,7 +187,10 @@ final class EtisClient {
         String dis = "", topic = "", value = "", max = "";
     }
 
-    /** «Оценки в семестре»: ключ (дисциплина|номер|тема) → оценка. */
+    /**
+     * «Оценки в семестре»: ключ (дисциплина|тема) → оценка. Без номера строки — новая КТ в середине
+     * таблицы не должна «сдвигать» остальные; одинаковые темы различаем счётчиком (|2, |3…).
+     */
     static Map<String, Grade> parseGrades(Document doc) {
         Map<String, Grade> out = new LinkedHashMap<>();
         for (Element table : doc.select("table.common")) {
@@ -178,7 +209,7 @@ final class EtisClient {
                 pos += span;
             }
             if (gradeCol < 0) continue;
-            int idx = 0;
+            Map<String, Integer> seen = new HashMap<>();
             for (Element tr : rows) {
                 Elements cells = tr.children();
                 if (!tr.select("th").isEmpty() || cells.size() < pos) continue;
@@ -187,7 +218,9 @@ final class EtisClient {
                 g.topic = cells.get(0).text().replaceAll("\\s+", " ").trim();
                 g.value = cells.get(gradeCol).text().trim();
                 if (maxCol >= 0 && maxCol < cells.size()) g.max = cells.get(maxCol).text().trim();
-                out.put(dis + "|" + (idx++) + "|" + g.topic, g);
+                String key = dis + "|" + g.topic;
+                int n = seen.merge(key, 1, Integer::sum);
+                out.put(n > 1 ? key + "|" + n : key, g);
             }
         }
         return out;

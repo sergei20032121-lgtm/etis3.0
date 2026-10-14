@@ -69,3 +69,20 @@ function stylePage_portfolio(span9) {
 }
 
 
+
+
+// Строки учебного плана. Дисциплины по выбору ЕТИС объединяет фигурной скобкой «{»
+// (ячейка с rowspan): group — номер группы выбора, 0 — обычная дисциплина; first — первая в группе.
+function planRows(table) {
+	const out = [];
+	let group = 0, left = 0, groups = 0;
+	table?.querySelectorAll('tr.cgrldatarow').forEach(tr => {
+		const brace = [...tr.children].find(td => td.textContent.trim() === '{' && td.rowSpan > 1);
+		let first = false;
+		if (brace) { group = ++groups; left = brace.rowSpan; first = true; }
+		const g = left > 0 ? group : 0;
+		if (left > 0) left--;
+		out.push({ tr, c: [...tr.children].filter(td => td.textContent.trim() !== '{'), group: g, first: !g || first });
+	});
+	return out;
+}

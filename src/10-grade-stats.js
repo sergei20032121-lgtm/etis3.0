@@ -28,7 +28,7 @@ function buildSignsStats(span9, disciplines, fresh = 0) {
 		<div class="esw-grid">
 			<div class="esw-card">
 				<div class="esw-label">Баллов в рейтинг</div>
-				<div class="esw-value">${cur}<small> / ${max}</small></div>
+				<div class="esw-value">${fmtNum(cur)}<small> / ${fmtNum(max)}</small></div>
 			</div>
 			<div class="esw-card">
 				<div class="esw-label">КТ сдано</div>
@@ -49,7 +49,7 @@ function buildSignsStats(span9, disciplines, fresh = 0) {
 				return `<div class="esw-dis etis3-dis${d.failed ? ' esw-dis--bad' : ''}" style="--dis-h:${disciplineHue(d.name)}">
 					<div class="esw-dis-name" title="${escapeHtml(d.name)}">${escapeHtml(d.name)}</div>
 					<div class="esw-dis-bar"><span style="width:${pct}%"></span></div>
-					<div class="esw-dis-val">${d.cur} / ${d.max}${d.failed ? ` · <b>${d.failed} не сдано</b>` : ''}</div>
+					<div class="esw-dis-val">${fmtNum(d.cur)} / ${fmtNum(d.max)}${d.failed ? ` · <b>${d.failed} не сдано</b>` : ''}</div>
 					<div class="esw-dis-goal" hidden></div>
 				</div>`;
 			}).join('')}

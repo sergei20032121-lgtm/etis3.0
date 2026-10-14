@@ -17,7 +17,7 @@ function readScale() {
 // Баллы → оценка по шкале (в процентах от максимума дисциплины)
 function gradeFor(points, max, report, scale) {
 	const pct = max ? points / max * 100 : 0;
-	if (/зач/i.test(report) && !/диф/i.test(report)) return pct >= scale[3] ? { mark: 'зачёт', cls: 'g5' } : { mark: 'незачёт', cls: 'g2' };
+	if (/зач/i.test(report) && !/диф|с\s*оценк/i.test(report)) return pct >= scale[3] ? { mark: 'зачёт', cls: 'g5' } : { mark: 'незачёт', cls: 'g2' };
 	if (pct >= scale[5]) return { mark: '5', cls: 'g5' };
 	if (pct >= scale[4]) return { mark: '4', cls: 'g4' };
 	if (pct >= scale[3]) return { mark: '3', cls: 'g3' };
@@ -83,14 +83,13 @@ async function sessionCollect() {
 	if (planDoc && term) {
 		const h = [...planDoc.querySelectorAll('h3')].find(x => x.textContent.replace(/\s+/g, ' ').trim().toLowerCase() === term.toLowerCase());
 		const table = h?.nextElementSibling?.matches('table.common') ? h.nextElementSibling : null;
-		table?.querySelectorAll('tr.cgrldatarow').forEach(tr => {
-			const c = [...tr.children].filter(td => td.textContent.trim() !== '{');
-			reports[disciplineKey(c[0]?.textContent || '')] = { name: c[0]?.textContent.trim() || '', report: c[1]?.textContent.trim() || '' };
+		planRows(table).forEach(({ c, group }) => {
+			reports[disciplineKey(c[0]?.textContent || '')] = { name: c[0]?.textContent.trim() || '', report: c[1]?.textContent.trim() || '', choice: group > 0 };
 		});
 	}
 
 	const weeks = ttDoc ? readWeeks(ttDoc) : [];
-	const now = new Date();
+	const now = etisNow();
 	const sessionWeeks = weeks.filter(w => w.session && w.href && (!w.start || w.start.getTime() + 7 * 864e5 > now.getTime()));
 	const pairs = [];
 	if (ttDoc && sessionWeeks.length) {
@@ -109,6 +108,8 @@ function sessionModel(data) {
 	data.dis.forEach(d => { const it = add(disciplineKey(d.name)); it.name = d.name; it.dis = d; });
 	Object.entries(data.reports).forEach(([k, r]) => {
 		if (!/экз|зач/i.test(r.report)) return;
+		// Дисциплина по выбору — только та, которую студент выбрал (она есть в оценках или расписании)
+		if (r.choice && !items[k] && !data.pairs.some(p => disciplineKey(p.name) === k)) return;
 		const it = add(k); it.name = it.name || r.name; it.report = r.report;
 	});
 	data.pairs.filter(p => p.when.getTime() > now - 864e5).sort((a, b) => a.when - b.when).forEach(p => {
@@ -119,13 +120,14 @@ function sessionModel(data) {
 	});
 	const list = Object.values(items).filter(it => it.report || it.exam);
 	list.sort((a, b) => (a.exam ? a.exam.when : Infinity) - (b.exam ? b.exam.when : Infinity) || (/экз/i.test(b.report) - /экз/i.test(a.report)) || a.name.localeCompare(b.name));
-	const firstExam = list.find(it => it.exam)?.exam || null;
+	// Ближайший экзамен — из ещё не прошедших
+	const firstExam = list.map(it => it.exam).filter(e => e && e.when.getTime() >= now).sort((a, b) => a.when - b.when)[0] || null;
 	const sessionStart = data.sessionWeeks.find(w => w.start)?.start || null;
 	return { list, firstExam, sessionStart };
 }
 
 function daysUntil(date) {
-	const a = new Date(); a.setHours(0, 0, 0, 0);
+	const a = etisNow(); a.setHours(0, 0, 0, 0);
 	const b = new Date(date); b.setHours(0, 0, 0, 0);
 	return Math.round((b - a) / 864e5);
 }

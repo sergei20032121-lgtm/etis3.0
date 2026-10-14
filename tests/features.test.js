@@ -110,6 +110,7 @@ test('Напоминания о ДЗ уходят в приложение', asyn
 	const last = sent.at(-1);
 	assert.equal(last.length, 1, 'только невыполненное');
 	assert.match(last[0].title, /^Завтра: Физика · 2 пара$/);
+	// 19:00 по Перми (UTC+5), в каком бы поясе ни было устройство
 	const at = new Date(last[0].at);
-	assert.equal(at.getHours(), 19, 'вечером накануне');
+	assert.equal((at.getUTCHours() + 5) % 24, 19, 'вечером накануне по пермскому времени');
 });

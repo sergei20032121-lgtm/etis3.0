@@ -88,6 +88,11 @@ function parseSignsTable(table) {
 		return parseFloat(t.replace(',', '.'));
 	};
 
+	const textGrade = td => {
+		const t = (td?.textContent || '').replace(/\s+/g, ' ').trim();
+		return t && !/^[-—–.]*$/.test(t) && !/^-?\d+([.,]\d+)?$/.test(t) ? t.slice(0, 20) : '';
+	};
+
 	const kts = [];
 	let total = null;
 	rows.forEach(tr => {
@@ -100,8 +105,11 @@ function parseSignsTable(table) {
 		if (cells.length < pos) return;
 		const grade = num(cells[col.grade]);
 		const pass  = num(cells[col.pass]);
-		const status = grade === null ? 'pending' : (pass === null || grade >= pass ? 'passed' : 'failed');
-		kts.push({ row: tr, gradeCell: cells[col.grade], grade, pass, status,
+		// Оценка словами («н/я», «незачёт», «зачтено») — КТ уже прошла, это не «впереди»
+		const text  = grade === null ? textGrade(cells[col.grade]) : '';
+		const status = grade !== null ? (pass === null || grade >= pass ? 'passed' : 'failed')
+			: text ? (/н\s*\/\s*я|не\s*яв|неуд|незач|не\s*зач|^2$/i.test(text) ? 'failed' : 'passed') : 'pending';
+		kts.push({ row: tr, gradeCell: cells[col.grade], grade, text, pass, status,
 			topic: cells[0]?.textContent.replace(/\s+/g, ' ').trim() || '',
 			cur: col.cur !== undefined ? num(cells[col.cur]) : null,
 			max: col.cur !== undefined ? num(cells[col.max]) : null,
@@ -136,7 +144,7 @@ function styleSignsTable(d) {
 		if (k.status === 'failed') k.row.classList.add('row-red');
 		if (k.status === 'pending') return;
 		const dot = createEl('span', { className: 'score-dot ' + (k.status === 'passed' ? 'score-dot--high' : 'score-dot--low') });
-		dot.title = `${k.grade} из проходных ${k.pass}`;
+		dot.title = k.grade === null ? k.text : `${k.grade} из проходных ${k.pass}`;
 		k.gradeCell.appendChild(dot);
 	});
 
@@ -146,10 +154,10 @@ function styleSignsTable(d) {
 	const pct = d.max ? Math.round(d.cur / d.max * 100) : 0;
 	const sum = createEl('div', { className: 'etis3-dis-summary' });
 	sum.innerHTML = `
-		<span class="eds-chip">рейтинг <b>${d.cur}</b> / ${d.max}</span>
+		<span class="eds-chip">рейтинг <b>${fmtNum(d.cur)}</b> / ${fmtNum(d.max)}</span>
 		<span class="eds-chip eds-chip--ok">сдано ${d.passed}</span>
 		${d.failed ? `<span class="eds-chip eds-chip--bad">не сдано ${d.failed}</span>` : ''}
-		${d.pending ? `<span class="eds-chip">впереди ${d.pending}${d.left ? ` · до +${d.left}` : ''}</span>` : ''}
+		${d.pending ? `<span class="eds-chip">впереди ${d.pending}${d.left ? ` · до +${fmtNum(d.left)}` : ''}</span>` : ''}
 		${d.fresh ? `<span class="eds-chip eds-chip--new">новых ${d.fresh}</span>` : ''}
 		<span class="eds-chip eds-chip--goal" hidden></span>
 		<span class="eds-bar"><span class="eds-bar-fill" style="width:${pct}%"></span></span>
@@ -164,7 +172,19 @@ function styleSignsTable(d) {
 const SEEN_GRADES_KEY = 'etis3-seen-grades';
 const NEW_GRADE_DAYS  = 3;
 
-function gradeKey(dkey, i, topic) { return `${dkey}|${i}|${topic.slice(0, 60)}`; }
+// Ключ оценки — дисциплина, семестр и тема КТ (с номером повтора, если темы совпадают).
+// Номер строки в ключ не входит: ЕТИС может добавить КТ, и оценки ниже не должны стать «новыми».
+function gradeTerm(search = location.search) { return new URLSearchParams(search).get('p_term') || 'cur'; }
+function gradeKeys(dkey, kts, term) {
+	const seenTopics = {};
+	return kts.map(k => {
+		const t = k.topic.slice(0, 60);
+		seenTopics[t] = (seenTopics[t] || 0) + 1;
+		return `${dkey}|${term}|${t}|${seenTopics[t]}`;
+	});
+}
+// Ключ до 4.13.3 — чтобы после обновления старые оценки не подсветились как новые
+function legacyGradeKey(dkey, i, topic) { return `${dkey}|${i}|${topic.slice(0, 60)}`; }
 
 function markNewGrades(disciplines) {
 	let seen = null;
@@ -177,14 +197,17 @@ function markNewGrades(disciplines) {
 		d.fresh = 0;
 		// Дисциплину, которую видим впервые (другой семестр, первый заход), только запоминаем
 		const dkey  = disciplineKey(d.name);
-		const known = `#${dkey}` in seen;
-		seen[`#${dkey}`] = 1;
+		const term  = gradeTerm();
+		const known = `#${dkey}|${term}` in seen || (term === 'cur' && `#${dkey}` in seen);
+		seen[`#${dkey}|${term}`] = 1;
+		const keys = gradeKeys(dkey, d.kts, term);
 		d.kts.forEach((k, i) => {
 			if (k.grade === null) return;
-			const key  = gradeKey(dkey, i, k.topic);
-			const prev = seen[key];
+			const key  = keys[i];
+			const prev = seen[key] ?? (term === 'cur' ? seen[legacyGradeKey(dkey, i, k.topic)] : undefined);
 			if (!known) seen[key] = { g: k.grade, t: 0 };
 			else if (!prev || prev.g !== k.grade) seen[key] = { g: k.grade, t: now };
+			else seen[key] = prev;
 			if (now - seen[key].t < NEW_GRADE_DAYS * 864e5) {
 				k.fresh = true;
 				k.row.classList.add('kt-new');
@@ -209,9 +232,9 @@ function goalHint(d, goal) {
 	if (!goal) return null;
 	const need = goal - d.cur;
 	if (need <= 0) return { cls: 'ok', text: 'цель есть ✓' };
-	if (need > d.left) return { cls: 'bad', text: `до ${goal} не добрать: максимум ${d.cur + d.left}${d.failed ? ' без пересдач' : ''}` };
+	if (need > d.left) return { cls: 'bad', text: `до ${goal} не добрать: максимум ${fmtNum(d.cur + d.left)}${d.failed ? ' без пересдач' : ''}` };
 	const share = d.left ? Math.round(need / d.left * 100) : 100;
-	return { cls: share > 80 ? 'warn' : '', text: `нужно ещё ${need} из ${d.left} (${share}%)` };
+	return { cls: share > 80 ? 'warn' : '', text: `нужно ещё ${fmtNum(need)} из ${fmtNum(d.left)} (${share}%)` };
 }
 
 function updateGoalHints(disciplines) {

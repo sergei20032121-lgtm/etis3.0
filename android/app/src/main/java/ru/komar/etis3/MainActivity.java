@@ -91,6 +91,8 @@ public class MainActivity extends Activity {
     private boolean bioPrompted;            // отпечаток уже спрашивали на этой странице входа
     private boolean bioSubmitted;           // форму только что отправили сохранёнными данными
     private ScriptHandler scriptHandler;
+    /** Адрес текущей страницы — для синхронных методов моста (они вызываются не в UI-потоке). */
+    private volatile String currentUrl;
     private ValueCallback<Uri[]> fileCallback;
     private ProgressBar progress;
     private LinearLayout errorView;
@@ -144,17 +146,27 @@ public class MainActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
-                if (HOST.equalsIgnoreCase(uri.getHost())) return false;   // ЕТИС — внутри приложения
+                if (isEtis(uri.toString())) return false;                // ЕТИС (только https) — внутри приложения
+                if (HOST.equalsIgnoreCase(uri.getHost()) && "http".equalsIgnoreCase(uri.getScheme())) {
+                    view.loadUrl(uri.buildUpon().scheme("https").build().toString());   // http-ссылку ЕТИС — по https
+                    return true;
+                }
                 openExternal(uri);                                       // остальное — в браузере / приложениях
                 return true;
             }
 
             @Override
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                currentUrl = url;
                 bioPrompted = false;
                 progress.setVisibility(View.VISIBLE);
                 ui.removeCallbacks(loadTimeout);
                 ui.postDelayed(loadTimeout, LOAD_TIMEOUT_MS);
+            }
+
+            @Override
+            public void doUpdateVisitedHistory(WebView view, String url, boolean isReload) {
+                currentUrl = url;
             }
 
             @Override
@@ -232,7 +244,7 @@ public class MainActivity extends Activity {
 
         Uri data = getIntent() != null ? getIntent().getData() : null;
         if (savedInstanceState != null) web.restoreState(savedInstanceState);
-        else web.loadUrl(data != null && HOST.equalsIgnoreCase(data.getHost()) ? data.toString() : START_URL);
+        else web.loadUrl(data != null && isEtis(data.toString()) ? data.toString() : START_URL);
 
         updateScriptInBackground();
         SyncWorker.schedule(this);
@@ -259,6 +271,7 @@ public class MainActivity extends Activity {
         // Страница входа без поля пароля — значит, мы уже внутри
         web.evaluateJavascript("(document.querySelector('input[type=password]') && !document.querySelector('div.span3'))"
                 + " ? (document.querySelector('.error_message') ? 'error' : 'login') : 'in'", state -> {
+            if (isFinishing() || isDestroyed()) return;
             if ("\"error\"".equals(state)) {
                 // Сохранённый пароль не подошёл (сменили на сайте) — не спрашиваем по кругу; после ручного входа обновим
                 if (bioSubmitted) LoginVault.setStale(this);
@@ -313,6 +326,7 @@ public class MainActivity extends Activity {
 
     /** Отпечаток / лицо / PIN телефона; на Android < 9 — экран блокировки. */
     private void authenticate(String title, Runnable onSuccess) {
+        if (isFinishing() || isDestroyed()) return;
         if (!canAuthenticate()) { toast("Включите блокировку экрана (отпечаток или PIN)"); return; }
         if (Build.VERSION.SDK_INT >= 28) {
             android.hardware.biometrics.BiometricPrompt.Builder b = new android.hardware.biometrics.BiometricPrompt.Builder(this)
@@ -332,14 +346,34 @@ public class MainActivity extends Activity {
                         public void onAuthenticationSucceeded(android.hardware.biometrics.BiometricPrompt.AuthenticationResult r) {
                             onSuccess.run();
                         }
+
+                        @Override
+                        public void onAuthenticationError(int code, CharSequence err) {
+                            if (isFinishing() || isDestroyed()) return;
+                            switch (code) {
+                                // Отпечатков нет / сканера нет / он занят (Android 9 спрашивает только биометрию) — код блокировки
+                                case android.hardware.biometrics.BiometricPrompt.BIOMETRIC_ERROR_NO_BIOMETRICS:
+                                case android.hardware.biometrics.BiometricPrompt.BIOMETRIC_ERROR_HW_NOT_PRESENT:
+                                case android.hardware.biometrics.BiometricPrompt.BIOMETRIC_ERROR_HW_UNAVAILABLE:
+                                    confirmCredential(title, onSuccess);
+                                    return;
+                                case android.hardware.biometrics.BiometricPrompt.BIOMETRIC_ERROR_USER_CANCELED:
+                                case android.hardware.biometrics.BiometricPrompt.BIOMETRIC_ERROR_CANCELED:
+                                case 13:   // BIOMETRIC_ERROR_NEGATIVE_BUTTON — в SDK скрыта
+                                    return;
+                                default:
+                                    // Блокировка после попыток и прочее — хотя бы скажем, что случилось
+                                    toast(err != null ? err.toString() : "Не удалось подтвердить");
+                            }
+                        }
                     });
         } else {
-            android.app.KeyguardManager km = (android.app.KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
             confirmCredential(title, onSuccess);
         }
     }
 
     private void confirmCredential(String title, Runnable onSuccess) {
+        if (isFinishing() || isDestroyed()) return;
         android.app.KeyguardManager km = (android.app.KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
         Intent i = km.createConfirmDeviceCredentialIntent(title, "ЕТИС 3.0");
         if (i == null) return;
@@ -406,7 +440,8 @@ public class MainActivity extends Activity {
 
         @android.webkit.JavascriptInterface
         public boolean hasSavedLogin() {
-            return LoginVault.has(MainActivity.this);
+            String url = currentUrl;
+            return url != null && isEtis(url) && LoginVault.has(MainActivity.this);
         }
 
         @android.webkit.JavascriptInterface
@@ -416,9 +451,13 @@ public class MainActivity extends Activity {
 
         @android.webkit.JavascriptInterface
         public void forgetLogin() {
-            LoginVault.clear(MainActivity.this);
-            LoginVault.setDeclined(MainActivity.this, false);
-            ui.post(() -> toast("Сохранённый вход удалён"));
+            ui.post(() -> {
+                String url = web.getUrl();
+                if (url == null || !isEtis(url)) return;
+                LoginVault.clear(MainActivity.this);
+                LoginVault.setDeclined(MainActivity.this, false);
+                toast("Сохранённый вход удалён");
+            });
         }
 
         @android.webkit.JavascriptInterface
@@ -453,12 +492,17 @@ public class MainActivity extends Activity {
             v.put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, name);
             v.put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/png");
             v.put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/ЕТИС 3.0");
+            v.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1);
             Uri uri = getContentResolver().insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v);
             if (uri == null) throw new java.io.IOException("MediaStore");
             try (java.io.OutputStream out = getContentResolver().openOutputStream(uri)) {
                 if (out == null) throw new java.io.IOException("MediaStore");
                 out.write(png);
+            } catch (java.io.IOException | RuntimeException e) {
+                finishPending(uri, false);
+                throw e;
             }
+            finishPending(uri, true);
             return uri;
         }
         if (checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
@@ -536,8 +580,8 @@ public class MainActivity extends Activity {
                 new Handler(Looper.getMainLooper()).post(() -> {
                     script = wrap(fresh);
                     installScript();
+                    // Не перезагружаем страницу посреди работы — новый скрипт подключится при следующем переходе
                     toast("ЕТИС 3.0 обновлён до " + version(fresh));
-                    web.reload();
                 });
             } catch (Exception ignored) { }
         }).start();
@@ -621,7 +665,9 @@ public class MainActivity extends Activity {
             KeyStore ks = KeyStore.getInstance("AndroidCAStore");
             ks.load(null, null);
             for (java.util.Enumeration<String> e = ks.aliases(); e.hasMoreElements(); ) {
-                java.security.cert.Certificate c = ks.getCertificate(e.nextElement());
+                String alias = e.nextElement();
+                if (alias.startsWith("user:")) continue;   // сертификаты, установленные пользователем, не доверяем
+                java.security.cert.Certificate c = ks.getCertificate(alias);
                 if (c instanceof X509Certificate) anchors.add(new TrustAnchor((X509Certificate) c, null));
             }
         } catch (Exception ignored) { }
@@ -774,7 +820,7 @@ public class MainActivity extends Activity {
     /** Сохранённое фоновой синхронизацией расписание — когда ЕТИС не открывается. */
     private void showOffline() {
         long now = System.currentTimeMillis();
-        java.util.Calendar today = java.util.Calendar.getInstance();
+        java.util.Calendar today = java.util.Calendar.getInstance(EtisClient.TZ);   // дни и время пар — пермские
         today.set(java.util.Calendar.HOUR_OF_DAY, 0); today.set(java.util.Calendar.MINUTE, 0);
         today.set(java.util.Calendar.SECOND, 0); today.set(java.util.Calendar.MILLISECOND, 0);
         long dayStart = today.getTimeInMillis();
@@ -800,6 +846,8 @@ public class MainActivity extends Activity {
         int shown = 0;
         java.text.SimpleDateFormat dayFmt = new java.text.SimpleDateFormat("EEEE, d MMMM", new java.util.Locale("ru"));
         java.text.SimpleDateFormat hm = new java.text.SimpleDateFormat("H:mm", java.util.Locale.getDefault());
+        dayFmt.setTimeZone(EtisClient.TZ);
+        hm.setTimeZone(EtisClient.TZ);
         for (EtisClient.Pair p : EtisStore.loadPairs(this)) {
             if (p.end < dayStart) continue;
             long d = p.start - ((p.start - dayStart) % 86400000L + 86400000L) % 86400000L;
@@ -897,45 +945,59 @@ public class MainActivity extends Activity {
             toast("Разрешите доступ к файлам и нажмите «скачать» ещё раз");
             return;
         }
-        String cookie = CookieManager.getInstance().getCookie(url);
         toast("Скачивание: " + name);
         new Thread(() -> {
             String result;
+            Uri[] pending = new Uri[1];
             try {
-                HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-                c.setConnectTimeout(15000);
-                c.setReadTimeout(60000);
-                if (cookie != null) c.setRequestProperty("Cookie", cookie);
-                c.setRequestProperty("User-Agent", userAgent);
+                if (!url.startsWith("https://")) throw new java.io.IOException("not https");
+                // Cookie ЕТИС шлём сами, поэтому редиректы — только на https://student.psu.ru
+                HttpURLConnection c = EtisClient.open(url, userAgent, 60000, false);
                 if (c.getResponseCode() >= 400) throw new java.io.IOException("HTTP " + c.getResponseCode());
                 String type = mimeType != null && !mimeType.isEmpty() ? mimeType : c.getContentType();
-                try (InputStream in = c.getInputStream(); java.io.OutputStream out = openDownload(name, type)) {
+                try (InputStream in = c.getInputStream(); java.io.OutputStream out = openDownload(name, type, pending)) {
                     byte[] buf = new byte[16384];
                     int n;
                     while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
                 }
+                finishPending(pending[0], true);
                 result = "Сохранено в «Загрузки»: " + name;
             } catch (Exception e) {
+                finishPending(pending[0], false);
                 result = null;
             }
             String done = result;
             ui.post(() -> {
                 if (done != null) toast(done);
-                else {
+                else if (url.startsWith("https://")) {
                     toast("Не получилось скачать — открываю в браузере");
                     openExternal(Uri.parse(url));
-                }
+                } else toast("Не получилось скачать файл");
             });
         }).start();
     }
 
-    private java.io.OutputStream openDownload(String name, String type) throws java.io.IOException {
+    /** Android 10+: файл виден в «Загрузках» только после успешной записи; недокачанный — удаляем. */
+    private void finishPending(Uri uri, boolean ok) {
+        if (uri == null || Build.VERSION.SDK_INT < 29) return;
+        try {
+            if (ok) {
+                android.content.ContentValues v = new android.content.ContentValues();
+                v.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 0);
+                getContentResolver().update(uri, v, null, null);
+            } else getContentResolver().delete(uri, null, null);
+        } catch (Exception ignored) { }
+    }
+
+    private java.io.OutputStream openDownload(String name, String type, Uri[] pending) throws java.io.IOException {
         if (Build.VERSION.SDK_INT >= 29) {
             android.content.ContentValues v = new android.content.ContentValues();
             v.put(android.provider.MediaStore.Downloads.DISPLAY_NAME, name);
             if (type != null) v.put(android.provider.MediaStore.Downloads.MIME_TYPE, type.split(";")[0].trim());
+            v.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1);
             Uri uri = getContentResolver().insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, v);
             if (uri == null) throw new java.io.IOException("MediaStore");
+            pending[0] = uri;
             java.io.OutputStream out = getContentResolver().openOutputStream(uri);
             if (out == null) throw new java.io.IOException("MediaStore");
             return out;
@@ -950,7 +1012,7 @@ public class MainActivity extends Activity {
 
     private static boolean isEtis(String url) {
         Uri u = Uri.parse(url);
-        return u != null && HOST.equalsIgnoreCase(u.getHost());
+        return u != null && "https".equalsIgnoreCase(u.getScheme()) && HOST.equalsIgnoreCase(u.getHost());
     }
 
     private void openExternal(Uri uri) {
@@ -969,7 +1031,7 @@ public class MainActivity extends Activity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         Uri data = intent.getData();
-        if (data != null && HOST.equalsIgnoreCase(data.getHost())) web.loadUrl(data.toString());
+        if (data != null && isEtis(data.toString())) web.loadUrl(data.toString());
     }
 
     @Override
