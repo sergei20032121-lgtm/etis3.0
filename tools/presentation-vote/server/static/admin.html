@@ -30,7 +30,7 @@ p{margin:0}
 .box{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
 .qr{background:#fff;border-radius:10px;padding:10px;display:flex;justify-content:center}
 .qr img{width:100%;max-width:300px;image-rendering:pixelated}
-.url{font:13px ui-monospace,Menlo,Consolas,monospace;overflow-wrap:anywhere;background:var(--bg);padding:8px 10px;border-radius:8px;border:1px solid var(--line)}
+.url{-webkit-user-select:all;user-select:all;font:13px ui-monospace,Menlo,Consolas,monospace;overflow-wrap:anywhere;background:var(--bg);padding:8px 10px;border-radius:8px;border:1px solid var(--line)}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .btn{appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:500 14px system-ui,sans-serif;padding:8px 14px;border-radius:8px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
 .btn:hover{border-color:var(--accent)}
@@ -219,7 +219,7 @@ function render(){
     $('url').textContent = voteUrl;
     $('qr').src = qrSrc(voteUrl, 600);
     $('csv').href = '/api/export.csv?key=' + encodeURIComponent(key);
-    $('copy').addEventListener('click', async () => { try { await navigator.clipboard.writeText(voteUrl); toast('Ссылка скопирована'); } catch(e){ toast(voteUrl); } });
+    $('copy').addEventListener('click', async () => { toast(await VoteCharts.copyText(voteUrl) ? 'Ссылка скопирована' : 'Не удалось — выделите ссылку вручную'); });
     $('full').addEventListener('click', showStage);
     $('screen-btn').href = '/screen?key=' + encodeURIComponent(key);
     $('shot-btn').addEventListener('click', () => VoteCharts.showShot(data.results, data.config));

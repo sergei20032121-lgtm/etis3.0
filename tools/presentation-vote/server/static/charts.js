@@ -424,6 +424,22 @@ window.VoteCharts = (() => {
     document.addEventListener('mousemove', e => { if (tip.hidden) return; tip.style.left = Math.min(innerWidth - tip.offsetWidth - 8, e.clientX + 12) + 'px'; tip.style.top = (e.clientY + 16) + 'px'; });
   }
 
-  return {full, image, showShot, tooltips, ranked, fmt, radarSvg, plural, applyBrand, avatar, brandHead, logoUrl,
+  // Копирование, которое работает и на http: там браузер не даёт странице navigator.clipboard
+  async function copyText(text){
+    try {
+      if (navigator.clipboard && window.isSecureContext){ await navigator.clipboard.writeText(text); return true; }
+    } catch(e){}
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select(); ta.setSelectionRange(0, text.length);
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch(e){}
+    ta.remove();
+    return ok;
+  }
+
+  return {copyText, full, image, showShot, tooltips, ranked, fmt, radarSvg, plural, applyBrand, avatar, brandHead, logoUrl,
           insights, insightsHtml, audit, bindLookup, loadImages, initials};
 })();

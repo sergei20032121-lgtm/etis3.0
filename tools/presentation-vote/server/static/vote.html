@@ -97,7 +97,7 @@ textarea{width:100%;font:inherit;color:var(--ink);background:var(--surface);bord
 .check path{fill:none;stroke:var(--accent);stroke-width:7;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:60;stroke-dashoffset:60;animation:draw .5s .15s ease-out forwards}
 @keyframes draw{to{stroke-dashoffset:0}}
 .receipt{width:100%;background:var(--surface);border:1px dashed var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:6px;align-items:center}
-.receipt .code{font:700 26px ui-monospace,Menlo,Consolas,monospace;letter-spacing:.12em;color:var(--ink)}
+.receipt .code{font:700 26px ui-monospace,Menlo,Consolas,monospace;letter-spacing:.12em;color:var(--ink);-webkit-user-select:all;user-select:all;cursor:text}
 .receipt p{font-size:13px;color:var(--muted);max-width:42ch}
 .next{width:100%;text-align:left}
 
@@ -241,12 +241,18 @@ function done(){
       <h2>Спасибо, оценка принята!</h2>
       <p class="muted">${esc(sel)}</p>
       ${lastReceipt ? `<div class="receipt"><span class="small muted">Ваш код проверки</span><span class="code">${esc(lastReceipt)}</span>
-        <p>После закрытия голосования по этому коду можно найти свои оценки в открытых данных и убедиться, что они учтены.</p>
+        <p>После закрытия голосования по этому коду можно найти свои оценки в открытых данных и убедиться, что они учтены. Можно просто сделать скриншот.</p>
         <button class="btn sm" id="copy">Скопировать код</button></div>` : ''}
       <p class="muted small">${left.length ? `Осталось оценить: ${left.length} из ${P.length}` : 'Вы оценили все презентации. Спасибо!'}</p>
     </div>`;
   const cp = document.getElementById('copy');
-  if (cp) cp.addEventListener('click', async () => { try { await navigator.clipboard.writeText(lastReceipt); toast('Код скопирован'); } catch(e){ toast(lastReceipt); } });
+  if (cp) cp.addEventListener('click', async () => {
+    if (await VC.copyText(lastReceipt)) { toast('Код скопирован'); return; }
+    // Не вышло — выделяем код, чтобы его можно было скопировать вручную
+    const el = document.querySelector('.receipt .code'), r = document.createRange();
+    r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    toast('Код выделен — нажмите «Копировать»');
+  });
   barIn.innerHTML = next
     ? `<button class="btn" id="all">Список</button><button class="btn primary" id="more" style="min-width:0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Дальше: ${esc(next)}</span></button>`
     : `<button class="btn primary" id="all">К списку презентаций</button>`;
